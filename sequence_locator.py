@@ -3,9 +3,10 @@ Python implementation of HIV Sequence Locator from https://www.hiv.lanl.gov
 """
 
 import argparse
-import sys
 import subprocess
 import tempfile
+import os
+import logging
 
 
 from Bio import SeqIO
@@ -36,7 +37,7 @@ def parse_args():
         description='Aligns a nucleotide or protein sequence relative to the HIV or SIV reference genomes; '
                     'or retrieves a sequence in the HXB2 or SIVmm239 reference genome from its coordinates',
     )
-    subparsers = parser.add_subparsers()
+    subparsers = parser.add_subparsers(dest='subcommand')
 
     # Create subparser for 'align' mode
     parser_align = subparsers.add_parser('align',
@@ -52,7 +53,7 @@ def parse_args():
                               choices=bases
                               )
     parser_align.add_argument('-reference',
-                              type=argparse.FileType('r'),
+                              type=argparse.FileType('w+'),
                               help='FASTA file with the reference genome of HIV strain HXB2 (Accession: K03455) or '
                                    'SIV strain SIVmm239 (Accession: M33262), or any other reference genome.',
                               metavar=''
@@ -100,6 +101,23 @@ def is_fasta(infile):
     return any(fasta)
 
 
+def make_fasta(handle):
+    fasta = []
+    seq = ""
+    for line in handle:
+        if line.startswith('>'):
+            header = line
+            if len(seq) > 0:
+                fasta.append([header, seq])
+                seq = ""
+                header = line.strip('>\n')
+            else:
+                seq += line.strip('\n').upper()
+
+    fasta.append([header, seq])
+    return fasta
+
+
 def valid_sequence(base, query):
     """
     Verifies that input sequence uses the correct output
@@ -129,17 +147,27 @@ def align(ref_seq, query):
     :param: query sequence
     :return: output of alignment
     """
-    with tempfile.NamedTemporaryFile('w', delete=False) as handle:
+    with tempfile.NamedTemporaryFile('w+', delete=False) as handle:
         handle.write(ref_seq)
         handle.write('>query sequence\n{}\n'.format(query))
-        print(handle.name)
 
-    raw_output = subprocess.check_output(['mafft', '--quiet', 'test_config.txt'])
+        # Path for the temporary file
+        os.path.join(tempfile.gettempdir(), handle.name)
+
+        # Path to find MAFFT
+        script_path = os.path.dirname(os.path.abspath(__file__))
+        bin_dir = os.path.join(script_path, '/mafft-linux64/bin/')
+
+        if not os.path.isfile(os.path.join(bin_dir, 'mafft-linux64')):
+            logging.error("No file exists.")
+
+        raw_output = subprocess.check_output(['mafft', '--quiet', handle.name])
+
     output = raw_output.decode('utf-8')
     return output
 
 
-def seq_locator(ref_seq, base, infile):
+def sequence_align(ref_seq, base, infile):
     """
     Sequence locator for 'align mode'
     :param ref_seq: reference sequence
@@ -156,10 +184,11 @@ def seq_locator(ref_seq, base, infile):
 
         # Check if query uses the correct alphabet
         if valid_sequence(base, query):
-            align(ref_seq, query)
+            print
+            # align(ref_seq, query)
 
 
-def sequence_locator(ref_seq, region, start_coord, end_coord):
+def sequence_retrieve(ref_seq, region, start_coord, end_coord):
     """
     Sequence locator for 'retrieve' mode
     :param ref_seq: reference genome sequence
@@ -169,23 +198,23 @@ def sequence_locator(ref_seq, region, start_coord, end_coord):
     :return: return the genomic region defined by the starting and ending coordinates
     """
 
-    return None 
+    return None
 
 
 def main():
     args = parse_args()
     ref_seq = args.reference.read()
 
-    if sys.argv[1] == "align":
+    if args.subcommand == "align":
         base = args.base
         infile = args.file
-        seq_locator(ref_seq, base, infile)
+        sequence_align(ref_seq, base, infile)
 
     else:
         region = args.region
         start_coord = args.first
         end_coord = args.last
-        sequence_locator(ref_seq, region, start_coord, end_coord)
+        sequence_retrieve(ref_seq, region, start_coord, end_coord)
 
 
 if __name__ == '__main__':
