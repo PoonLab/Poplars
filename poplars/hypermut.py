@@ -9,6 +9,22 @@ import argparse
 from Bio import SeqIO
 import scipy.stats as stats
 
+
+class HyperMut:
+
+    def __init__(self, seq_name, num_muts, potential_muts, ctrl_muts,
+                 potential_ctrls, rate_ratio, p_value, odds_ratio, ctable):
+        self.seq_name = seq_name
+        self.num_muts = num_muts
+        self.pot_muts = potential_muts
+        self.ctrl_muts = ctrl_muts
+        self.potential_ctrls = potential_ctrls
+        self.rate_ratio = rate_ratio
+        self.p_value = p_value
+        self.odds_ratio = odds_ratio
+        self.ctable = ctable
+
+
 mut_pattern = '[AGCT](?=[AG][AGT])'
 mut = re.compile(mut_pattern)  # Matches potential mutation sites (GRD)
 ctrl_pattern = '[AGCT](?=[CT].|[AG]C)'
@@ -29,8 +45,9 @@ def hypermut(infile):
     # Get reference sequence
     with open(infile) as handle:
         fasta = [list(s) for s in SeqIO.FastaIO.SimpleFastaParser(handle)]
+
     if args.skip:
-        print ("skipping first {} records".format(args.skip))
+        print("skipping first {} records".format(args.skip))
         fasta = fasta[int(args.skip):]
 
     # Open and clear output file
@@ -43,6 +60,7 @@ def hypermut(infile):
     gees = [i for i, nt in enumerate(refseq) if nt.upper() == 'G']
 
     results = [[0] * 8 for _ in range(len(fasta) - 1)]
+    ctable_list = []
 
     # Iterate through sequences and identify substitutions from consensus
     for j, seq in enumerate(fasta[1:]):
@@ -71,14 +89,16 @@ def hypermut(infile):
 
             elif i in ds_ctrl:
                 ctable[1][row] += 1
+        ctable_list.append(ctable)
 
-        # Populate output table using entries from contingency table
-        results[j][0] = header
-        results[j][1] = ctable[0][0]  # Mutation sites
-        results[j][2] = ctable[0][0] + ctable[0][1]  # Potential mutation sites
-        results[j][3] = ctable[1][0]  # Control mutations
-        results[j][4] = ctable[1][0] + ctable[1][1]  # Potential controls
-        results[j][5] = rate_ratio(ctable)  # Rate ratio
+        for i in range(len(ctable_list)):
+            # Populate output table using entries from contingency table
+            results[j][0] = header
+            results[j][1] = ctable_list[i][0][0]  # Mutation sites
+            results[j][2] = ctable_list[i][0][0] + ctable_list[i][0][1]  # Potential mutation sites
+            results[j][3] = ctable_list[i][1][0]  # Control mutations
+            results[j][4] = ctable_list[i][1][0] + ctable_list[i][1][1]  # Potential controls
+            results[j][5] = rate_ratio(ctable_list[i])  # Rate ratio
 
         # Calculate one-sided P-value
         odds_ratio, p_value = stats.fisher_exact(ctable, alternative='greater')
@@ -87,13 +107,18 @@ def hypermut(infile):
 
         make_data_file(header, s, j + 1, gees, ds_motifs, ds_ctrl)
 
-    pretty_print(results)
+    print(ctable_list)
+    # pretty_print(results)
+    results_list = make_return(results, ctable_list)
+
+    return results_list
 
 
 def rate_ratio(ctable):
     """
     Calculate rate ratio from contingency table
-    @param ctable: Contingency table...
+    @:param ctable: Contingency table
+    @:return r_ratio: rate ratio
     """
     muts = float(ctable[0][0])
     pot_muts = float(muts + ctable[0][1])
@@ -111,6 +136,7 @@ def rate_ratio(ctable):
 def pretty_print(table):
     """
     Print headings in bold
+    @:param results table
     """
     print("\033[1m{0:<11} {1:<7} {2:<22} {3:<15} {4:<21} {5:<22} {6:<25} {7:<20}".format
           ("Sequence", "Muts", "Potential Mut Sites", "Control Muts", "Potential Controls",
@@ -128,7 +154,16 @@ def pretty_print(table):
 
 
 def make_data_file(header, s, num_seq, gees, ds_motifs, ds_ctrl):
-    # Write hypermut data to a file
+    """
+    Writes detailed output of hypermut to a text file
+    :param header: the sequence header
+    :param s: the sequence
+    :param num_seq: number of sequences in the FASTA file (excluding the consensus sequence)
+    :param gees: list of position of G's in the consensus sequence
+    :param ds_motifs: list of positions that match GRD motif in the query sequence
+    :param ds_ctrl: list of positions that match control (YN|RC) motif in the query sequence
+    """
+
     with open("hypermut_output.txt", "a") as output:
         if num_seq == 1:
             output.write("Regex: " + mut_pattern + ", " + ctrl_pattern + "\n")
@@ -151,13 +186,35 @@ def make_data_file(header, s, num_seq, gees, ds_motifs, ds_ctrl):
             nt = s[i]
             if i in ds_ctrl:
                 output.write("{}\t{}\n".format(
-                    str(i+1), 
-                    '1' if nt=='A' else '0'
+                    str(i + 1),
+                    '1' if nt == 'A' else '0'
                 ))
-                #if nt == 'A':
-                #    output.write(str(i + 1) + "\t" + "1\n")
-                #else:
-                #    output.write(str(i + 1) + "\t" + "0\n")
+
+
+def make_return(results_table, ctable_list):
+    """
+    Creates a list of HyperMut objects with attributes specified from results_table and ctable_list
+    :param results_table: the table of results from hypermut
+    :param ctable_list: list of contingency tables
+    :return: a list of HyperMut objects
+    """
+
+    tmp_list = []
+    # Make a list of objects
+    for i in range(len(results_table)):
+        tmp = HyperMut(results_table[i][0], results_table[i][1], results_table[i][2],
+                       results_table[i][3], results_table[i][4], results_table[i][5],
+                       results_table[i][6], results_table[i][7], ctable_list[i])
+        tmp_list.append(tmp)
+
+    results_list = []
+    # Make a list of iterable objects
+    for i in range(len(tmp_list)):
+        result = vars(tmp_list[i])
+        results_list.append(result)
+
+    print(results_list)
+    return results_list
 
 
 if __name__ == '__main__':
