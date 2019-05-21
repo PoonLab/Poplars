@@ -153,12 +153,10 @@ def align(ref_seq, query):
 
         # Path for the temporary file
         file_path = os.path.join(tempfile.gettempdir(), handle.name)
-        print(file_path)
 
         # Path to find MAFFT
         script_path = os.path.dirname(os.path.abspath(__file__))
         bin_path = os.path.join(script_path, 'bin/mafft-linux64/mafft.bat')
-        print(bin_path)
 
         if not os.path.isfile(bin_path):
             logging.error("No file exists.")
