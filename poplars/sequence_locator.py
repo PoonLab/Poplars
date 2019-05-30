@@ -7,13 +7,7 @@ import subprocess
 import tempfile
 import os
 import logging
-
-
 from Bio import SeqIO
-
-
-DNA_ALPHABET = "atgc"
-AA_ALPHABET = "ARDNCEQGHILKMFPSTWYV"
 
 
 def parse_args():
@@ -114,7 +108,7 @@ def make_fasta(handle):
             else:
                 seq += line.strip('\n').upper()
 
-    fasta.append([header, seq])
+        fasta.append([header, seq])
     return fasta
 
 
@@ -126,18 +120,28 @@ def valid_sequence(base, query):
     :return: <true> if the input sequence uses the correct alphabet; <false> otherwise
     """
 
+    dna_alphabet = 'atgc'
+    aa_alphabet = 'ARDNCEQGHILKMFPSTWYV'
+
+    # Check if length is not 0
+    if not query:
+        return False
+
     if base == "nucl":
-        for pos in query:
-            if pos not in DNA_ALPHABET:
-                print("Invalid nucleotide sequence input")
-                return False
-        return True
+        # Nucleotide sequences are converted to lowercase
+        query = query.lower()
+        valid = all(pos in dna_alphabet for pos in query)
+        if not valid:
+            print("Invalid nucleotide sequence: {}".format(query))
+
     else:
-        for pos in query:
-            if pos not in AA_ALPHABET:
-                print("Invalid amino acid sequence")
-                return False
-        return True
+        # Amino acid sequences are converted to uppercase
+        query = query.upper()
+        valid = all(pos in aa_alphabet for pos in query)
+        if not valid:
+            print("Invalid amino acid sequence: {}".format(query))
+
+    return valid
 
 
 def align(ref_seq, query):
@@ -185,6 +189,9 @@ def sequence_align(ref_seq, base, infile):
         # Check if query uses the correct alphabet
         if valid_sequence(base, query):
             align(ref_seq, query)
+
+        else:
+            raise ValueError("Invalid input")
 
 
 def sequence_retrieve(ref_seq, region, start_coord, end_coord):
