@@ -6,8 +6,7 @@ import argparse
 import subprocess
 import tempfile
 import os
-import logging
-from Bio import SeqIO
+from mafft import *
 
 
 def parse_args():
@@ -16,7 +15,6 @@ def parse_args():
     """
 
     bases = ["nucl", "prot"]
-    ref_organisms = ["K03455.fasta", "M33262.fasta"]
 
     regions = ["LTR5", "Gag", "Matrix", "p17/p15", "Capsid",
                "p24/p27", "p2", "Nucleocapsid", "p7/p8", "p1",
@@ -38,7 +36,7 @@ def parse_args():
                                          description='Align a nucleotide or protein sequence '
                                                      'relative to the HIV or SIV reference genome',
                                          formatter_class=argparse.ArgumentDefaultsHelpFormatter)
-    parser_align.add_argument('file',
+    parser_align.add_argument('infile',
                               help='Path to the input file.',
                               )
     parser_align.add_argument('base',
@@ -46,11 +44,20 @@ def parse_args():
                               metavar='base',
                               choices=bases
                               )
-    parser_align.add_argument('-reference',
-                              type=argparse.FileType('r+'),
-                              help='FASTA file with the reference genome of HIV strain HXB2 (Accession: K03455) or '
-                                   'SIV strain SIVmm239 (Accession: M33262), or any other reference genome.',
+    parser_align.add_argument('virus',
+                              help='The reference virus',
+                              metavar='',
+                              choices=['hiv', 'siv']
+                              )
+    parser_align.add_argument('--refseq',
+                              help='Path to the FASTA file with the reference genome',
                               metavar=''
+                              )
+    parser_align.add_argument('--outfile',
+                              help='File where results will be written. If no file is specified, '
+                                   'the results will be written to \'seqeunce-locator-output.fasta\'',
+                              metavar='',
+                              default=os.path.abspath("sequence-locator-output.fasta")
                               )
 
     # Create subparser for 'retrieve' mode
@@ -59,73 +66,51 @@ def parse_args():
                                                         'or SIVmm239 from its coordinates',
                                             formatter_class=argparse.ArgumentDefaultsHelpFormatter
                                             )
-    parser_retrieve.add_argument('-reference',
-                                 type=argparse.FileType('r'),
-                                 help='FASTA file with reference genomes of HIV strain HXB2 (Accession: K03455) or SIV '
-                                      'strain SIVmm239 (Accession: M33262). Options are: ' + ', '.join(ref_organisms),
-                                 default="auto",
+    parser_retrieve.add_argument('virus',
+                                 help='The reference virus',
                                  metavar='',
+                                 choices=['hiv', 'siv']
                                  )
-    parser_retrieve.add_argument('-first',
+    parser_retrieve.add_argument('--ref',
+                                 help='FASTA file with the reference genome',
+                                 metavar=''
+                                 )
+    parser_retrieve.add_argument('--first',
                                  default="start",
                                  help='Starting coordinate of the genomic region'
                                  )
-    parser_retrieve.add_argument('-last',
+    parser_retrieve.add_argument('--last',
                                  default="end",
                                  help='Ending coordinate of the genomic region'
                                  )
-    parser_retrieve.add_argument('-region',
+    parser_retrieve.add_argument('--region',
                                  help='List of case sensitive genomic regions. '
                                       'Allowed regions are: ' + ', '.join(regions),
                                  metavar='',
                                  choices=regions
                                  )
-
+    parser_retrieve.add_argument('-outfile',
+                                 help='File where results will be written. If no file is specified, '
+                                      'the results will be written to \'seqeunce-locator-output.fasta\'',
+                                 metavar='',
+                                 default=os.path.abspath("sequence-locator-output.fasta")
+                                 )
     return parser.parse_args()
 
 
-def is_fasta(infile):
-    """
-    Checks whether an input file is a FASTA file
-    :param infile: the input file
-    :return: <true> if the file is a FASTA file; <false> otherwise
-    """
-
-    fasta = SeqIO.parse(infile, "fasta")
-    return any(fasta)
-
-
-def make_fasta(handle):
-    fasta = []
-    seq = ""
-    for line in handle:
-        if line.startswith('>'):
-            header = line
-            if len(seq) > 0:
-                fasta.append([header, seq])
-                seq = ""
-                header = line.strip('>\n')
-            else:
-                seq += line.strip('\n').upper()
-
-        fasta.append([header, seq])
-    return fasta
-
-
-def valid_sequence(base, query):
+def valid_sequence(query, base):
     """
     Verifies that input sequence uses the correct output
-    :param base: the base of the sequence (nucl or prot)
     :param query: input sequence
-    :return: <true> if the input sequence uses the correct alphabet; <false> otherwise
+    :param base: the base of the sequence (nucl or prot)
+    :return valid: <true> if the input sequence uses the correct alphabet; <false> otherwise
     """
-
     dna_alphabet = 'atgc'
     aa_alphabet = 'ARDNCEQGHILKMFPSTWYV'
 
-    # Check if length is not 0
+    valid = False
     if not query:
-        return False
+        return valid
 
     if base == "nucl":
         # Nucleotide sequences are converted to lowercase
@@ -144,40 +129,56 @@ def valid_sequence(base, query):
     return valid
 
 
-def align(ref_seq, query):
+def align(query, virus, ref_seq=None, outfile=None):
     """
     Pairwise alignment of input sequence relative to HIV reference genome
-    :param: reference sequence
-    :param: query sequence
-    :return: output of alignment
+    :param query: query sequence
+    :param virus: the reference virus
+    :param ref_seq: reference sequence
+    :param outfile: the file where the output will be written
     """
-    with tempfile.NamedTemporaryFile('w+', delete=True) as handle:
-        handle.write(ref_seq)
+
+    if virus is 'hiv' and ref_seq is None:
+        ref_seq = os.path.abspath("ref_genomes/K03455.fasta")
+
+    if virus is 'siv' and ref_seq is None:
+        ref_seq = os.path.abspath("ref_genomes/M33262.fasta")
+
+    # Create a temporary file containing the reference genome and query sequence
+    with open(ref_seq, "r") as ref_handle, tempfile.NamedTemporaryFile('w+', delete=True) as handle:
+        reference_sequence = ref_handle.read()
+        handle.write(reference_sequence)
         handle.write('\n>query sequence\n{}\n'.format(query))
 
-        # Path for the temporary file
+        # Path to the temporary file
         file_path = os.path.join(tempfile.gettempdir(), handle.name)
 
-        # Path to find MAFFT
-        script_path = os.path.dirname(os.path.abspath(__file__))
-        bin_path = os.path.join(script_path, 'bin/mafft-linux64/mafft.bat')
-
-        if not os.path.isfile(bin_path):
-            logging.error("No file exists.")
-
-        raw_output = subprocess.check_output([bin_path, '--quiet', file_path])
+        raw_output = run_mafft(file_path)
 
     output = raw_output.decode('utf-8')
-    return output
+
+    if outfile is not None:
+        with open(outfile, "w+") as out_handle:
+            out_handle.write(output)
+    # Print to console if no outfile is specified
+    else:
+        print(output)
+
+# test_path = os.path.abspath("siv-test.fasta")
+# raw_output = run_mafft(test_path)
+# output = raw_output.decode('utf-8')
+# with open("sl-siv-test.txt", "w+") as out_handle:
+#     out_handle.write(output)
 
 
-def sequence_align(ref_seq, base, infile):
+def sequence_align(infile, base, virus, ref_seq=None, outfile=None):
     """
     Sequence locator for 'align mode'
-    :param ref_seq: reference sequence
-    :param base: base of the sequence (nucleotide or protein)
     :param infile: input file containing query sequence
-    :return: the alignment of the query sequence with the reference genome
+    :param base: base of the sequence (nucleotide or protein)
+    :param virus: the reference virus
+    :param ref_seq: the reference sequence
+    :param outfile: the file where the output will be written
     """
 
     with open(infile) as handle:
@@ -188,19 +189,19 @@ def sequence_align(ref_seq, base, infile):
 
         # Check if query uses the correct alphabet
         if valid_sequence(base, query):
-            align(ref_seq, query)
-
+            align(query, virus, ref_seq, outfile)
         else:
             raise ValueError("Invalid input")
 
 
-def sequence_retrieve(ref_seq, region, start_coord, end_coord):
+def sequence_retrieve(ref_seq, virus, region, start_coord, end_coord, outfile=None):
     """
     Sequence locator for 'retrieve' mode
     :param ref_seq: reference genome sequence
     :param region: genomic region
     :param start_coord: starting coordinate
     :param end_coord: ending coordinate
+    :param outfile: the file where the output will be written
     :return: return the genomic region defined by the starting and ending coordinates
     """
 
@@ -209,18 +210,25 @@ def sequence_retrieve(ref_seq, region, start_coord, end_coord):
 
 def main():
     args = parse_args()
-    ref_seq = args.reference.read()
 
     if args.subcommand == "align":
         base = args.base
-        infile = args.file
-        sequence_align(ref_seq, base, infile)
+        infile = args.infile
+        virus = args.virus
+        ref_seq = args.refseq
+        outfile = args.outfile
 
-    else:
-        region = args.region
-        start_coord = args.first
-        end_coord = args.last
-        sequence_retrieve(ref_seq, region, start_coord, end_coord)
+        sequence_align(ref_seq, virus, base, infile, outfile)
+
+    # else:
+    #     region = args.region
+    #     virus = args.virus
+    #     ref_seq = args.refseq
+    #     start_coord = args.first
+    #     end_coord = args.last
+    #     outfile = args.outfile
+
+        # sequence_retrieve(ref_seq, virus, region, start_coord, end_coord, outfile)
 
 
 if __name__ == '__main__':

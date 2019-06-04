@@ -18,7 +18,7 @@ def run_mafft(file_path):
     """
 
     try:
-       sys.platform.startswith("linux") or sys.platform("win") or sys.platform == "darwin"
+       sys.platform.startswith("linux") or sys.platform.startswith("win") or sys.platform == "darwin"
 
     except OSError:
         print("OSError: {} is not supported".format(sys.platform))
@@ -38,7 +38,7 @@ def run_mafft(file_path):
     if not os.path.isfile(bin_path):
         logging.error("No file exists.")
 
-    raw_output = subprocess.check_output([bin_path, '--quiet', file_path])
+    raw_output = subprocess.check_output([bin_path, '--quiet', file_path], shell=False)
 
     return raw_output
 
