@@ -38,7 +38,7 @@ def run_mafft(file_path):
     if not os.path.isfile(bin_path):
         logging.error("No file exists.")
 
-    raw_output = subprocess.check_output([bin_path, '--quiet', file_path], shell=False)
+    raw_output = subprocess.check_output([bin_path, '--quiet', file_path], shell=False, stderr=subprocess.STDOUT)
 
     return raw_output
 
