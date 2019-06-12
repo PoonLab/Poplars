@@ -57,7 +57,7 @@ class TestGetReferenceSequence(unittest.TestCase):
                    "ttgttacaccctgtgagcctgcatggaatggatgacccggagagagaagt" \
                    "gttagagtggaggtttgacagccgcctagcatttcatcacatggcccgag" \
                    "agctgcatccggagtacttcaagaactgctgacatcgagcttgctacaag"
-        result = get_ref_seq("hiv")
+        result = get_ref_seq("hiv", "nucl")
         self.assertEqual(expected, result)
 
     def testDefaultSIVGenome(self):
@@ -69,7 +69,7 @@ class TestGetReferenceSequence(unittest.TestCase):
                    "ggtttctggaagggatttattacagtgcaagaagacatagaatcttagac" \
                    "atatacttagaaaaggaagaaggcatcataccagattggcaggattacac" \
                    "ctcaggaccaggaattagatacccaaagacatttggctggctatggaaat"
-        result = get_ref_seq("siv")
+        result = get_ref_seq("siv", "nucl")
         self.assertEqual(expected, result)
 
     def testInputGenome(self):
@@ -81,7 +81,7 @@ class TestGetReferenceSequence(unittest.TestCase):
                    "ggtttctggaagggatttattacagtgcaagaagacatagaatcttagac" \
                    "atatacttagaaaaggaagaaggcatcataccagattggcaggattacac" \
                    "ctcaggaccaggaattagatacccaaagacatttggctggctatggaaat"
-        result = get_ref_seq("siv", "/home/kwade4/PycharmProjects/Poplars/poplars/ref_genomes/siv-test-genome.fasta")
+        result = get_ref_seq("siv", "nucl", "/home/kwade4/PycharmProjects/Poplars/poplars/ref_genomes/siv-test-genome.fasta")
         self.assertEqual(expected, result)
 
 
@@ -129,13 +129,13 @@ class TestValidCoordinates(unittest.TestCase):
         self.assertEqual(expected, result)
 
     def testOutOfBoundsHIV(self):
-        expected = False
+        expected = True
         result = valid_inputs("hiv", 1, 10278, "p6")
         self.assertEqual(expected, result)
 
     def testOutofBoundsSIV(self):
-        expected = False
-        result = valid_inputs("siv", 1, 10279, "gp120")
+        expected = True
+        result = valid_inputs("siv", 1, 10536, "gp120")
         self.assertEqual(expected, result)
 
     def testInvalidRegionHIV(self):
@@ -143,7 +143,12 @@ class TestValidCoordinates(unittest.TestCase):
         result = valid_inputs("hiv", 1, 100, "Vpx")
         self.assertEqual(expected, result)
 
-    def testInvalidRegionSIV(self):
+    def testInvalidStringHIV(self):
         expected = False
-        result = valid_inputs("siv", 1, 10278, "Vpu")
+        result = valid_inputs("hiv", 78, "kjl", "Complete")
+        self.assertEqual(expected, result)
+
+    def testValidStringSIV(self):
+        expected = True
+        result = valid_inputs("siv", 890, 6000, "end")
         self.assertEqual(expected, result)
