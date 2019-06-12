@@ -9,6 +9,36 @@ import subprocess
 import logging
 import argparse
 
+from poplars.common import convert_fasta
+
+def align(query, reference):
+    """
+    Python wrapper to MAFFT for pairwise/multiple sequence alignment
+    :param query: The query sequence
+    :param reference: Either a reference sequence (str) or a list from convert_fasta()
+    :param outfile: <option> The file where the output will be written.
+                    If no output file is specified, the output will be printed.
+    """
+
+    with tempfile.NamedTemporaryFile('w+', delete=False) as handle:
+        if type(reference) == 'str':
+            handle.write('>reference\n{}\n'.format(reference))
+        elif type(reference) == 'list':
+            for h, s in reference:
+                handle.write('>{}\n{}\n'.format(h, s))
+                
+        handle.write('>query\n{}\n'.format(query))
+        handle.seek(0)        # Move position back to allow subprocess to use file
+
+        # Path to the temporary query file for MAFFT
+        file_path = os.path.join(tempfile.gettempdir(), handle.name)
+
+        raw_output = run_mafft(file_path)
+
+    output = raw_output.decode('utf-8')
+    return convert_fasta(result.split('\n'))
+
+
 
 def run_mafft(file_path):
     """
