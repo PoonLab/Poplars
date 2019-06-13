@@ -8,16 +8,16 @@ import os
 import subprocess
 import logging
 import argparse
+import tempfile
 
 from poplars.common import convert_fasta
+
 
 def align(query, reference):
     """
     Python wrapper to MAFFT for pairwise/multiple sequence alignment
     :param query: The query sequence
     :param reference: Either a reference sequence (str) or a list from convert_fasta()
-    :param outfile: <option> The file where the output will be written.
-                    If no output file is specified, the output will be printed.
     """
 
     with tempfile.NamedTemporaryFile('w+', delete=False) as handle:
@@ -26,9 +26,9 @@ def align(query, reference):
         elif type(reference) == 'list':
             for h, s in reference:
                 handle.write('>{}\n{}\n'.format(h, s))
-                
+
         handle.write('>query\n{}\n'.format(query))
-        handle.seek(0)        # Move position back to allow subprocess to use file
+        handle.seek(0)  # Move position back to allow subprocess to use file
 
         # Path to the temporary query file for MAFFT
         file_path = os.path.join(tempfile.gettempdir(), handle.name)
@@ -36,8 +36,8 @@ def align(query, reference):
         raw_output = run_mafft(file_path)
 
     output = raw_output.decode('utf-8')
-    return convert_fasta(result.split('\n'))
 
+    return convert_fasta(output.split('\n'))
 
 
 def run_mafft(file_path):
@@ -48,7 +48,7 @@ def run_mafft(file_path):
     """
 
     try:
-       sys.platform.startswith("linux") or sys.platform.startswith("win") or sys.platform == "darwin"
+        sys.platform.startswith("linux") or sys.platform.startswith("win") or sys.platform == "darwin"
 
     except OSError:
         print("OSError: {} is not supported".format(sys.platform))
@@ -77,14 +77,14 @@ def parse_args():
     parser = argparse.ArgumentParser(
         description="Wrapper to run MAFFT"
     )
-    parser.add_argument("infile",
-                        help="Path to the input file")
+    parser.add_argument("infile", help="The input file", type=argparse.FileType('r'))
 
     return parser.parse_args()
 
 
 def main():
     args = parse_args()
+
     run_mafft(args.infile)
 
 
