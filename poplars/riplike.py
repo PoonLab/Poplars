@@ -1,13 +1,13 @@
 #TODO: consistent reference coordinates across outputs
 
 import sys
-import tempfile
 import subprocess
 import random
 import argparse
 
 from poplars.common import convert_fasta
 from poplars.mafft import align
+
 
 
 def pdistance(seq1, seq2):
@@ -48,24 +48,30 @@ def bootstrap(s1, s2, reps=100):
         yield b1, b2
 
 
-def riplike(header, seq, outfile, reference, window=400, step=5, nrep=100):
+def riplike(seq, window=400, step=5, nrep=100):
     """
-    
-    
-    :param header:  FASTA-style metadata for query sequence
     :param seq:  query sequence
     :param outfile:  open file stream in write mode for results
-    :param reference:  list returned from convert_fasta()
     :param window:  width of sliding window in nucleotides
     :param step:  step size of sliding window in nucleotides
     :param nrep:  number of replicates for nonparametric bootstrap sampling
     """
     
+    # subset of HIV-1 group M subtype references curated by LANL
+    with open('poplars/ref_genomes/HIV1_Mgroup.fasta') as handle:
+        reference = convert_fasta(handle)
+    
+    results = []
+    
     # append query sequence to reference alignment
     fasta = align(seq, reference)
     
     # eliminate insertions in query relative to references
-    conseq = dict(fasta)['CON_OF_CONS']
+    try:
+        conseq = dict(fasta)['CON_OF_CONS']
+    except:
+        print(fasta)
+        raise
     skip = [i for i in range(len(conseq)) if conseq[i] == '-']
     fasta2 = []
     for h, s in fasta:
@@ -95,15 +101,14 @@ def riplike(header, seq, outfile, reference, window=400, step=5, nrep=100):
             # calculate p-distance
             ndiff, denom = pdistance(s1, q1)
             if denom == 0:
-                # no overlap!
+                # no overlap!  TODO: require minimum overlap?
                 continue
             pd = ndiff/denom
-                
+            
             if pd < best_p:
                 # query is closer to this reference
                 second_p = best_p
                 second_ref = best_ref
-                
                 best_p = pd
                 best_ref = h
                 best_seq = s1
@@ -130,14 +135,26 @@ def riplike(header, seq, outfile, reference, window=400, step=5, nrep=100):
             quant = list(map(lambda x: x < second_p, boot_dist))
             quant = sum(quant) / float(len(quant))
             
-            outfile.write('{},{},{},{},{},{},{}\n'.format(
-                header, left, best_ref, best_p, second_ref, second_p, quant)
-            )
+            results.append({
+                'left': left,
+                'best_ref': best_ref, 
+                'best_p': best_p, 
+                'second_ref': second_ref, 
+                'second_p': second_p, 
+                'quant': quant
+            })
         else:
             # if no valid second best, accept first without bootstrap
-            outfile.write('{},{},{},{},,,\n'.format(
-                header,left, best_ref, best_p)
-        )
+            results.append({
+                'left': left,
+                'best_ref': best_ref, 
+                'best_p': best_p, 
+                'second_ref': None, 
+                'second_p': None, 
+                'quant': None
+            })
+        
+    return results
 
 
 def main():
@@ -157,16 +174,18 @@ def main():
                         help='<optional, int> Number of bootstrap replicates.')
 
     args = parser.parse_args()
-
-    with open('ref_genomes/HIV1_Mgroup.fasta') as handle:
-        reference = convert_fasta(handle)
-    fasta = convert_fasta(args.infile)
-
     args.outfile.write('qname,pos,rname,pdist,rname2,pdist2,qboot\n')
+    
+    fasta = convert_fasta(args.infile)
     for h, s in fasta:
         print(h)  # crude progress monitoring
-        riplike(h, s, args.outfile, reference, window=args.window, step=args.step, nrep=args.nrep)
-
+        res = riplike(s, args.outfile, window=args.window, step=args.step, nrep=args.nrep)
+        args.outfile.write(
+            '{},{left},{best_ref},{best_p},{second_ref},{second_p},{quant}\n'.format(header, **res)
+        )
+        
+    args.outfile.close()
+    
 
 if __name__ == '__main__':
     main()

@@ -214,35 +214,7 @@ def get_ref_seq(virus, ref_seq_path=None):
     return reference_sequence
 
 
-def align(query_sequence, reference_sequence, outfile=None):
-    """
-    Sequence locator for 'align mode'
-    :param query_sequence: The query sequence
-    :param reference_sequence: The reference sequence.
-    :param outfile: <option> The file where the output will be written.
-                    If no output file is specified, the output will be printed.
-    """
 
-    with tempfile.NamedTemporaryFile('w+', delete=False) as handle:
-        handle.write('>reference sequence\n')
-        handle.write(reference_sequence)
-        handle.write('\n>query sequence\n{}\n'.format(query_sequence))
-        handle.seek(0)        # Move position back to allow subprocess to use file
-
-        # Path to the temporary query file for MAFFT
-        file_path = os.path.join(tempfile.gettempdir(), handle.name)
-
-        raw_output = run_mafft(file_path)
-
-    output = raw_output.decode('utf-8')
-
-    if outfile is not None:
-        with open(outfile, "w+") as out_handle:
-            out_handle.write(output)
-
-    # TODO: Print to console if no outfile is specified
-    else:
-        print(output)
 
 # TODO: write a function that reads output of subprocess and returns the corresponding gene
 #  - sequence_retrieve(start_coord=start of longest alignment, end_coord=end of longest alignment))

@@ -1,6 +1,6 @@
 import unittest
 from io import StringIO
-from poplars.riplike import convert_fasta
+from poplars.common import convert_fasta
 
 class TestConvertFasta(unittest.TestCase):
     def testSimpleConversion(self):

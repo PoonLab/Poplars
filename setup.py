@@ -1,11 +1,10 @@
 #!/usr/bin/env python3
-
 from distutils import log
 from distutils.core import setup
 from setuptools.command.install import install
 import os
 import sys
-
+from setuptools.command.install_scripts import install_scripts
 
 class OverrideInstall(install):
     """
@@ -17,57 +16,38 @@ class OverrideInstall(install):
         mode = 0o755
         set_data_dir = False
         install.run(self)
+        for filepath in self.get_outputs():
+            path = os.path.dirname(filepath)
+            if path.endswith('ref_genomes'):
+                log.info('Changing permissions of {0} to {1:o}'.format(filepath, mode))
+                os.chmod(filepath, mode)
 
 
+data_files = ['ref_genomes/K03455.fasta', 'ref_genomes/M33262.fasta', 
+    'ref_genomes/HIV1_Mgroup.fasta']
+
+# identify platform
 if sys.platform.startswith("linux"):
-    mafft_files = []
-    for root, dirs, files in os.walk('bin/mafft-linux64/'):
-        if len(files) > 0:
-            mafft_files.append((root, files))
-
-    setup(
-        name='poplars',
-        packages=['poplars'],
-        package_data={'poplars': [
-            'bin/mafft-linux64/mafft.bat',
-            'bin/mafft-linux64/mafftdir/bin/mafft',
-            'bin/mafft-linux64/mafftdir/libexec/*'
-        ]},
-        cmdclass={'install': OverrideInstall}
-    )
-
+    mafft_dir = 'bin/mafft-linux64/'
 elif sys.platform.startswith("win"):
-    mafft_files = []
-    for root, dirs, files in os.walk('bin/mafft-win/'):
-        if len(files) > 0:
-            mafft_files.append((root, files))
-
-    setup(
-        name='poplars',
-        packages=['poplars'],
-        package_data={'poplars': [
-            'bin/mafft-win/mafft.bat',
-            'bin/mafft-win/mafft-signed.ps1',
-            'bin/mafft-win/usr/bin/*',
-            'bin/mafft-win/usr/lib/mafft/*',
-            'bin/mafft-win/usr/share/misc/magic'
-        ]},
-        cmdclass={'install': OverrideInstall}
-    )
-
+    mafft_dir = 'bin/mafft-win/'
 elif sys.platform == "darwin":
-    mafft_files = []
-    for root, dirs, files in os.walk('bin/mafft-mac/'):
-        if len(files) > 0:
-            mafft_files.append((root, files))
+    mafft_dir = 'bin/mafft-mac/'
+else:
+    sys.stderr.write("Warning: failed to recognize platform.")
+    sys.exit()
 
-    setup(
-        name='poplars',
-        packages=['poplars'],
-        package_data={'poplars': [
-            'bin/mafft-mac/mafft.bat',
-            'bin/mafft-mac/mafftdir/bin/mafft',
-            'bin/mafft-mac/mafftdir/libexec/*'
-        ]},
-        cmdclass={'install': OverrideInstall}
-    )
+# generate listing of MAFFT-associated files for user's platform
+mafft_files = []
+for root, dirs, files in os.walk('bin/mafft-linux64/'):
+    if len(files) > 0:
+        mafft_files.append((root, files))
+
+setup(
+    name='poplars',
+    packages=['poplars'],
+    package_data={'poplars': mafft_files + data_files},
+    cmdclass={'install': OverrideInstall}
+)
+
+

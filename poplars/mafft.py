@@ -8,6 +8,7 @@ import os
 import subprocess
 import logging
 import argparse
+import tempfile
 
 from poplars.common import convert_fasta
 
@@ -20,23 +21,21 @@ def align(query, reference):
                     If no output file is specified, the output will be printed.
     """
 
-    with tempfile.NamedTemporaryFile('w+', delete=False) as handle:
-        if type(reference) == 'str':
-            handle.write('>reference\n{}\n'.format(reference))
-        elif type(reference) == 'list':
-            for h, s in reference:
-                handle.write('>{}\n{}\n'.format(h, s))
-                
-        handle.write('>query\n{}\n'.format(query))
-        handle.seek(0)        # Move position back to allow subprocess to use file
+    handle = tempfile.NamedTemporaryFile('w+', delete=False)
+    if type(reference) == 'str':
+        handle.write('>reference\n{}\n'.format(reference))
+    elif type(reference) == 'list':
+        for h, s in reference:
+            handle.write('>{}\n{}\n'.format(h, s))
+            
+    handle.write('>query\n{}\n'.format(query))
+    handle.close()
 
-        # Path to the temporary query file for MAFFT
-        file_path = os.path.join(tempfile.gettempdir(), handle.name)
-
-        raw_output = run_mafft(file_path)
+    # Path to the temporary query file for MAFFT
+    raw_output = run_mafft(handle.name)
 
     output = raw_output.decode('utf-8')
-    return convert_fasta(result.split('\n'))
+    return convert_fasta(output.split('\n'))
 
 
 
