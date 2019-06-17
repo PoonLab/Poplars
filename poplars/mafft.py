@@ -20,7 +20,6 @@ def align(query, reference):
     :param reference: Either a reference sequence (str) or a list from convert_fasta()
     """
 
-<<<<<<< HEAD
     handle = tempfile.NamedTemporaryFile('w+', delete=False)
     if type(reference) == 'str':
         handle.write('>reference\n{}\n'.format(reference))
@@ -30,27 +29,11 @@ def align(query, reference):
             
     handle.write('>query\n{}\n'.format(query))
     handle.close()
-=======
-    with tempfile.NamedTemporaryFile('w+', delete=False) as handle:
-        if type(reference) == 'str':
-            handle.write('>reference\n{}\n'.format(reference))
-        elif type(reference) == 'list':
-            for h, s in reference:
-                handle.write('>{}\n{}\n'.format(h, s))
-
-        handle.write('>query\n{}\n'.format(query))
-        handle.seek(0)  # Move position back to allow subprocess to use file
->>>>>>> 061688e25bd0f652d9be2af50f06c6ba862a6476
 
     # Path to the temporary query file for MAFFT
     raw_output = run_mafft(handle.name)
 
     output = raw_output.decode('utf-8')
-<<<<<<< HEAD
-    return convert_fasta(output.split('\n'))
-=======
->>>>>>> 061688e25bd0f652d9be2af50f06c6ba862a6476
-
     return convert_fasta(output.split('\n'))
 
 
