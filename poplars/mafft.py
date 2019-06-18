@@ -19,11 +19,10 @@ def align(query, reference):
     :param query: The query sequence
     :param reference: Either a reference sequence (str) or a list from convert_fasta()
     """
-
     handle = tempfile.NamedTemporaryFile('w+', delete=False)
-    if type(reference) == 'str':
+    if type(reference) == str:
         handle.write('>reference\n{}\n'.format(reference))
-    elif type(reference) == 'list':
+    elif type(reference) == list:
         for h, s in reference:
             handle.write('>{}\n{}\n'.format(h, s))
             

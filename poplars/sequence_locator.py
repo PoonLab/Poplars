@@ -63,7 +63,7 @@ def valid_sequence(base, sequence):
     """
     Verifies that input sequence uses the correct output
     :param base: the base of the sequence (nucl or prot)
-    :param sequence: input sequence
+    :param sequence: a list of lists containing header and sequence pairs
     :raises ValueError: if the sequence is empty or if it contains invalid characters
     :return: <true> if the input sequence uses the correct alphabet
     """
@@ -74,19 +74,21 @@ def valid_sequence(base, sequence):
         print("Invalid sequence: sequence length is 0\n")
         return False
 
-    if base == 'nucl':
-        for h, s in sequence:
+    for h, s in sequence:
+        if not s:
+            print("Invalid sequence: sequence length is 0\n")
+            return False
+        elif base == 'nucl':
             # Nucleotide sequences are converted to lowercase
             s = s.lower()
             if not all(pos in dna_alphabet for pos in s):
-                print("Invalid nucleotide sequence: {}\n".format(s))
+                print("Invalid nucleotide sequence:\n{}\n{}\n".format(h, s))
                 return False
-    else:
-        for h, s in sequence:
+        else:
             # Amino acid sequences are converted to uppercase
             s = s.upper()
             if not all(pos in aa_alphabet for pos in s):
-                print("Invalid amino acid sequence: {}\n".format(s))
+                print("Invalid amino acid sequence:\n{}\n{}\n".format(h, s))
                 return False
 
     return True
@@ -128,15 +130,11 @@ def get_query(base, query):
     :param query: the file stream containing the query sequence in read mode
     :return: the query sequence as a string
     """
-    if base == 'nucl':
-        query_seq = query.read().lower()
+    query = convert_fasta(query)
+    if valid_sequence(base, query):
+        return query[0][1]
     else:
-        query_seq = query.read().upper()
-
-    if valid_sequence(base, query_seq):
-        return query_seq
-    else:
-        sys.exit()
+        sys.exit(0)
 
 
 def get_ref_seq(virus, base, ref_seq=None):
@@ -155,43 +153,23 @@ def get_ref_seq(virus, base, ref_seq=None):
             # If no reference sequence is specified, set default reference sequence
             if virus == 'hiv':
                 ref_seq = os.path.join(seq_path, "ref_genomes/K03455.fasta")
-
             if virus == 'siv':
                 ref_seq = os.path.join(seq_path, "ref_genomes/M33262.fasta")
-
         else:
             if virus == 'hiv':
                 ref_seq = os.path.join(seq_path, "ref_genomes/K03455-protein.fasta")
-
             if virus == 'siv':
                 ref_seq = os.path.join(seq_path, "ref_genomes/M33262-protein.fasta")
 
         with open(ref_seq, 'r') as ref_handle:
             reference_sequence = convert_fasta(ref_handle)
-
     else:
         reference_sequence = convert_fasta(ref_seq)
 
     if valid_sequence(base, reference_sequence):
         return reference_sequence
     else:
-        sys.exit()
-
-
-def sequence_align(query_sequence, reference_sequence, outfile):
-    """
-    Sequence locator for 'align mode'
-    :param query_sequence: The query sequence
-    :param reference_sequence: The reference sequence.
-    :param outfile: <option> The file stream of the output file in write mode
-    """
-    result = align(query_sequence, reference_sequence)
-
-    if outfile is not None:
-        outfile.write(result)
-    else:
-        print(result)
-    return result
+        sys.exit(0)
 
 
 def make_aa_dict(ref_aa_seq):
@@ -202,11 +180,54 @@ def make_aa_dict(ref_aa_seq):
     """
     viral_prots = {}
     for h, seq in ref_aa_seq:
-        if h.startswith('>'):
-            line = h.split("|")
-            region = line[0]
-            viral_prots[region] = seq
+        viral_prots[h] = seq
     return viral_prots
+
+
+def sequence_align(query_sequence, reference_sequence, outfile=None):
+    """
+    Sequence locator for 'align mode'
+    :param query_sequence: The query sequence
+    :param reference_sequence: The reference sequence.
+    :param outfile: <option> The file stream of the output file in write mode
+    """
+    result = align(query_sequence, reference_sequence)
+
+    if outfile is not None:
+        outfile.write("Alignment:")
+        for h, s in result:
+            outfile.write("\n>{}\n".format(h))
+            outfile.write(textwrap.fill("{}\n".format(s)))
+    else:
+        print("Alignment:")
+        for h, s in result:
+            print(">{}".format(h))
+            print(textwrap.fill("{}".format(s)))
+
+    return result
+
+
+def get_region_coordinates(alignment):
+    """
+    Gets the indices of regions where the query aligns with the reference sequence
+    :param alignment: a list containing the header of the query sequence, and the aligned query sequence
+    :return: the positions where the query sequence aligns with the reference sequences(s) with no gaps
+    """
+    pat = re.compile('[A-Z]{2,}')     # Match the aligned region (minimum alignment length is 2)
+    coordinates = [[match.start(), match.end()] for match in pat.finditer(alignment[1])]
+    print(coordinates)
+    return coordinates
+
+
+def get_matches(alignment):
+    """
+    Retrieves sequences where the query sequence matches the reference sequence
+    :param alignment: a list containing the aligned regions
+    :return coordinates: the sequences where the query sequence aligns with the reference sequences(s) with no gaps
+    """
+    pat = re.compile('[A-Z]{2,}')    # Match the aligned region (minimum alignment length is 2)
+    matches = [match for match in pat.finditer(alignment)]
+    return matches
 
 
 def find_genomic_regions(virus, reference_nt_sequence, coordinates):
@@ -253,28 +274,6 @@ def find_aa_regions(matches, viral_prots):
             if seq in viral_prots[key]:
                 regions[key] = sub_region.append([key, viral_prots[key], [match.start(), match.end()-1]])
     return regions
-
-
-def get_region_coordinates(alignment):
-    """
-    Gets the indices of regions where the query aligns with the reference sequence
-    :param alignment: a list containing the header of the query sequence, and the aligned query sequence
-    :return: the positions where the query sequence aligns with the reference sequences(s) with no gaps
-    """
-    pat = re.compile('[A-Z]+|[a-z]+')    # Match the start and end of an alignment
-    coordinates = [[match.start(), match.end() - 1] for match in pat.finditer(alignment)]
-    return coordinates
-
-
-def get_matches(alignment):
-    """
-    Retrieves sequences where the query sequence matches the reference sequence
-    :param alignment: a list containing the aligned regions
-    :return coordinates: the sequences where the query sequence aligns with the reference sequences(s) with no gaps
-    """
-    pat = re.compile('[A-Z]+|[a-z]+')    # Match the start and end of an alignment
-    matches = [match for match in pat.finditer(alignment)]
-    return matches
 
 
 def pretty_output(outfile, nt_regions=None, aa_regions=None):
