@@ -59,60 +59,6 @@ SIV_NT_REGIONS = {"Complete": (1, 10535),           "5'LTR": (257, 1074),
                   "3'LTR-U3": (9719, 10234),        "3'LTR-U5": (10412, 10535)}
 
 
-class SeqLocator:
-
-    def __init__(self, virus, region=None, start_coord=None, end_coord=None):
-        self.virus = virus
-        self.region = region
-        self.start_coord = start_coord
-        self.end_coord = end_coord
-
-        self.nt_seq = self.get_seq('nucl')
-        self.aa_seq = self.get_seq('prot')
-
-    def get_seq(self, base):
-        reference_sequence = get_ref_seq(self.virus, base)
-        seq = reference_sequence[self.start_coord - 1: self.end_coord]
-
-        return seq
-
-    def retrieve(self, reference_sequence, outfile):
-        """
-        Sequence locator for 'retrieve' mode
-        :param reference_sequence: reference genome sequence
-        :param outfile: the file stream of the output file in write mode
-        :return: return the genomic region defined by the starting and ending coordinates
-        """
-
-        if self.virus == 'hiv':
-            sequence_range = HIV_NT_REGIONS[self.region]
-        else:
-            sequence_range = SIV_NT_REGIONS[self.region]
-
-        if self.start_coord is None:
-            self.start_coord = 1
-
-        # If start_coord is smaller than the region's start coordinate, set start_coord to region's start coordinate
-        if self.start_coord < sequence_range[0]:
-            self.start_coord = sequence_range[0]
-
-        # If end_coord is greater than the region's end coordinate, set end_coord to region's end coordinate
-        if self.end_coord == "end" or self.end_coord > sequence_range[1]:
-            self.end_coord = sequence_range[1]
-
-        # -1 to account for 0-based indexing
-        region_to_retrieve = reference_sequence[(self.start_coord - 1): self.end_coord]
-
-        if outfile is None:
-            print("\033[1mRetrieved sequence: \033[0m")
-            print(textwrap.fill(region_to_retrieve, 50))
-
-        else:
-            outfile.write(region_to_retrieve)
-
-        return region_to_retrieve
-
-
 def valid_sequence(base, sequence):
     """
     Verifies that input sequence uses the correct output
@@ -129,18 +75,19 @@ def valid_sequence(base, sequence):
         return False
 
     if base == 'nucl':
-        # Nucleotide sequences are converted to lowercase
-        sequence = sequence.lower()
-        if not all(pos in dna_alphabet for pos in sequence):
-            print("Invalid nucleotide sequence: {}\n".format(sequence))
-            return False
-
+        for h, s in sequence:
+            # Nucleotide sequences are converted to lowercase
+            s = s.lower()
+            if not all(pos in dna_alphabet for pos in s):
+                print("Invalid nucleotide sequence: {}\n".format(s))
+                return False
     else:
-        # Amino acid sequences are converted to uppercase
-        sequence = sequence.upper()
-        if not all(pos in aa_alphabet for pos in sequence):
-            print("Invalid amino acid sequence: {}\n".format(sequence))
-            return False
+        for h, s in sequence:
+            # Amino acid sequences are converted to uppercase
+            s = s.upper()
+            if not all(pos in aa_alphabet for pos in s):
+                print("Invalid amino acid sequence: {}\n".format(s))
+                return False
 
     return True
 
@@ -219,9 +166,11 @@ def get_ref_seq(virus, base, ref_seq=None):
             if virus == 'siv':
                 ref_seq = os.path.join(seq_path, "ref_genomes/M33262-protein.fasta")
 
-        ref_seq = open(ref_seq, 'r')
+        with open(ref_seq, 'r') as ref_handle:
+            reference_sequence = convert_fasta(ref_handle)
 
-    reference_sequence = convert_fasta(ref_seq)
+    else:
+        reference_sequence = convert_fasta(ref_seq)
 
     if valid_sequence(base, reference_sequence):
         return reference_sequence
@@ -242,44 +191,67 @@ def sequence_align(query_sequence, reference_sequence, outfile):
         outfile.write(result)
     else:
         print(result)
-
     return result
 
 
-def find_regions(coordinates, reference_nt_sequence, reference_aa_sequence, seq_locator, viral_prots):
+def make_aa_dict(ref_aa_seq):
+    """
+    Creates a dictionary where the keys are the name of the protein and the values are the protein sequence
+    :param ref_aa_seq: the file stream containing the reference sequence in read mode
+    :return viral_prots: a dictionary of the viral proteins
+    """
+    viral_prots = {}
+    for h, seq in ref_aa_seq:
+        if h.startswith('>'):
+            line = h.split("|")
+            region = line[0]
+            viral_prots[region] = seq
+    return viral_prots
+
+
+def find_genomic_regions(virus, reference_nt_sequence, coordinates):
     """
     Finds the genomic regions where the query sequence aligns with the reference sequence
-    :param coordinates: a list indices where the query sequence aligns with the reference sequence
+    :param virus: the virus (HIV or SIV)
     :param reference_nt_sequence: the nucleotide reference sequence
-    :param reference_aa_sequence: the amino acid reference sequence
-    :param seq_locator: a sequence-locator object
-    :param viral_prots: a dictionary of viral proteins where the keys are the protein names,
-                        and the values are the protein sequences
-    :return regions: a list of lists containing the name of the region, the amino acid sequence of the region,
-                    and the nucleotide sequence of the region
+    :param coordinates: a list of indices where the query sequence aligns with the reference sequence
+    :return regions: a list of lists containing the name of the region and the nucleotide sequence of the region
     """
     regions = []
     for coord in coordinates:
-        if seq_locator.virus == 'hiv':
+        start = coord[0]
+        end = coord[1]
+        if virus == 'hiv':
             sub_region = []
             for key in HIV_NT_REGIONS:
-                if HIV_NT_REGIONS[key] == coord:
-                    sub_region.append(key)
-                    sub_region.append(reference_nt_sequence[coord[0] - 1: coord[1]])
-                    if key in viral_prots:
-                        sub_region.append(reference_aa_sequence[coord[0] - 1:coord[1]])
-                regions.append(sub_region)
+                if HIV_NT_REGIONS[key][0] >= start and HIV_NT_REGIONS[key][1] <= end:
+                    sub_region.append((key, reference_nt_sequence[start:end]))
+            regions.append(sub_region)
 
         else:
             sub_region = []
             for key in SIV_NT_REGIONS:
-                if SIV_NT_REGIONS[key] == coord:
-                    sub_region.append(key)
-                    sub_region.append(reference_nt_sequence[coord[0] - 1: coord[1]])
-                    if key in viral_prots:
-                        sub_region.append(reference_aa_sequence[coord[0] - 1: coord[1]])
-                regions.append(sub_region)
+                if SIV_NT_REGIONS[key][0] >= start and SIV_NT_REGIONS[key][1] <= end:
+                    sub_region.append((key, reference_nt_sequence[start:end]))
+            regions.append(sub_region)
 
+    return regions
+
+
+def find_aa_regions(matches, viral_prots):
+    """
+    Finds amino acid regions where the query aligns with the references genome
+    :param matches: a list of match objects
+    :param viral_prots: a dictionary of the viral protein sequence
+    :return regions: a list of lists containing the region and the sequence of the aligned region
+    """
+    regions = {}
+    for match in matches:
+        seq = match.group()
+        sub_region = []
+        for key in viral_prots:
+            if seq in viral_prots[key]:
+                regions[key] = sub_region.append([key, viral_prots[key], [match.start(), match.end()-1]])
     return regions
 
 
@@ -287,64 +259,95 @@ def get_region_coordinates(alignment):
     """
     Gets the indices of regions where the query aligns with the reference sequence
     :param alignment: a list containing the header of the query sequence, and the aligned query sequence
-    :return: the positions where the query sequence aligned with the reference sequences(s) with no gaps
+    :return: the positions where the query sequence aligns with the reference sequences(s) with no gaps
     """
-
-    # TODO: locate aligned regions at the ends
-    pat = re.compile('(?<=-)[A-Z]+|[a-z]+(?=-)')    # Match the start and end of an alignment
-    coordinates = [[match.start(), match.end()] for match in pat.finditer(alignment)]
+    pat = re.compile('[A-Z]+|[a-z]+')    # Match the start and end of an alignment
+    coordinates = [[match.start(), match.end() - 1] for match in pat.finditer(alignment)]
     return coordinates
 
-# TODO: search in dictionary to find all regions the query sequence touches
 
-
-def find_adjacent_regions(virus, base, coordinates, ref_nt_seq, ref_aa_seq, viral_prot):
-
-    regions = []
-    for coord in coordinates:
-        start = coord[0]
-        end = coord[1]
-
-        if virus == 'hiv':
-            if base == 'nucl':
-                region = []
-                for key in HIV_NT_REGIONS:
-                    if HIV_NT_REGIONS[key][0] >= start and HIV_NT_REGIONS[key][1] <= end:
-                        region.append(key)
-                        region.append(ref_nt_seq[start - 1: end])
-                    for prot in viral_prot:
-                        if key == prot:
-                            region.append(viral_prot[prot])
-                    regions.append(region)
-
-        elif virus == 'siv':
-            if base == 'nucl':
-                region = []
-                for key in SIV_NT_REGIONS:
-                    if SIV_NT_REGIONS[key][0] >= start and SIV_NT_REGIONS[key][1] <= end:
-                        region.append(key)
-                        region.append(ref_nt_seq[start - 1: end])
-                    for prot in viral_prot:
-                        if key == prot:
-                            region.append(viral_prot[prot])
-                    regions.append(region)
-
-    return regions
-
-
-def make_aa_dict(ref_seq):
+def get_matches(alignment):
     """
-    Creates a dictionary where the keys are the name of the protein and the values are the protein sequence
-    :param ref_seq: the file stream containing the reference sequence in read mode
-    :return viral prots: a dictionary of the viral proteins
+    Retrieves sequences where the query sequence matches the reference sequence
+    :param alignment: a list containing the aligned regions
+    :return coordinates: the sequences where the query sequence aligns with the reference sequences(s) with no gaps
     """
-    viral_prots = {}
-    for h, seq in ref_seq:
-        if h.startswith('>'):
-            line = h.split("|")
-            region = line[0]
-            viral_prots[region] = seq
-    return viral_prots
+    pat = re.compile('[A-Z]+|[a-z]+')    # Match the start and end of an alignment
+    matches = [match for match in pat.finditer(alignment)]
+    return matches
+
+
+def pretty_output(outfile, nt_regions=None, aa_regions=None):
+    """
+    Prints the output of 'align' mode
+    :param outfile: <option> the file stream for the output file in write mode
+    :param nt_regions: <option> the nucleotide regions where the query aligned with the reference sequence
+    :param aa_regions: <option> the protein regions where the query sequence aligned with th reference sequence
+    """
+    if outfile is not None:
+        if nt_regions is not None:
+            outfile.write("Nucleotide regions touched by the query sequence:")
+            for nt_region in nt_regions:
+                outfile.write("\tRegion:\t{}"
+                              "\n\tSequence:\t{}\n".format(nt_region[0], nt_region[1]))
+
+        if aa_regions is not None:
+            outfile.write("Protein regions touched by the query sequence:")
+            for aa_region in aa_regions:
+                outfile.write("\tRegion:\t{}"
+                              "\n\tSequence:\t{}"
+                              "\n\tCoordinates:\t{}\n".format(aa_region[0], aa_region[1], aa_region[2]))
+
+    else:
+        if nt_regions is not None:
+            print("Nucleotide regions touched by the query sequence:")
+            for nt_region in nt_regions:
+                print("\tRegion:\t{}"
+                      "\n\tSequence:\t{}\n".format(nt_region[0], nt_region[1]))
+
+        if aa_regions is not None:
+            print("Protein regions touched by the query sequence:")
+            for aa_region in aa_regions:
+                print("\tRegion:\t{}"
+                      "\n\tSequence:\t{}"
+                      "\n\tCoordinates:\t{}\n".format(aa_region[0], aa_region[1], aa_region[2]))
+
+
+def retrieve(virus, reference_sequence, start, end, region, outfile):
+    """
+    Sequence locator for 'retrieve' mode
+    :param virus: the reference virus
+    :param reference_sequence: reference genome sequence
+    :param start: the starting coordinate
+    :param end: the end coordinate
+    :param region: the genomic region
+    :param outfile: the file stream of the output file in write mode
+    :return: return the genomic region defined by the starting and ending coordinates
+    """
+
+    if virus == 'hiv':
+        sequence_range = HIV_NT_REGIONS[region]
+    else:
+        sequence_range = SIV_NT_REGIONS[region]
+
+    # If start is smaller than the region's start coordinate, set start_coord to region's start coordinate
+    if start < sequence_range[0]:
+        start = sequence_range[0]
+
+    # If end_coord is greater than the region's end coordinate, set end_coord to region's end coordinate
+    if end == "end" or end > sequence_range[1]:
+        end = sequence_range[1]
+
+    # -1 to account for 0-based indexing
+    region_to_retrieve = reference_sequence[start-1:end]
+
+    if outfile is None:
+        print("\033[1mRetrieved sequence: \033[0m")
+        print(textwrap.fill(region_to_retrieve, 50))
+    else:
+        outfile.write(region_to_retrieve)
+
+    return region_to_retrieve
 
 
 def parse_args():
@@ -354,8 +357,9 @@ def parse_args():
     regions = list(HIV_NT_REGIONS)  # The same genomic region options are provided for HIV and SIV
 
     parser = argparse.ArgumentParser(
-        description='Aligns a nucleotide or protein sequence relative to the HIV or SIV reference genomes; '
-                    'or retrieves a sequence in the HXB2 or SIVmm239 reference genome from its coordinates',
+        description='An implementation of the HIV Sequence Locator tool by the Los Alamos National Laboratory.'
+                    'This tool aligns a nucleotide or protein sequence relative to HIV or SIV reference genomes;'
+                    'or retrieves a sequence in the HXB2 or SIVmm239 reference genome from its coordinates.',
     )
     parser.add_argument('virus', metavar='', choices=['hiv', 'siv'],
                         help='The reference virus')
@@ -409,33 +413,49 @@ def main():
         else:
             reference_sequence = ref_aa_seq
 
-        # If user specifies both references files or if neither reference file is specified
-        if not args.ref_nt is not args.ref_aa:
-            viral_prots = make_aa_dict(ref_aa_seq)
-
+        viral_prots = make_aa_dict(ref_aa_seq)
         alignment = sequence_align(query, reference_sequence, args.outfile)
 
-        # Query sequence will be the last item in the list
-        coordinates = get_region_coordinates(alignment[-1])
-        seq_locator = SeqLocator(args.virus, region=None, start_coord=coordinates[0], end_coord=[1])
+        nt_regions = None
+        aa_regions = None
 
-        regions = find_regions(coordinates, ref_nt_seq, ref_aa_seq, seq_locator, viral_prots)
+        if args.base == 'nucl':
+            coordinates = get_region_coordinates(alignment[-1])  # Query sequence will be the last item in the list
+            nt_regions = find_genomic_regions(args.virus, coordinates, ref_nt_seq)
+
+            # If user specifies both references files or if neither file is specified, the program
+            # will give both amino acid and nucleotide regions that are touched by the query sequence.
+            # If only one reference file is specified (eg: a reference nucleotide sequence), the program
+            # will give only nucleotide regions that are touched by the query sequence.
+            if args.ref_nt is None == args.ref_aa is None:
+                matches = get_matches(alignment[-1])
+                aa_regions = find_aa_regions(matches, viral_prots)
+
+        else:
+            matches = get_matches(alignment[-1])
+            aa_regions = find_aa_regions(matches, viral_prots)
+
+            # If user specifies both references files or if neither file is specified, the program
+            # will give both amino acid and nucleotide regions that are touched by the query sequence.
+            # If only one reference file is specified (eg: a reference protein sequence), the program
+            # will give only protein regions that are touched by the query sequence.
+            if (args.ref_nt is None) == (args.ref_aa is None):
+                coordinates = get_region_coordinates(alignment[-1])
+                nt_regions = find_genomic_regions(args.virus, coordinates, ref_nt_seq)
+
+        pretty_output(args.outfile, nt_regions, aa_regions)
 
     else:
         # Read reference_sequence from file
-        reference_sequence = get_ref_seq(args.virus, args.base, args.ref_nt)
-        valid_seq = valid_sequence(args.base, reference_sequence)
+        reference_sequence = get_ref_seq(args.virus, args.base)
         valid_in = valid_inputs(args.virus, args.start_coord, args.end_coord, args.region)
-
-        if not valid_seq:
-            print("Invalid sequence: {}".format(reference_sequence))
 
         if not valid_in:
             print("Invalid input")
+            sys.exit()
 
-        if valid_seq and valid_in:
-            seq_locator = SeqLocator(args.virus, args.region, args.start_coord, args.end_coord)
-            seq_locator.retrieve(reference_sequence, args.outfile)
+        if valid_in:
+            retrieve(reference_sequence, args.virus, args.start, args.end, args.region, args.outfile)
 
 
 if __name__ == '__main__':
