@@ -10,6 +10,7 @@ and are included in the complete SIV genome (https://www.ncbi.nlm.nih.gov/nucleo
 import re
 import textwrap
 from poplars.mafft import *
+from poplars.common import convert_fasta
 
 HIV_NT_REGIONS = {"Complete": (1, 9719),            "5'LTR": (1, 634),
                   "5'LTR-R": (456, 551),            "5'LTR-U3": (1, 455),
@@ -100,7 +101,7 @@ class SeqLocator:
             self.end_coord = sequence_range[1]
 
         # -1 to account for 0-based indexing
-        region_to_retrieve = reference_sequence[(self.start_coord - 1):self.end_coord]
+        region_to_retrieve = reference_sequence[(self.start_coord - 1): self.end_coord]
 
         if outfile is None:
             print("\033[1mRetrieved sequence: \033[0m")
@@ -112,33 +113,33 @@ class SeqLocator:
         return region_to_retrieve
 
 
-def valid_sequence(base, query):
+def valid_sequence(base, sequence):
     """
     Verifies that input sequence uses the correct output
     :param base: the base of the sequence (nucl or prot)
-    :param query: input sequence
+    :param sequence: input sequence
     :raises ValueError: if the sequence is empty or if it contains invalid characters
     :return: <true> if the input sequence uses the correct alphabet
     """
     dna_alphabet = 'atgc'
     aa_alphabet = 'ARDNCEQGHILKMFPSTWYV'
 
-    if not query:
+    if not sequence:
         print("Invalid sequence: sequence length is 0\n")
         return False
 
     if base == 'nucl':
         # Nucleotide sequences are converted to lowercase
-        query = query.lower()
-        if not all(pos in dna_alphabet for pos in query):
-            print("Invalid nucleotide sequence: {}\n".format(query))
+        sequence = sequence.lower()
+        if not all(pos in dna_alphabet for pos in sequence):
+            print("Invalid nucleotide sequence: {}\n".format(sequence))
             return False
 
     else:
         # Amino acid sequences are converted to uppercase
-        query = query.upper()
-        if not all(pos in aa_alphabet for pos in query):
-            print("Invalid amino acid sequence: {}\n".format(query))
+        sequence = sequence.upper()
+        if not all(pos in aa_alphabet for pos in sequence):
+            print("Invalid amino acid sequence: {}\n".format(sequence))
             return False
 
     return True
@@ -202,27 +203,25 @@ def get_ref_seq(virus, base, ref_seq=None):
     """
     seq_path = os.path.dirname(os.path.abspath(__file__))
 
-    if base == 'nucl':
-        # If no reference sequence is specified, set default reference sequence
-        if virus == 'hiv' and ref_seq is None:
-            ref_seq = os.path.join(seq_path, "ref_genomes/K03455.fasta")
+    if ref_seq is None:
+        if base == 'nucl':
+            # If no reference sequence is specified, set default reference sequence
+            if virus == 'hiv':
+                ref_seq = os.path.join(seq_path, "ref_genomes/K03455.fasta")
 
-        if virus == 'siv' and ref_seq is None:
-            ref_seq = os.path.join(seq_path, "ref_genomes/M33262.fasta")
+            if virus == 'siv':
+                ref_seq = os.path.join(seq_path, "ref_genomes/M33262.fasta")
 
-    else:
-        if virus == 'hiv' and ref_seq is None:
-            ref_seq = os.path.join(seq_path, "ref_genomes/K03455-protein.fasta")
+        else:
+            if virus == 'hiv':
+                ref_seq = os.path.join(seq_path, "ref_genomes/K03455-protein.fasta")
 
-        if virus == 'siv' and ref_seq is None:
-            ref_seq = os.path.join(seq_path, "ref_genomes/M33262-protein.fasta")
+            if virus == 'siv':
+                ref_seq = os.path.join(seq_path, "ref_genomes/M33262-protein.fasta")
 
-    reference_sequence = ''
-    for line in ref_seq:
-        # Skip fist line if the file is a FASTA file
-        if not reference_sequence.startswith(">"):
-            reference_sequence = ref_seq.read().replace("\n", "")
-            reference_sequence.join(line)
+        ref_seq = open(ref_seq, 'r')
+
+    reference_sequence = convert_fasta(ref_seq)
 
     if valid_sequence(base, reference_sequence):
         return reference_sequence
@@ -266,9 +265,9 @@ def find_regions(coordinates, reference_nt_sequence, reference_aa_sequence, seq_
             for key in HIV_NT_REGIONS:
                 if HIV_NT_REGIONS[key] == coord:
                     sub_region.append(key)
-                    sub_region.append(reference_nt_sequence[coord[0]-1: coord[1]])
+                    sub_region.append(reference_nt_sequence[coord[0] - 1: coord[1]])
                     if key in viral_prots:
-                        sub_region.append(reference_aa_sequence[coord[0]-1:coord[1]])
+                        sub_region.append(reference_aa_sequence[coord[0] - 1:coord[1]])
                 regions.append(sub_region)
 
         else:
@@ -278,7 +277,7 @@ def find_regions(coordinates, reference_nt_sequence, reference_aa_sequence, seq_
                     sub_region.append(key)
                     sub_region.append(reference_nt_sequence[coord[0] - 1: coord[1]])
                     if key in viral_prots:
-                        sub_region.append(reference_aa_sequence[coord[0] - 1:coord[1]])
+                        sub_region.append(reference_aa_sequence[coord[0] - 1: coord[1]])
                 regions.append(sub_region)
 
     return regions
@@ -296,7 +295,7 @@ def get_region_coordinates(alignment):
     coordinates = [[match.start(), match.end()] for match in pat.finditer(alignment)]
     return coordinates
 
-# TODO: search in dictionary to find all regions the query touches
+# TODO: search in dictionary to find all regions the query sequence touches
 
 
 def find_adjacent_regions(virus, base, coordinates, ref_nt_seq, ref_aa_seq, viral_prot):
@@ -312,7 +311,7 @@ def find_adjacent_regions(virus, base, coordinates, ref_nt_seq, ref_aa_seq, vira
                 for key in HIV_NT_REGIONS:
                     if HIV_NT_REGIONS[key][0] >= start and HIV_NT_REGIONS[key][1] <= end:
                         region.append(key)
-                        region.append(ref_nt_seq[start-1:end])
+                        region.append(ref_nt_seq[start - 1: end])
                     for prot in viral_prot:
                         if key == prot:
                             region.append(viral_prot[prot])
@@ -324,7 +323,7 @@ def find_adjacent_regions(virus, base, coordinates, ref_nt_seq, ref_aa_seq, vira
                 for key in SIV_NT_REGIONS:
                     if SIV_NT_REGIONS[key][0] >= start and SIV_NT_REGIONS[key][1] <= end:
                         region.append(key)
-                        region.append(ref_nt_seq[start - 1:end])
+                        region.append(ref_nt_seq[start - 1: end])
                     for prot in viral_prot:
                         if key == prot:
                             region.append(viral_prot[prot])
@@ -373,7 +372,7 @@ def parse_args():
                               help='File containing the query sequence.')
     parser_align.add_argument('-ref_nt', metavar='', type=argparse.FileType('r'),
                               help='FASTA file containing the reference nucleotide sequence')
-    parser_align.add_argument('-ref_aa', metavar='', type=argparse.FileType('w'),
+    parser_align.add_argument('-ref_aa', metavar='', type=argparse.FileType('r'),
                               help='FASTA file containing the reference amino acid sequence')
     parser_align.add_argument('-outfile', type=argparse.FileType('w'),
                               help='File where results will be written. '
@@ -410,7 +409,10 @@ def main():
         else:
             reference_sequence = ref_aa_seq
 
-        viral_prots = make_aa_dict(ref_aa_seq)
+        # If user specifies both references files or if neither reference file is specified
+        if not args.ref_nt is not args.ref_aa:
+            viral_prots = make_aa_dict(ref_aa_seq)
+
         alignment = sequence_align(query, reference_sequence, args.outfile)
 
         # Query sequence will be the last item in the list
