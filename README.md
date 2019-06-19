@@ -4,7 +4,7 @@
 
 ## Available Tools 
 
-Implementaions of the following tools are currently available:
+Implementations of the following tools are currently available:
 * Hypermut
 * Rip-like
 * Sequence locator 
@@ -28,19 +28,19 @@ Implementaions of the following tools are currently available:
 *Poplars* can be installed directly from the source code on GitHub or through the [Python Package Index](https://pypi.org/) `pip`. 
 
 #### From Source 
-1. Navigate to your directory of choice. Then clone the *Poplars* repository by running the following command in your terminal
+1. Navigate to your directory of choice. Then clone the *Poplars* repository by running the following command in your terminal:
     ```commandline
     git clone https://github.com/PoonLab/Poplars.git
     ``` 
     Alternatively, you can download *Poplars* into your directory of choice.  
 
-2. After downloading or cloning the repository, a directory called *Poplars* will be created in your working directory. Navigate to the *Poplars* folder and run `setup.py` in your terminal using one of the following commands 
+2. After downloading or cloning the repository, a directory called *Poplars* will be created in your working directory. Navigate to the *Poplars* folder and run `setup.py` in your terminal using one of the following commands: 
     ```commandline
-    python setup.py install 
+    sudo python setup.py install 
     ```
     or 
     ```commandline
-    python3 setup.py install
+    sudo python3 setup.py install
     ```
 
     `setup.py` will install *Poplars* along with MAFFT binaries (executables) that are specific to your machine. 
@@ -48,15 +48,15 @@ Implementaions of the following tools are currently available:
     *Poplars* will be installed into your Python site-packages (so you can use *Poplars* anywhere you can use Python!)
 
 #### Using `pip` 
-1. To install *Poplars*, run the following command in your terminal
+1. To install *Poplars*, run the following command in your terminal:
     ```commandline
     pip install poplars
     ```
-2. To upgrade the version of *Poplars* run the following command in your terminal
+2. To upgrade the version of *Poplars* run the following command in your terminal:
     ```commandline
     pip install --upgrade poplars
     ```
-3. To uninstall *Poplars* run the following command in your terminal
+3. To uninstall *Poplars* run the following command in your terminal:
     ```commandline
     pip uninstall poplars
     ```
