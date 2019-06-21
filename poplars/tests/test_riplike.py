@@ -22,5 +22,7 @@ class testRiplike(unittest.TestCase):
         self.assertEqual(expected, result)
     
     def testBootstrap(self):
-        pass
+        pass  #FIXME: not sure how to test this function just yet
         
+    def testRiplike(self):
+        pass
