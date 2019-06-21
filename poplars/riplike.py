@@ -8,7 +8,9 @@ import argparse
 from poplars.common import convert_fasta
 from poplars.mafft import align
 
-
+# subset of HIV-1 group M subtype references curated by LANL
+with open('poplars/ref_genomes/HIV1_Mgroup.fasta') as handle:
+    reference = convert_fasta(handle)
 
 def pdistance(seq1, seq2):
     """
@@ -49,6 +51,26 @@ def bootstrap(s1, s2, reps=100):
         yield b1, b2
 
 
+def update_alignment(seq):
+    # append query sequence to reference alignment
+    fasta = align(seq, reference)
+    
+    # eliminate insertions in query relative to references
+    try:
+        conseq = dict(fasta)['CON_OF_CONS']
+    except:
+        print("ERROR: reference alignment in poplars.riplike does not contain CON_OF_CONS entry")
+        raise
+        
+    skip = [i for i in range(len(conseq)) if conseq[i] == '-']
+    fasta2 = []
+    for h, s in fasta:
+        s2 = [nt for i, nt in enumerate(s) if i not in skip]
+        fasta2.append([h, ''.join(s2)])
+    
+    return fasta2
+
+
 def riplike(seq, window=400, step=5, nrep=100):
     """
     :param seq:  query sequence
@@ -58,28 +80,9 @@ def riplike(seq, window=400, step=5, nrep=100):
     :param nrep:  number of replicates for nonparametric bootstrap sampling
     """
     
-    # subset of HIV-1 group M subtype references curated by LANL
-    with open('poplars/ref_genomes/HIV1_Mgroup.fasta') as handle:
-        reference = convert_fasta(handle)
-    
     results = []
     
-    # append query sequence to reference alignment
-    fasta = align(seq, reference)
-    
-    # eliminate insertions in query relative to references
-    try:
-        conseq = dict(fasta)['CON_OF_CONS']
-    except:
-        print(fasta)
-        raise
-    skip = [i for i in range(len(conseq)) if conseq[i] == '-']
-    fasta2 = []
-    for h, s in fasta:
-        s2 = [nt for i, nt in enumerate(s) if i not in skip]
-        fasta2.append([h, ''.join(s2)])
-    fasta = fasta2
-    
+    fasta = update_alignment(seq)
     query = dict(fasta)['query']  # aligned query
     seqlen = len(query)
     
@@ -108,24 +111,22 @@ def riplike(seq, window=400, step=5, nrep=100):
             
             if pd < best_p:
                 # query is closer to this reference
-                second_p = best_p
-                second_ref = best_ref
-                best_p = pd
-                best_ref = h
-                best_seq = s1
-                
+                second_p = best_p; second_ref = best_ref
+                best_p = pd; best_ref = h; best_seq = s1
             elif pd < second_p:
                 # replace second best
-                second_p = pd
-                second_ref = h
-        
+                second_p = pd; second_ref = h
         
         if best_ref is None:
             outfile.write('{},{},None,,None,,\n'.format(header, left))
             continue
         
-        # use nonparametric bootstrap to determine significance
+        result = {'left': left, 'best_ref': best_ref, 'best_p': best_p, 
+                'second_ref': second_ref, 'second_p': None if second_ref is None else second_p}
+        
+        quant = None
         if second_ref is not None:
+            # use nonparametric bootstrap to determine significance
             boot_dist = []
             for bs, bq in bootstrap(best_seq, q1, reps=nrep):
                 ndiff, denom = pdistance(bs, bq)
@@ -136,16 +137,8 @@ def riplike(seq, window=400, step=5, nrep=100):
             quant = list(map(lambda x: x < second_p, boot_dist))
             quant = sum(quant) / float(len(quant))
             
-            results.append({
-                'left': left, 'best_ref': best_ref, 'best_p': best_p, 
-                'second_ref': second_ref, 'second_p': second_p, 'quant': quant
-            })
-        else:
-            # if no valid second best, accept first without bootstrap
-            results.append({
-                'left': left, 'best_ref': best_ref, 'best_p': best_p, 
-                'second_ref': None, 'second_p': None, 'quant': None
-            })
+        result.update({'quant': quant})
+        results.append(result)
         
     return results
 
@@ -172,10 +165,12 @@ def main():
     fasta = convert_fasta(args.infile)
     for h, s in fasta:
         print(h)  # crude progress monitoring
-        res = riplike(s, args.outfile, window=args.window, step=args.step, nrep=args.nrep)
-        args.outfile.write(
-            '{},{left},{best_ref},{best_p},{second_ref},{second_p},{quant}\n'.format(header, **res)
-        )
+        results = riplike(s, args.outfile, window=args.window, step=args.step, nrep=args.nrep)
+        for result in results:
+            args.outfile.write(
+                '{},{left},{best_ref},{best_p},{second_ref},{second_p},{quant}\n'
+                .format(header, **result)
+            )
         
     args.outfile.close()
     
