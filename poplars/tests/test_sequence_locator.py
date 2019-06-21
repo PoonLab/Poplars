@@ -1,3 +1,5 @@
+# TODO: remove redundant setUp and tearDown functions
+
 import unittest
 import os
 from poplars.sequence_locator import valid_sequence
@@ -343,6 +345,31 @@ class TestMakeAADictionary(unittest.TestCase):
         self.assertEqual(expected, result)
 
     def tearDown(self):
+        self.hiv_prot_file.close()
+        self.siv_prot_file.close()
+
+
+class TestFindGenomicRegions(unittest.TestCase):
+
+    def setUp(self):
+        self.hiv_genome_file = open(TEST_HIV_GENOME)
+        self.siv_genome_file = open(TEST_SIV_GENOME)
+        self.hiv_prot_file = open(TEST_HIV_PROTS)
+        self.siv_prot_file = open(TEST_SIV_PROTS)
+
+    def testSimpleUse(self):
+        query = get_query('nucl', self.hiv_genome_file)
+        reference_sequence = get_ref_seq('hiv', 'nucl')
+        sequence_alignment = sequence_align(query, reference_sequence)
+        coordinates = get_region_coordinates(sequence_alignment[-1])
+        result = find_genomic_regions('hiv', reference_sequence, coordinates)
+        print(result)
+        expected = []
+        self.assertEqual(expected, result)
+
+    def tearDown(self):
+        self.hiv_genome_file.close()
+        self.siv_genome_file.close()
         self.hiv_prot_file.close()
         self.siv_prot_file.close()
 

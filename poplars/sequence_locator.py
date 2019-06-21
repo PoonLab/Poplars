@@ -214,7 +214,7 @@ def get_region_coordinates(alignment):
     :return: the positions where the query sequence aligns with the reference sequences(s) with no gaps
     """
     pat = re.compile('[A-Z]{2,}')     # Match the aligned region (minimum alignment length is 2)
-    coordinates = [[match.start(), match.end()] for match in pat.finditer(alignment[1])]
+    coordinates = [(match.start(), match.end()) for match in pat.finditer(alignment[1])]
     print(coordinates)
     return coordinates
 
@@ -243,18 +243,16 @@ def find_genomic_regions(virus, reference_nt_sequence, coordinates):
         start = coord[0]
         end = coord[1]
         if virus == 'hiv':
-            sub_region = []
             for key in HIV_NT_REGIONS:
-                if HIV_NT_REGIONS[key][0] >= start and HIV_NT_REGIONS[key][1] <= end:
-                    sub_region.append((key, reference_nt_sequence[start:end]))
-            regions.append(sub_region)
+                if (HIV_NT_REGIONS[key][0] - 1) <= start < HIV_NT_REGIONS[key][1] and \
+                        (HIV_NT_REGIONS[key][0] - 1 < end <= HIV_NT_REGIONS[key][1]):
+                    regions.append((key, reference_nt_sequence[1][start:end]))
 
         else:
-            sub_region = []
             for key in SIV_NT_REGIONS:
-                if SIV_NT_REGIONS[key][0] >= start and SIV_NT_REGIONS[key][1] <= end:
-                    sub_region.append((key, reference_nt_sequence[start:end]))
-            regions.append(sub_region)
+                if (SIV_NT_REGIONS[key][0] - 1) <= start and SIV_NT_REGIONS[key][1] and \
+                (SIV_NT_REGIONS[key][0] - 1 < end <= SIV_NT_REGIONS[key][1]):
+                    regions.append((key, reference_nt_sequence[1][start:end]))
 
     return regions
 

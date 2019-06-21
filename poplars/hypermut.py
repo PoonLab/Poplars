@@ -5,10 +5,10 @@ Supplementary Materials.
 """
 
 import argparse
+from poplars.common import convert_fasta
 import re
 
 import scipy.stats as stats
-from Bio import SeqIO
 
 
 class MutationInfo:
@@ -137,7 +137,7 @@ def hypermut(infile, skip=None):
     """
 
     with open(infile) as handle:
-        fasta = [list(s) for s in SeqIO.FastaIO.SimpleFastaParser(handle)]
+        fasta = convert_fasta(handle)
 
     if skip:
         print("skipping first {} records".format(skip))
