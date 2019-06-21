@@ -50,8 +50,6 @@ for root, dirs, files in os.walk(mafft_dir):
         for file in files:
             mafft_files.append(os.path.join(root.replace('poplars/', ''), file))
 
-print(mafft_files)
-
 setup(
     name='poplars',
     packages=['poplars'],
