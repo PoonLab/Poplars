@@ -13,12 +13,18 @@ class OverrideInstall(install):
     """
     def run(self):
         uid, gid = 0, 0  # root user
-        mode = 0o755
+        #mode = 0o755
         set_data_dir = False
-        install.run(self)
+        install.run(self)  # run parent class method
         for filepath in self.get_outputs():
             path = os.path.dirname(filepath)
+            #log.info('*** {}'.format(filepath))
             if path.endswith('ref_genomes'):
+                mode = 0o644
+                log.info('Changing permissions of {0} to {1:o}'.format(filepath, mode))
+                os.chmod(filepath, mode)
+            elif '/bin/' in path:
+                mode = 0o755
                 log.info('Changing permissions of {0} to {1:o}'.format(filepath, mode))
                 os.chmod(filepath, mode)
 
@@ -28,20 +34,23 @@ data_files = ['ref_genomes/K03455.fasta', 'ref_genomes/M33262.fasta',
 
 # identify platform
 if sys.platform.startswith("linux"):
-    mafft_dir = 'bin/mafft-linux64/'
+    mafft_dir = 'poplars/bin/mafft-linux64/'
 elif sys.platform.startswith("win"):
-    mafft_dir = 'bin/mafft-win/'
+    mafft_dir = 'poplars/bin/mafft-win/'
 elif sys.platform == "darwin":
-    mafft_dir = 'bin/mafft-mac/'
+    mafft_dir = 'poplars/bin/mafft-mac/'
 else:
     sys.stderr.write("Warning: failed to recognize platform.")
     sys.exit()
 
 # generate listing of MAFFT-associated files for user's platform
 mafft_files = []
-for root, dirs, files in os.walk('bin/mafft-linux64/'):
+for root, dirs, files in os.walk(mafft_dir):
     if len(files) > 0:
-        mafft_files.append((root, files))
+        for file in files:
+            mafft_files.append(os.path.join(root.replace('poplars/', ''), file))
+
+print(mafft_files)
 
 setup(
     name='poplars',
