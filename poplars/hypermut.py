@@ -4,6 +4,8 @@ as described in Keele et al. http://www.pnas.org/cgi/content/short/0802203105
 Supplementary Materials.
 """
 
+# TODO: Check that input sequences are the same length
+
 import argparse
 from poplars.common import convert_fasta
 import re
@@ -51,12 +53,6 @@ class MutationInfo:
         self.ctrl_sites = ctrl_sites
 
 
-mut_pattern = '[AGCT](?=[AG][AGT])'
-mut = re.compile(mut_pattern)  # Matches potential mutation sites (GRD)
-ctrl_pattern = '[AGCT](?=[CT].|[AG]C)'
-ctrl = re.compile(ctrl_pattern)  # Matches control sites (YN|RC)
-
-
 def parse_args():
     parser = argparse.ArgumentParser(
         description='Classify HIV-1 sequences as being hypermutated '
@@ -76,6 +72,11 @@ def make_results(seq, gees):
     :param gees: list of positions of G's in the reference sequence
     :return ctable: a contingency table for the query sequence
     """
+
+    # FIXME: Regexes do not catch all potential mutation/ control sites
+    #
+    mut = re.compile('[AGCT](?=[AG][AGT])')  # Matches potential mutation sites (GRD)
+    ctrl = re.compile('[AGCT](?=[CT].|[AG]C)')  # Matches control sites (YN|RC)
 
     # Keele et al. apply Fisher's exact test to a contingency table
     ctable = [
