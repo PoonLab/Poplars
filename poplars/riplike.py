@@ -4,12 +4,15 @@ import sys
 import subprocess
 import random
 import argparse
+import os
 
 from poplars.common import convert_fasta
 from poplars.mafft import align
 
 # subset of HIV-1 group M subtype references curated by LANL
-with open('poplars/ref_genomes/HIV1_Mgroup.fasta') as handle:
+seq_path = os.path.dirname(os.path.abspath(__file__))
+ref_seq = os.path.join(seq_path, 'ref_genomes/HIV1_Mgroup.fasta')
+with open(ref_seq) as handle:
     reference = convert_fasta(handle)
 
 def pdistance(seq1, seq2):
@@ -165,7 +168,7 @@ def main():
     fasta = convert_fasta(args.infile)
     for h, s in fasta:
         print(h)  # crude progress monitoring
-        results = riplike(s, args.outfile, window=args.window, step=args.step, nrep=args.nrep)
+        results = riplike(s, window=args.window, step=args.step, nrep=args.nrep)
         for result in results:
             args.outfile.write(
                 '{},{left},{best_ref},{best_p},{second_ref},{second_p},{quant}\n'

@@ -55,6 +55,9 @@ class testRiplike(unittest.TestCase):
         expected = 1
         self.assertEqual(expected, result)
         
+    def testRiplike(self):
+        result = riplike(self.hiv_genome)
+        
 
 
 
