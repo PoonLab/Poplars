@@ -363,9 +363,31 @@ class TestFindGenomicRegions(unittest.TestCase):
         sequence_alignment = sequence_align(query, reference_sequence)
         coordinates = get_region_coordinates(sequence_alignment[-1])
         result = find_genomic_regions('hiv', reference_sequence, coordinates)
-        print(result)
-        expected = []
+        expected = [('5\'LTR',    "TGGAAGGGCTAATTCACTCCCAACGAAGACAAGATATCCTTGATCTGTGG"
+                                  "ATCTACCACACACAAGGCTACTTCCCTGATTAGCAGAACTACACACCAGG"
+                                  "GCCAGGGATCAGATATCCACTGACCTTTGGATGGTGCTACAAGCTAGTAC"
+                                  "CAGTTGAGCCAGAGAAGTTAGAAGAAGCCAACAAAGGAGAGAACACCAGC"
+                                  "TTGTTACACCCTGTGAGCCTGCATGGAATGGATGACCCGGAGAGAGAAGT"
+                                  "GTTAGAGTGGAGGTTTGACAGCCGCCTAGCATTTCATCACATGGCCCGAG"
+                                  "AGCTGCATCCGGAGTACTTCAAGAACTGCTGACATCGAGCTTGCTACAAG"),
+
+                    ('5\'LTR-U3', "TGGAAGGGCTAATTCACTCCCAACGAAGACAAGATATCCTTGATCTGTGG"
+                                  "ATCTACCACACACAAGGCTACTTCCCTGATTAGCAGAACTACACACCAGG"
+                                  "GCCAGGGATCAGATATCCACTGACCTTTGGATGGTGCTACAAGCTAGTAC"
+                                  "CAGTTGAGCCAGAGAAGTTAGAAGAAGCCAACAAAGGAGAGAACACCAGC"
+                                  "TTGTTACACCCTGTGAGCCTGCATGGAATGGATGACCCGGAGAGAGAAGT"
+                                  "GTTAGAGTGGAGGTTTGACAGCCGCCTAGCATTTCATCACATGGCCCGAG"
+                                  "AGCTGCATCCGGAGTACTTCAAGAACTGCTGACATCGAGCTTGCTACAAG")]
         self.assertEqual(expected, result)
+
+    def testSIVAlignment(self):
+        query = get_query('nucl', self.siv_genome_file)
+        reference_sequence = get_ref_seq('hiv', 'nucl')
+        sequence_alignment = sequence_align(query, reference_sequence)
+        coordinates = get_region_coordinates(sequence_alignment[-1])
+        result = find_genomic_regions('hiv', reference_sequence, coordinates)
+        print(result)
+        # self.assertEqual(expected, result)
 
     def tearDown(self):
         self.hiv_genome_file.close()
