@@ -11,19 +11,34 @@ class testRiplike(unittest.TestCase):
         with open(TEST_HIV_GENOME) as handle:
             self.hiv_genome = handle.readlines()[1]
         
-    def testHamming(self):
-        test = [['query', 'ACGT'], ['CON_OF_CONS', 'ACGT'], ['A', 'ACGG']]
-        result = hamming(test)
-        expected = {'A': [0, 0, 0, 1]}
+    def testPdistSimple(self):
+        result = pdistance('ACGT', 'ACGC')
+        expected = (1, 4)
         self.assertEqual(expected, result)
-
+        
+        result = pdistance('ACGT', 'TGCA')
+        expected = (4, 4)
+        self.assertEqual(expected, result)
+    
+    def testPdistGapped(self):
+        result = pdistance('ACGT', '---T')
+        expected = (0, 1)
+        self.assertEqual(expected, result)
+        
+        result = pdistance('ACGT', 'G---')
+        expected = (1, 1)
+        self.assertEqual(expected, result)
+    
+    def testBootstrap(self):
+        pass  #FIXME: not sure how to test this function just yet
+        
     def testUpdateAlignment(self):
         aln = update_alignment(self.hiv_genome)
         aln = dict(aln)
         
         # alignment should have original number plus one
         result = len(aln)
-        expected = 13+1
+        expected = 11
         self.assertEqual(expected, result) 
         
         # alignment should contain entry for query sequence
@@ -39,9 +54,6 @@ class testRiplike(unittest.TestCase):
         result = len(set([len(s) for h, s in aln.items()]))
         expected = 1
         self.assertEqual(expected, result)
-        
-    def testRiplike(self):
-        result = riplike(self.hiv_genome)
         
 
 
