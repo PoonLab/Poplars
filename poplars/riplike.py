@@ -1,7 +1,5 @@
 #TODO: consistent reference coordinates across outputs
 
-import sys
-import subprocess
 import random
 import argparse
 
@@ -9,8 +7,9 @@ from poplars.common import convert_fasta
 from poplars.mafft import align
 
 # subset of HIV-1 group M subtype references curated by LANL
-with open('poplars/ref_genomes/HIV1_Mgroup.fasta') as handle:
+with open('../poplars/ref_genomes/HIV1_Mgroup.fasta') as handle:
     reference = convert_fasta(handle)
+
 
 def pdistance(seq1, seq2):
     """
@@ -71,7 +70,7 @@ def update_alignment(seq):
     return fasta2
 
 
-def riplike(seq, window=400, step=5, nrep=100):
+def riplike(seq, outfile, window=400, step=5, nrep=100):
     """
     :param seq:  query sequence
     :param outfile:  open file stream in write mode for results
@@ -96,7 +95,7 @@ def riplike(seq, window=400, step=5, nrep=100):
         
         # iterate over reference genomes
         for h, s in fasta:
-            if h=='query' or h=='CON_OF_CONS':
+            if h == 'query' or h == 'CON_OF_CONS':
                 continue 
                 
             # slice window segment from reference
@@ -118,11 +117,11 @@ def riplike(seq, window=400, step=5, nrep=100):
                 second_p = pd; second_ref = h
         
         if best_ref is None:
-            outfile.write('{},{},None,,None,,\n'.format(header, left))
+            outfile.write('{},{},None,,None,,\n'.format(h, left))
             continue
         
         result = {'left': left, 'best_ref': best_ref, 'best_p': best_p, 
-                'second_ref': second_ref, 'second_p': None if second_ref is None else second_p}
+                  'second_ref': second_ref, 'second_p': None if second_ref is None else second_p}
         
         quant = None
         if second_ref is not None:
@@ -169,7 +168,7 @@ def main():
         for result in results:
             args.outfile.write(
                 '{},{left},{best_ref},{best_p},{second_ref},{second_p},{quant}\n'
-                .format(header, **result)
+                .format(h, **result)
             )
         
     args.outfile.close()

@@ -427,3 +427,40 @@ class TestGetRegionCoordinates(unittest.TestCase):
         self.siv_genome_file.close()
         self.hiv_prot_file.close()
         self.siv_prot_file.close()
+
+
+class TestRetrieve(unittest.TestCase):
+
+    def setUp(self):
+        self.hiv_genome_file = open(TEST_HIV_GENOME)
+        self.siv_genome_file = open(TEST_SIV_GENOME)
+        self.hiv_prot_file = open(TEST_HIV_PROTS)
+        self.siv_prot_file = open(TEST_SIV_PROTS)
+
+    def testDefaultInput(self):
+        reference_sequence = get_ref_seq('hiv', 'nucl')
+        expected_seq = 'TTTTTAGGGAAGATCTGGCCTTCCTACAAGGGAAGGCCAGGGAATTTT'
+        result_seq = retrieve('hiv', reference_sequence, 'p1')
+        self.assertEqual(expected_seq, result_seq)
+
+    def testSIVInput(self):
+        reference_sequence = get_ref_seq('siv', 'nucl')
+        expected_seq = 'GTATTCAAATTTGGATTACCCAGAATAGTGGCCAGACAGATAGTAGACACCTGTGATAAATGTCATCAGAAAGGAGAGG' \
+                       'CTATACATGGGCAGGCAAATTCAGATCTAGGGACTTGGCAAAT'
+        result_seq = retrieve('siv', reference_sequence, 'Integrase', 67, 188)
+        self.assertEqual(expected_seq, result_seq)
+
+    def testBeyondEnd(self):
+        reference_sequence = get_ref_seq('hiv', 'nucl')
+        expected_seq = 'ATGGAACAAGCCCCAGAAGACCAAGGGCCACAGAGGGAGCCACACAATGAATGGACACTAGAGCTTTTAGAGGAGCTTAA' \
+                       'GAATGAAGCTGTTAGACATTTTCCTAGGATTTGGCTCCATGGCTTAGGGCAACATATCTATGAAACTTATGGGGATACTT' \
+                       'GGGCAGGAGTGGAAGCCATAATAAGAATTCTGCAACAACTGCTGTTTATCCATTTTCAGAATTGGGTGTCGACATAGCAG' \
+                       'AATAGGCGTTACTCGACAGAGGAGAGCAAGAAATGGAGCCAGTAGATCCTAG'
+        result_seq = retrieve('hiv', reference_sequence, 'Vpr', 1, 9000)
+        self.assertEqual(expected_seq, result_seq)
+
+    def tearDown(self):
+        self.hiv_genome_file.close()
+        self.siv_genome_file.close()
+        self.hiv_prot_file.close()
+        self.siv_prot_file.close()

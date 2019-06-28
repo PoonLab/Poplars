@@ -8,7 +8,6 @@ and are included in the complete SIV genome (https://www.ncbi.nlm.nih.gov/nucleo
 """
 
 import re
-import textwrap
 from poplars.mafft import *
 from poplars.common import convert_fasta
 from math import ceil
@@ -368,7 +367,7 @@ def pretty_output(outfile, nt_regions=None, aa_regions=None):
                       "\n\tCoordinates:\t{}\n".format(aa_region[0], aa_region[1], aa_region[2]))
 
 
-def retrieve(virus, reference_sequence, start, end, region, outfile):
+def retrieve(virus, reference_sequence, region, start=1, end='end', outfile=None):
     """
     Sequence locator for 'retrieve' mode
     :param virus: the reference virus
@@ -385,26 +384,37 @@ def retrieve(virus, reference_sequence, start, end, region, outfile):
     else:
         sequence_range = SIV_NT_REGIONS[region]
 
-    # If start is smaller than the region's start coordinate, set start_coord to region's start coordinate
-    if start < sequence_range[0]:
+    if start <= sequence_range[0]:
         start = sequence_range[0]
+
+    else:
+        start = sequence_range[0] + start
 
     # If end_coord is greater than the region's end coordinate, set end_coord to region's end coordinate
     if end == "end" or end > sequence_range[1]:
         end = sequence_range[1]
 
+    else:
+        end = sequence_range[0] + end
+
     # -1 to account for 0-based indexing
-    region_to_retrieve = reference_sequence[start-1:end]
+    region_to_retrieve = reference_sequence[0][1][start-1:end]
 
     if outfile is None:
         print("\033[1mRetrieved sequence: \033[0m")
-        print(textwrap.fill(region_to_retrieve, 50))
-        print("Nucleotide position relative to CDS: {} to {}\n"
-              "Nucleotide position relative to query sequence start: {} --> {}\n"
-              "Nucleotide position relative to start of genome: {} --> {}\n"
-              "Amino acid position relative to protein start: {} --> {}"
-              .format(start, end, 1, (start-end + 1), (region[0]+start), (region[1]+end), ceil(start/3), ceil(end/3)))
+        # Print 60 characters per line
+        seq_lines = [region_to_retrieve[i:i + 60] for i in range(0, len(region_to_retrieve), 60)]
+        for line in seq_lines:
+            print("{}".format(line))
 
+        print("\n\033[1mNucleotide position relative to CDS start: \033[0m{} --> {}\n"
+              .format(start - 790, end + 1 - 790))      # +1 to account for 0-based indexing
+        print("\033[1mNucleotide position relative to query sequence start: \033[0m{} --> {}\n"
+              .format(1, (end-start + 1)))
+        print("\033[1mNucleotide position relative to {} genome start: \033[0m{} --> {}\n"
+              .format(virus, start, end + 1))
+        print("\033[1mAmino acid position relative to protein start: \033[0m{} --> {}"
+              .format(ceil((start + 1 - sequence_range[0])/3), (ceil((end - start)/3))))
     else:
         outfile.write("Retrieved sequence: {}\n".format(region_to_retrieve))
         outfile.write("Nucleotide position relative to CDS: {} to {}\n"
@@ -494,7 +504,7 @@ def main():
             # will give both amino acid and nucleotide regions that are touched by the query sequence.
             # If only one reference file is specified (eg: a reference nucleotide sequence), the program
             # will give only nucleotide regions that are touched by the query sequence.
-            if args.ref_nt is None == args.ref_aa is None:
+            if (args.ref_nt is None) == (args.ref_aa is None):
                 matches = get_matches(alignment[-1])
                 aa_regions = find_aa_regions(matches, viral_prots)
 
@@ -522,7 +532,7 @@ def main():
             sys.exit(0)
 
         if valid_in:
-            retrieve(reference_sequence, args.virus, args.start, args.end, args.region, args.outfile)
+            retrieve(args.virus, reference_sequence, args.region, args.start, args.end, args.outfile)
 
 
 if __name__ == '__main__':
