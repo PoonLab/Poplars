@@ -61,14 +61,14 @@ SIV_NT_REGIONS = {"Complete": (1, 10535),           "5'LTR": (257, 1074),
 
 def valid_sequence(base, sequence):
     """
-    Verifies that input sequence uses the correct output
+    Verifies that input sequence is valid
     :param base: the base of the sequence (nucl or prot)
     :param sequence: a list of lists containing header and sequence pairs
     :raises ValueError: if the sequence is empty or if it contains invalid characters
     :return: <true> if the input sequence uses the correct alphabet
     """
-    dna_alphabet = 'atgc'
-    aa_alphabet = 'ARDNCEQGHILKMFPSTWYV'
+    dna_alphabet = 'atgc-xn'
+    aa_alphabet = 'ARDNCEQGHILKMFPSTWYV-X'
 
     if not sequence:
         print("Invalid sequence: sequence length is 0\n")
@@ -123,18 +123,33 @@ def valid_inputs(virus, start_coord, end_coord, region):
     return True
 
 
-def get_query(base, query):
+def get_query(base, query_file):
     """
-    Gets and checks that the query sequence is valid
+    Gets the query sequence and checks that it is valid
     :param base: the base (nucleotide or protein)
-    :param query: the file stream containing the query sequence in read mode
-    :return: the query sequence as a string
+    :param query_file: the file stream containing the query sequence in read mode
+    :return: a list of lists containing the sequence identifiers and the query sequences
     """
-    query = convert_fasta(query)
-    if valid_sequence(base, query):
-        return query[0][1]
+    line = query_file.readline()
+    query_file.seek(0)              # reset pointer to beginning
+
+    # Fasta file
+    if line.startswith('>'):
+        query = convert_fasta(query_file)
+
     else:
+        count = 1
+        query = []
+        for line in query_file:
+            line = line.strip('\n')
+            if len(line) > 0:
+                query.append(["Sequence{}".format(count), line.upper()])
+                count += 1
+
+    if not valid_sequence(base, query):
         sys.exit(0)
+    else:
+        return query
 
 
 def get_ref_seq(virus, base, ref_seq=None):
@@ -191,7 +206,6 @@ def sequence_align(query_sequence, reference_sequence, outfile=None):
     :param outfile: <option> The file stream of the output file in write mode
     """
     result = align(query_sequence, reference_sequence)
-    print(result)
 
     if outfile is not None:
         outfile.write("Alignment:")
@@ -343,21 +357,21 @@ def pretty_output(outfile, nt_regions=None, aa_regions=None):
             outfile.write("Nucleotide regions touched by the query sequence:")
             for nt_region in nt_regions:
                 outfile.write("\tRegion:\t{}"
-                              "\n\tSequence:\t{}\n".format(nt_region[0], nt_region[1]))
+                              "\n\tSequence:\t{}\n".format(nt_region, nt_region[1]))
 
         if aa_regions is not None:
             outfile.write("Protein regions touched by the query sequence:")
             for aa_region in aa_regions:
                 outfile.write("\tRegion:\t{}"
                               "\n\tSequence:\t{}"
-                              "\n\tCoordinates:\t{}\n".format(aa_region[0], aa_region[1], aa_region[2]))
+                              "\n\tCoordinates:\t{}\n".format(aa_region, aa_region[1], aa_region[2]))
 
     else:
         if nt_regions is not None:
             print("Nucleotide regions touched by the query sequence:")
             for nt_region in nt_regions:
                 print("\tRegion:\t{}"
-                      "\n\tSequence:\t{}\n".format(nt_region[0], nt_region[1]))
+                      "\n\tSequence:\t{}\n".format(nt_region, nt_region[1]))
 
         if aa_regions is not None:
             print("Protein regions touched by the query sequence:")
@@ -367,15 +381,15 @@ def pretty_output(outfile, nt_regions=None, aa_regions=None):
                       "\n\tCoordinates:\t{}\n".format(aa_region[0], aa_region[1], aa_region[2]))
 
 
-def retrieve(virus, reference_sequence, region, start=1, end='end', outfile=None):
+def retrieve(virus, reference_sequence, region, outfile, start_offset=1, end_offset='end'):
     """
-    Sequence locator for 'retrieve' mode
+    Retrieves a sequence given its coordinates
     :param virus: the reference virus
     :param reference_sequence: reference genome sequence
-    :param start: the starting coordinate
-    :param end: the end coordinate
     :param region: the genomic region
-    :param outfile: the file stream of the output file in write mode
+    :param outfile: file stream of the output file
+    :param start_offset: the starting coordinate
+    :param end_offset: the end coordinate
     :return: return the genomic region defined by the starting and ending coordinates
     """
 
@@ -384,21 +398,21 @@ def retrieve(virus, reference_sequence, region, start=1, end='end', outfile=None
     else:
         sequence_range = SIV_NT_REGIONS[region]
 
-    if start <= sequence_range[0]:
-        start = sequence_range[0]
+    region_start = sequence_range[0]
+    region_end = sequence_range[1]
 
+    if start_offset <= region_start:
+        start = region_start
     else:
-        start = sequence_range[0] + start
+        start = region_start + (start_offset - region_start)
 
     # If end_coord is greater than the region's end coordinate, set end_coord to region's end coordinate
-    if end == "end" or end > sequence_range[1]:
-        end = sequence_range[1]
-
+    if end_offset == 'end' or end_offset > region_end:
+        end = region_end
     else:
-        end = sequence_range[0] + end
+        end = region_end + (region_end - end_offset)
 
-    # -1 to account for 0-based indexing
-    region_to_retrieve = reference_sequence[0][1][start-1:end]
+    region_to_retrieve = reference_sequence[0][1][start-1:end]          # -1 to account for 0-based indexing
 
     if outfile is None:
         print("\033[1mRetrieved sequence: \033[0m")
@@ -407,24 +421,43 @@ def retrieve(virus, reference_sequence, region, start=1, end='end', outfile=None
         for line in seq_lines:
             print("{}".format(line))
 
+    else:
+        outfile.write("Retrieved sequence: {}\n".format(region_to_retrieve))
+
+    output_relative_positions(start, end, sequence_range, region, outfile)
+
+    return region_to_retrieve
+
+
+def output_relative_positions(start, end, sequence_range, region, outfile):
+    """
+    :param start:
+    :param end:
+    :param sequence_range:
+    :param region:
+    :param outfile:
+    :return:
+    """
+
+    if outfile is None:
         print("\n\033[1mNucleotide position relative to CDS start: \033[0m{} --> {}\n"
               .format(start - 790, end + 1 - 790))      # +1 to account for 0-based indexing
         print("\033[1mNucleotide position relative to query sequence start: \033[0m{} --> {}\n"
               .format(1, (end-start + 1)))
-        print("\033[1mNucleotide position relative to {} genome start: \033[0m{} --> {}\n"
-              .format(virus, start, end + 1))
+        print("\033[1mNucleotide position relative to genome start: \033[0m{} --> {}\n"
+              .format(start, end + 1))
         print("\033[1mAmino acid position relative to protein start: \033[0m{} --> {}"
               .format(ceil((start + 1 - sequence_range[0])/3), (ceil((end - start)/3))))
-    else:
-        outfile.write("Retrieved sequence: {}\n".format(region_to_retrieve))
-        outfile.write("Nucleotide position relative to CDS: {} to {}\n"
-                      "Nucleotide position relative to query sequence start: {} --> {}\n"
-                      "Nucleotide position relative to start of genome: {} --> {}\n"
-                      "Amino acid position relative to protein start: {} --> {}"
-                      .format(start, end, 1, (start - end + 1), (region[0] + start), (region[1] + end), ceil(start / 3),
-                       ceil(end / 3)))
 
-    return region_to_retrieve
+    else:
+        outfile.write("\nNucleotide position relative to CDS: {} to {}\n"
+                      .format(start, end))
+        outfile.write("\nNucleotide position relative to query sequence start: {} --> {}\n"
+                      .format(1, (start - end + 1)))
+        outfile.write("\nNucleotide position relative to start of genome: {} --> {}\n"
+                      .format((region[0] + start), (region[1] + end)))
+        outfile.write("\nAmino acid position relative to protein start: {} --> {}"
+                      .format(ceil(start / 3), ceil(end / 3)))
 
 
 def parse_args():
@@ -435,13 +468,13 @@ def parse_args():
 
     parser = argparse.ArgumentParser(
         description='An implementation of the HIV Sequence Locator tool by the Los Alamos National Laboratory.'
-                    'This tool aligns a nucleotide or protein sequence relative to HIV or SIV reference genomes;'
+                    'This tool aligns a nucleotide or protein sequence relative to HIV or SIV reference genomes; '
                     'or retrieves a sequence in the HXB2 or SIVmm239 reference genome from its coordinates.',
     )
     parser.add_argument('virus', metavar='', choices=['hiv', 'siv'],
                         help='The reference virus')
     parser.add_argument('base', metavar='base', choices=['nucl', 'prot'],
-                        help='Sequence base type. Allowed bases are: ' + ', '.join("\'nucl\' and \'prot\'"),)
+                        help='Sequence base type. Allowed bases are \'nucl\' and \'prot\'')
     subparsers = parser.add_subparsers(dest='subcommand')
 
     # Create subparser for 'align' mode
@@ -452,9 +485,9 @@ def parse_args():
     parser_align.add_argument('query', type=argparse.FileType('r'),
                               help='File containing the query sequence.')
     parser_align.add_argument('-ref_nt', metavar='', type=argparse.FileType('r'),
-                              help='FASTA file containing the reference nucleotide sequence')
+                              help='File containing the reference nucleotide sequence')
     parser_align.add_argument('-ref_aa', metavar='', type=argparse.FileType('r'),
-                              help='FASTA file containing the reference amino acid sequence')
+                              help='File containing the reference amino acid sequence')
     parser_align.add_argument('-outfile', type=argparse.FileType('w'),
                               help='File where results will be written. '
                                    'If no file is specified, the results will be printed to the console')
@@ -493,8 +526,7 @@ def main():
         viral_prots = make_aa_dict(ref_aa_seq)
         alignment = sequence_align(query, reference_sequence, args.outfile)
 
-        nt_regions = None
-        aa_regions = None
+        nt_regions, aa_regions = None, None
 
         if args.base == 'nucl':
             coordinates = get_region_coordinates(alignment[-1])  # Query sequence will be the last item in the list

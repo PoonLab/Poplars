@@ -2,6 +2,7 @@
 
 import unittest
 import os
+from io import StringIO
 from poplars.sequence_locator import valid_sequence
 from poplars.sequence_locator import valid_inputs
 from poplars.sequence_locator import get_query
@@ -60,6 +61,11 @@ class TestValidSequence(unittest.TestCase):
     def testAALowerCase(self):
         expected = True
         result = valid_sequence("prot", [[">header", "mwaglsalwgggp"]])
+        self.assertEqual(expected, result)
+
+    def testGappySequence(self):
+        expected = True
+        result = valid_sequence("nucl", [["header", "atgc-natgcgacgac"]])
         self.assertEqual(expected, result)
 
 
@@ -133,40 +139,63 @@ class TestGetQuery(unittest.TestCase):
         self.siv_genome_file = open(TEST_SIV_GENOME)
 
     def testNucleotideQuery(self):
-        expected = "ATGCGCG"
-        result = get_query("nucl", [">query", "atgcgcg"])
+        expected = [["query", "ATGCGCG"]]
+        handle = StringIO(">query\natgcgcg\n")
+        result = get_query("nucl", handle)
         self.assertEqual(expected, result)
 
     def testProteinQuery(self):
-        expected = "MPPLMMADLADLGG"
-        result = get_query("prot", [">query", "MPPLMMADLADLGG"])
+        expected = [["query", "MPPLMMADLADLGG"]]
+        handle = StringIO(">query\nMPPLMMADLADLGG\n")
+        result = get_query("prot", handle)
         self.assertEqual(expected, result)
 
     def testLongNucleotideSequence(self):
-        expected = "ATGCGCGAATTAGCGA"
-        result = get_query("nucl", [">query", "atgcgcg", "aattagcga"])
+        expected = [["query", "ATGCGCGAATTAGCGA"]]
+        handle = StringIO(">query\natgcgcg\naattagcga\n")
+        result = get_query("nucl", handle)
         self.assertEqual(expected, result)
 
     def testDefaultHIVGenome(self):
-        expected = ("TGGAAGGGCTAATTCACTCCCAACGAAGACAAGATATCCTTGATCTGTGG" 
-                    "ATCTACCACACACAAGGCTACTTCCCTGATTAGCAGAACTACACACCAGG" 
-                    "GCCAGGGATCAGATATCCACTGACCTTTGGATGGTGCTACAAGCTAGTAC" 
-                    "CAGTTGAGCCAGAGAAGTTAGAAGAAGCCAACAAAGGAGAGAACACCAGC" 
-                    "TTGTTACACCCTGTGAGCCTGCATGGAATGGATGACCCGGAGAGAGAAGT"
-                    "GTTAGAGTGGAGGTTTGACAGCCGCCTAGCATTTCATCACATGGCCCGAG"
-                    "AGCTGCATCCGGAGTACTTCAAGAACTGCTGACATCGAGCTTGCTACAAG")
+        expected = [["K03455|HIVHXB2CG", "TGGAAGGGCTAATTCACTCCCAACGAAGACAAGATATCCTTGATCTGTGG" 
+                                         "ATCTACCACACACAAGGCTACTTCCCTGATTAGCAGAACTACACACCAGG" 
+                                         "GCCAGGGATCAGATATCCACTGACCTTTGGATGGTGCTACAAGCTAGTAC" 
+                                         "CAGTTGAGCCAGAGAAGTTAGAAGAAGCCAACAAAGGAGAGAACACCAGC" 
+                                         "TTGTTACACCCTGTGAGCCTGCATGGAATGGATGACCCGGAGAGAGAAGT"
+                                         "GTTAGAGTGGAGGTTTGACAGCCGCCTAGCATTTCATCACATGGCCCGAG"
+                                         "AGCTGCATCCGGAGTACTTCAAGAACTGCTGACATCGAGCTTGCTACAAG"]]
         result = get_query("nucl", self.hiv_genome_file)
         self.assertEqual(expected, result)
 
     def testInvalidNucleotideQuery(self):
+        handle = StringIO(">query\natgcgcg*\n")
         with self.assertRaises(SystemExit) as e:
-            get_query("nucl", [">query", "atgcgcg*"])
+            get_query("nucl", handle)
         self.assertEqual(e.exception.code, 0)
 
     def testInvalidProteinQuery(self):
+        handle = StringIO(">query\nMPPLMMAD>LADLGG\n")
         with self.assertRaises(SystemExit) as e:
-            get_query("prot", [">query", "MPPLMMAD>LADLGG"])
+            get_query("prot", handle)
         self.assertEqual(e.exception.code, 0)
+
+    def testPlainText(self):
+        handle = StringIO("atgatcg\n")
+        expected = [["Sequence1", "ATGATCG"]]
+        result = get_query("nucl", handle)
+        self.assertEqual(expected, result)
+
+    def testMultipleQueries(self):
+        handle = StringIO("atgct--agc\natgca---ga\n")
+        expected = [["Sequence1", "ATGCT--AGC"], ["Sequence2", "ATGCA---GA"]]
+        result = get_query("nucl", handle)
+        self.assertEqual(expected, result)
+
+    def testMultipleFasta(self):
+        handle = StringIO(">q1\natgct--agc\n>q2\natgca---ga\n")
+        expected = [["q1", "ATGCT--AGC"], ["q2", "ATGCA---GA"]]
+        result = get_query("nucl", handle)
+        self.assertEqual(expected, result)
 
     def tearDown(self):
         self.hiv_genome_file.close()
