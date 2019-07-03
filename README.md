@@ -17,7 +17,7 @@ Implementations of the following tools are currently available:
 
 *Poplars* was tested using Python 3.6.x and Python 2.7x and is compatible with all major versions of Python.
 
-*Poplars* uses MAFFT (Multiple Alignment using Fast Fourier Transform) for sequence alignment, so for ease of use we have distributed all-in-one MAFFT packages for Linux (MAFFT Version 7.427), Windows  (MAFFT Version 7.428), and Mac OS X (MAFFT 7.427). 
+*Poplars* uses MAFFT (Multiple Alignment using Fast Fourier Transform) for sequence alignment, so for ease of use we have distributed all-in-one MAFFT packages for Linux (MAFFT Version 7.427), Windows  (MAFFT Version 7.429), and Mac OS X (MAFFT 7.427). 
 
 #### Operating System Requirements 
 *Poplars* is compatible with:

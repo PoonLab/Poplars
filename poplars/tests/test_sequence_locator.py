@@ -6,6 +6,7 @@ from io import StringIO
 from poplars.sequence_locator import valid_sequence
 from poplars.sequence_locator import valid_inputs
 from poplars.sequence_locator import get_query
+from poplars.sequence_locator import reverse_comp
 from poplars.sequence_locator import get_ref_seq
 from poplars.sequence_locator import sequence_align
 from poplars.sequence_locator import make_aa_dict
@@ -168,7 +169,7 @@ class TestGetQuery(unittest.TestCase):
         self.assertEqual(expected, result)
 
     def testInvalidNucleotideQuery(self):
-        handle = StringIO(">query\natgcgcg*\n")
+        handle = StringIO(">query\natgcgcg&\n")
         with self.assertRaises(SystemExit) as e:
             get_query("nucl", handle)
         self.assertEqual(e.exception.code, 0)
@@ -202,10 +203,15 @@ class TestGetQuery(unittest.TestCase):
         self.siv_genome_file.close()
 
 
+class TestReverseComp(unittest.TestCase):
+
+    def testSimpleUse(self):
+        expected = "TCGCTAATTCGCGCATN*"
+        result = reverse_comp("*NATGCGCGAATTAGCGA")
+        self.assertEqual(expected, result)
+
+
 class TestGetReferenceSequence(unittest.TestCase):
-    """
-    Adapted from https://stackoverflow.com/questions/8047736/how-to-load-data-from-a-file-for-a-unit-test-in-python
-    """
 
     def setUp(self):
         self.hiv_genome_file = open(TEST_HIV_GENOME)
@@ -391,22 +397,9 @@ class TestFindGenomicRegions(unittest.TestCase):
         reference_sequence = get_ref_seq('hiv', 'nucl')
         sequence_alignment = sequence_align(query, reference_sequence)
         coordinates = get_region_coordinates(sequence_alignment[-1])
-        result = find_genomic_regions('hiv', reference_sequence, coordinates)
-        expected = [('5\'LTR',    "TGGAAGGGCTAATTCACTCCCAACGAAGACAAGATATCCTTGATCTGTGG"
-                                  "ATCTACCACACACAAGGCTACTTCCCTGATTAGCAGAACTACACACCAGG"
-                                  "GCCAGGGATCAGATATCCACTGACCTTTGGATGGTGCTACAAGCTAGTAC"
-                                  "CAGTTGAGCCAGAGAAGTTAGAAGAAGCCAACAAAGGAGAGAACACCAGC"
-                                  "TTGTTACACCCTGTGAGCCTGCATGGAATGGATGACCCGGAGAGAGAAGT"
-                                  "GTTAGAGTGGAGGTTTGACAGCCGCCTAGCATTTCATCACATGGCCCGAG"
-                                  "AGCTGCATCCGGAGTACTTCAAGAACTGCTGACATCGAGCTTGCTACAAG"),
 
-                    ('5\'LTR-U3', "TGGAAGGGCTAATTCACTCCCAACGAAGACAAGATATCCTTGATCTGTGG"
-                                  "ATCTACCACACACAAGGCTACTTCCCTGATTAGCAGAACTACACACCAGG"
-                                  "GCCAGGGATCAGATATCCACTGACCTTTGGATGGTGCTACAAGCTAGTAC"
-                                  "CAGTTGAGCCAGAGAAGTTAGAAGAAGCCAACAAAGGAGAGAACACCAGC"
-                                  "TTGTTACACCCTGTGAGCCTGCATGGAATGGATGACCCGGAGAGAGAAGT"
-                                  "GTTAGAGTGGAGGTTTGACAGCCGCCTAGCATTTCATCACATGGCCCGAG"
-                                  "AGCTGCATCCGGAGTACTTCAAGAACTGCTGACATCGAGCTTGCTACAAG")]
+        result = find_genomic_regions('hiv', reference_sequence, coordinates)
+        expected = ['5\'LTR', '5\'LTR-U3', 'Nef', '3\'LTR']
         self.assertEqual(expected, result)
 
     def testSIVAlignment(self):
@@ -445,7 +438,7 @@ class TestGetRegionCoordinates(unittest.TestCase):
         query = get_query('nucl', self.hiv_genome_file)
         reference_sequence = get_ref_seq('siv', 'nucl')
         sequence_alignment = sequence_align(query, reference_sequence)
-        expected = [[256, 402], [414, 429], [595, 611], [2453, 2466], [2855, 2869], [3390, 3406],
+        expected = [[256, 402],   [414, 429],   [595, 611],   [2453, 2466], [2855, 2869], [3390, 3406],
                     [3560, 3573], [3856, 3867], [4501, 4518], [4556, 4566], [4750, 4758], [5912, 5927],
                     [6005, 6014], [6634, 6641], [8649, 8667], [8740, 8748], [10132, 10146]]
         result = get_region_coordinates(sequence_alignment[-1])

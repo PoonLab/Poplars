@@ -1,6 +1,6 @@
 """
 Wrapper script to ensure that MAFFT use system-specific binaries
-MAFFT versions: 7.427 (Linux), 7.482 (Windows), 7.427 (Mac OS X)
+MAFFT versions: 7.427 (Linux), 7.429 (Windows), 7.427 (Mac OS X)
 """
 
 import sys
@@ -25,7 +25,7 @@ def align(query, reference):
     elif type(reference) == list:
         for h, s in reference:
             handle.write('>{}\n{}\n'.format(h, s))
-            
+
     handle.write('>query\n{}\n'.format(query))
     handle.close()
 

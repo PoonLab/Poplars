@@ -12,51 +12,49 @@ from poplars.mafft import *
 from poplars.common import convert_fasta
 from math import ceil
 
-HIV_NT_REGIONS = {"Complete": (1, 9719),            "5'LTR": (1, 634),
-                  "5'LTR-R": (456, 551),            "5'LTR-U3": (1, 455),
-                  "5'LTR-U5": (552, 634),           "TAR": (453, 513),
-                  "Gag-Pol": (790, 5096),           "Gag": (790, 2292),
-                  "Matrix(p17/p15)": (790, 1185),   "Capsid(p24/p27)": (1186, 1878),
-                  "p2": (1879, 1920),               "Nucleocapsid(p7/p8)": (1921, 2085),
-                  "p1": (2086, 2133),               "p6": (2134, 2292),
-                  "Pol": (2085, 5096),              "GagPolTF": (2085, 2252),
-                  "Protease": (2253, 2549),         "RT": (2250, 3869),
-                  "RNase": (3870, 4229),            "Integrase": (4230, 5096),
-                  "Vif": (5041, 5619),              "Vpx": (-1, -1),  # Not a region in HIV
-                  "Vpr": (5559, 5850),              "Tat(with intron)": (5831, 8469),
-                  "Tat(exon1)": (5831, 6045),       "Tat(exon2)": (8379, 8469),
-                  "Rev(with intron)": (5970, 8653), "Rev(exon1)": (5970, 6045),
-                  "Rev(exon2)": (8739, 8653),       "Vpu": (6062, 6310),
-                  "Env(gp160)": (6225, 8795),       "V1": (6615, 6692),
-                  "V2": (6693, 6812),               "V3": (7110, 7217),
-                  "V4": (7377, 7478),               "V5": (7602, 7634),
-                  "RRE": (7710, 8061),              "gp120": (6225, 7757),
-                  "gp41": (7758, 8795),             "Nef": (8797, 9417),
-                  "3'LTR": (9086, 9719),            "3'LTR-R": (9541, 9636),
-                  "3'LTR-U3": (9086, 9540),         "3'LTR-U5": (9637, 9719)}
+HIV_NT_REGIONS = {"5'LTR":               (1, 634),      "5'LTR-R":          (456, 551),
+                  "5'LTR-U3":            (1, 455),      "5'LTR-U5":         (552, 634),
+                  "TAR":                 (453, 513),    "Gag-Pol":          (790, 5096),
+                  "Gag":                 (790, 2292),   "Matrix(p17/p15)":  (790, 1185),
+                  "Capsid(p24/p27)":     (1186, 1878),  "p2":               (1879, 1920),
+                  "Nucleocapsid(p7/p8)": (1921, 2085),  "p1":               (2086, 2133),
+                  "p6":                  (2134, 2292),  "Pol":              (2085, 5096),
+                  "GagPolTF":            (2085, 2252),  "Protease":         (2253, 2549),
+                  "RT":                  (2250, 3869),  "RNase":            (3870, 4229),
+                  "Integrase":           (4230, 5096),  "Vif":              (5041, 5619),
+                  "Vpr":                 (5559, 5850),  "Tat(with intron)": (5831, 8469),
+                  "Tat(exon1)":          (5831, 6045),  "Tat(exon2)":       (8379, 8469),
+                  "Rev(with intron)":    (5970, 8653),  "Rev(exon1)":       (5970, 6045),
+                  "Rev(exon2)":          (8739, 8653),  "Vpu":              (6062, 6310),
+                  "Env(gp160)":          (6225, 8795),  "V1":               (6615, 6692),
+                  "V2":                  (6693, 6812),  "V3":               (7110, 7217),
+                  "V4":                  (7377, 7478),  "V5":               (7602, 7634),
+                  "RRE":                 (7710, 8061),  "gp120":            (6225, 7757),
+                  "gp41":                (7758, 8795),  "Nef":              (8797, 9417),
+                  "3'LTR":               (9086, 9719),  "3'LTR-R":          (9541, 9636),
+                  "3'LTR-U3":            (9086, 9540),  "3'LTR-U5":         (9637, 9719)}
 
-SIV_NT_REGIONS = {"Complete": (1, 10535),           "5'LTR": (257, 1074),
-                  "5'LTR-R": (777, 950),            "5'LTR-U3": (257, 776),
-                  "5'LTR-U5": (951, 1074),          "TAR": (774, 898),
-                  "Gag-Pol": (1309, 5666),          "Gag": (1309, 2842),
-                  "Matrix(p17/p15)": (1309, 1713),  "Capsid(p24/p27)": (1714, 2400),
-                  "p2": (2401, 2451),               "Nucleocapsid(p7/p8)": (2452, 2607),
-                  "p1": (2608, 2649),               "p6": (2650, 2842),
-                  "Pol": (2607, 5666),              "GagPolTF": (2607, 2810),
-                  "Protease": (2811, 3107),         "RT": (3108, 4424),
-                  "RNase": (4425, 4784),            "Integrase": (4785, 5666),
-                  "Vif": (5596, 6240),              "Vpx": (6068, 6406),
-                  "Vpr": (6407, 6712),              "Tat(with intron)": (6558, 9158),
-                  "Tat(exon1)": (6558, 6853),       "Tat(exon2)": (9062, 9158),
-                  "Rev(with intron)": (6784, 9315), "Rev(exon1)": (6784, 6853),
-                  "Rev(exon2)": (9062, 9315),       "Vpu": (-1, -1),  # Not a region in SIV
-                  "Env(gp160)": (6860, 9499),       "V1": (7196, 7360),
-                  "V2": (7364, 7492),               "V3": (7791, 7892),
-                  "V4": (8063, 8153),               "V5": (8273, 8290),
-                  "RRE": (8380, 8735),              "gp120": (6860, 8434),
-                  "gp41": (8435, 9499),             "Nef": (9333, 10124),
-                  "3'LTR": (9719, 10535),           "3'LTR-R": (10235, 10411),
-                  "3'LTR-U3": (9719, 10234),        "3'LTR-U5": (10412, 10535)}
+SIV_NT_REGIONS = {"5'LTR":               (257, 1074),   "5'LTR-R":          (777, 950),
+                  "5'LTR-U3":            (257, 776),    "5'LTR-U5":         (951, 1074),
+                  "TAR":                 (774, 898),    "Gag-Pol":          (1309, 5666),
+                  "Gag":                 (1309, 2842),  "Matrix(p17/p15)":  (1309, 1713),
+                  "Capsid(p24/p27)":     (1714, 2400),  "p2":               (2401, 2451),
+                  "Nucleocapsid(p7/p8)": (2452, 2607),  "p1":               (2608, 2649),
+                  "p6":                  (2650, 2842),  "Pol":              (2607, 5666),
+                  "GagPolTF":            (2607, 2810),  "Protease":         (2811, 3107),
+                  "RT":                  (3108, 4424),  "RNase":            (4425, 4784),
+                  "Integrase":           (4785, 5666),  "Vif":              (5596, 6240),
+                  "Vpx":                 (6068, 6406),  "Vpr":              (6407, 6712),
+                  "Tat(with intron)":    (6558, 9158),  "Tat(exon1)":       (6558, 6853),
+                  "Tat(exon2)":          (9062, 9158),  "Rev(with intron)": (6784, 9315),
+                  "Rev(exon1)":          (6784, 6853),  "Rev(exon2)":       (9062, 9315),
+                  "Env(gp160)":          (6860, 9499),  "V1":               (7196, 7360),
+                  "V2":                  (7364, 7492),  "V3":               (7791, 7892),
+                  "V4":                  (8063, 8153),  "V5":               (8273, 8290),
+                  "RRE":                 (8380, 8735),  "gp120":            (6860, 8434),
+                  "gp41":                (8435, 9499),  "Nef":              (9333, 10124),
+                  "3'LTR":               (9719, 10535), "3'LTR-R":          (10235, 10411),
+                  "3'LTR-U3":            (9719, 10234), "3'LTR-U5":         (10412, 10535)}
 
 
 def valid_sequence(base, sequence):
@@ -67,8 +65,8 @@ def valid_sequence(base, sequence):
     :raises ValueError: if the sequence is empty or if it contains invalid characters
     :return: <true> if the input sequence uses the correct alphabet
     """
-    dna_alphabet = 'atgc-xn'
-    aa_alphabet = 'ARDNCEQGHILKMFPSTWYV-X'
+    dna_alphabet = 'atgc-*xn'
+    aa_alphabet = 'ARDNCEQGHILKMFPSTWYV-*X'
 
     if not sequence:
         print("Invalid sequence: sequence length is 0\n")
@@ -152,6 +150,17 @@ def get_query(base, query_file):
         return query
 
 
+def reverse_comp(query_sequence):
+    """
+    Reverses and complements the query sequence
+    :param query_sequence: the query sequence
+    :return: the reverse complement of the queyr sequence
+    """
+    complement = {'A': 'T', 'C': 'G', 'G': 'C', 'T': 'A', '*': '*', 'N': 'N', '-': '-'}
+    rev_comp = "".join(complement.get(nt, nt) for nt in reversed(query_sequence))
+    return rev_comp
+
+
 def get_ref_seq(virus, base, ref_seq=None):
     """
     Converts the reference sequence to a string and checks if the sequence is valid
@@ -200,30 +209,30 @@ def make_aa_dict(ref_aa_seq):
 
 def sequence_align(query_sequence, reference_sequence, outfile=None):
     """
-    Sequence locator for 'align mode'
+    Aligns the query sequence to the reference genome
     :param query_sequence: The query sequence
     :param reference_sequence: The reference sequence.
     :param outfile: <option> The file stream of the output file in write mode
     """
     result = align(query_sequence[0][1], reference_sequence)
-    print(result)
 
     if outfile is not None:
-        outfile.write("Alignment:")
-        for h, s in result:
-            outfile.write("\n>{}\n".format(h))
-            # Print 60 characters per line
-            seq_lines = [s[i:i+60] for i in range(0, len(s), 60)]
-            for line in seq_lines:
-                outfile.write('{}\n'.format(line))
-
+        outfile.write("Alignment:\n")
     else:
-        print("Alignment:")
-        for h, s in result:
+        print("\033[1mAlignment:\033[0m")
+
+    for h, s in result:
+        if outfile is not None:
+            outfile.write(">{}\n".format(h))
+        else:
             print(">{}".format(h))
-            # Print 60 characters per line
-            seq_lines = [s[i:i + 60] for i in range(0, len(s), 60)]
-            for line in seq_lines:
+
+        # Ouput 60 characters per line
+        seq_lines = [s[i:i + 60] for i in range(0, len(s), 60)]
+        for line in seq_lines:
+            if outfile is not None:
+                outfile.write('{}\n'.format(line))
+            else:
                 print("{}".format(line))
 
     return result
@@ -237,7 +246,7 @@ def get_region_coordinates(alignment):
     """
     pat = re.compile('[A-Z]{2,}')     # Match the aligned region (minimum alignment length is 2)
     coordinates = [(match.start(), match.end()) for match in pat.finditer(alignment[1])]
-    print(coordinates)
+    print("Coordinates (get_region_coordinates): ", coordinates)
     return coordinates
 
 
@@ -249,6 +258,7 @@ def get_matches(alignment):
     """
     pat = re.compile('[A-Z]{2,}')    # Match the aligned region (minimum alignment length is 2)
     matches = [match for match in pat.finditer(alignment[1])]
+    print("Matches (get_matches): ", matches)
     return matches
 
 
@@ -258,41 +268,70 @@ def find_genomic_regions(virus, reference_nt_sequence, coordinates):
     :param virus: the virus (HIV or SIV)
     :param reference_nt_sequence: the nucleotide reference sequence
     :param coordinates: a list of indices where the query sequence aligns with the reference sequence
-    :return regions: a list of lists containing the name of the region and the nucleotide sequence of the region
+    :return regions: a list of lists containing the name of the region and positions of the alignments in this region
     """
     regions = {}
     if virus == 'hiv':
-        common_seq_coords = []
-        for coord in coordinates:
-            start = coord[0]
-            end = coord[1]
+
+        for align_coord in coordinates:
+            start_aln = align_coord[0]
+            end_aln = align_coord[1]
 
             for key in HIV_NT_REGIONS:
+                # -1 to account for 1-based indexing
+                start_region_coord = HIV_NT_REGIONS[key][0] - 1     # Start coordinate of the genomic feature
+                end_region_coord = HIV_NT_REGIONS[key][1] - 1          # End coordinate of the genomic feature
+
+                start_offset = start_aln - start_region_coord
+                end_offset = end_aln - end_region_coord
+
                 # Check if aligned region is contained in a genomic region
-                if (HIV_NT_REGIONS[key][0] - 1) <= start < HIV_NT_REGIONS[key][1] and \
-                        (HIV_NT_REGIONS[key][0] - 1) < end <= HIV_NT_REGIONS[key][1]:
+                if start_region_coord <= start_aln < end_aln <= end_region_coord:
+                    common_seq_coords = []
                     if key != "Complete":
-                        common_seq_coords.append(reference_nt_sequence[0][1][start-1:end])
+                        common_seq_coords.append(reference_nt_sequence[0][1][start_aln + 1: end_aln])
+                        common_seq_coords.append([start_region_coord + start_offset, end_region_coord + end_offset])
+                        regions[key] = common_seq_coords
+
+                # # Check if aligned region overlaps with genomic regions
+                # if start_aln < end_region_coord and end_aln > start_region_coord:
+                #     common_seq_coords = []
+                #     if key != "Complete":
+                #         common_seq_coords.append(reference_nt_sequence[0][1][start_aln + 1: end_aln])
+                #         common_seq_coords.append([start_region_coord + start_offset, end_region_coord + end_offset])
+                #         regions[key] = common_seq_coords
+
+    else:
+        common_seq_coords = []
+        for align_coord in coordinates:
+            start_aln = align_coord[0]
+            end_aln = align_coord[1]
+
+            for key in SIV_NT_REGIONS:
+                # -1 to account for 1-based indexing
+                start_region_coord = SIV_NT_REGIONS[key][0] - 1  # Start coordinate of the genomic feature
+                end_region_coord = SIV_NT_REGIONS[key][1] - 1  # End coordinate of the genomic feature
+
+                start_offset = start_aln - start_region_coord
+                end_offset = end_aln - end_region_coord
+
+                # Check if aligned region is contained in a genomic region
+                if start_region_coord <= start_aln < end_aln <= end_region_coord:
+                    if key != "Complete":
+                        common_seq_coords.append(reference_nt_sequence[0][1][start_aln + 1: end_aln])
+                        common_seq_coords.append([start_region_coord + start_offset, end_region_coord + end_offset])
                         regions[key] = common_seq_coords
 
                 # Check if aligned region overlaps with genomic regions
-                if start < HIV_NT_REGIONS[key][1] and end > HIV_NT_REGIONS[key][0]:
+                if start_aln < end_region_coord and end_aln > start_region_coord:
                     if key != "Complete":
-                        common_seq_coords.append(reference_nt_sequence[0][1][start-1:end])
+                        common_seq_coords.append(reference_nt_sequence[0][1][start_aln + 1: end_aln])
+                        common_seq_coords.append([start_region_coord + start_offset, end_region_coord + end_offset])
                         regions[key] = common_seq_coords
 
-    else:
-        for key in SIV_NT_REGIONS:
-            common_seqs = []
-            for coord in coordinates:
-                start = coord[0]
-                end = coord[1]
-                if (SIV_NT_REGIONS[key][0] - 1) <= start and SIV_NT_REGIONS[key][1] and \
-                        (SIV_NT_REGIONS[key][0] - 1) < end <= SIV_NT_REGIONS[key][1]:
-                    if key != "Complete":
-                        common_seqs.append(reference_nt_sequence[0][1][start:end])
-                        regions[key] = common_seqs
-
+    for key in regions:
+        print(key, regions[key])
+        print()
     return regions
 
 
@@ -401,7 +440,6 @@ def retrieve(virus, reference_sequence, region, outfile, start_offset=1, end_off
     :param end_offset: the end coordinate
     :return: return the genomic region defined by the starting and ending coordinates
     """
-
     if virus == 'hiv':
         sequence_range = HIV_NT_REGIONS[region]
     else:
@@ -485,6 +523,8 @@ def parse_args():
 
     parser_align.add_argument('query', type=argparse.FileType('r'),
                               help='File containing the query sequence.')
+    parser_align.add_argument('-revcomp', default='n', choices=['y', 'n'],
+                              help='Align the reverse complement of the query sequence with the reference sequence')
     parser_align.add_argument('-ref_nt', metavar='', type=argparse.FileType('r'),
                               help='File containing the reference nucleotide sequence')
     parser_align.add_argument('-ref_aa', metavar='', type=argparse.FileType('r'),
@@ -514,9 +554,16 @@ def main():
     args = parse_args()
 
     if args.subcommand == "align":
-        query = get_query(args.base, args.query)
         ref_nt_seq = get_ref_seq(args.virus, args.base, args.ref_nt)
         ref_aa_seq = get_ref_seq(args.virus, args.base, args.ref_aa)
+        query = get_query(args.base, args.query)
+
+        # Handle reverse complement option
+        if args.revcomp == 'y':
+            if args.base == 'prot':
+                print("Invalid option: reverse complement is not available for proteins.")
+            else:
+                query = reverse_comp(query[0][1])
 
         # Set the reference sequence
         if args.base == 'nucl':
@@ -558,7 +605,7 @@ def main():
     else:
         # Read reference_sequence from file
         reference_sequence = get_ref_seq(args.virus, args.base)
-        valid_in = valid_inputs(args.virus, args.start_coord, args.end_coord, args.region)
+        valid_in = valid_inputs(args.virus, args.start, args.end, args.region)
 
         if not valid_in:
             print("Invalid input")
