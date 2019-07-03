@@ -1,7 +1,7 @@
 #! /bin/bash 
 er=0;
 myself=`dirname "$0"`/`basename "$0"`; export myself
-version="v7.428 (2019/May/22)"; export version
+version="v7.429 (2019/Jun/29)"; export version
 LANG=C; export LANG
 os=`uname`
 progname=`basename "$0"`

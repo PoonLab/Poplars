@@ -5,7 +5,7 @@ def convert_fasta(handle):
     :return: list of lists containing header-sequence pairs
     """
     result = []
-    sequence = ''
+    sequence, h = '', ''
     for line in handle:
         if line.startswith('$'):  # skip header line
             continue
@@ -13,9 +13,9 @@ def convert_fasta(handle):
             if len(sequence) > 0:
                 result.append([h, sequence])
                 sequence = ''  # reset
-            h = line.strip('>#\n')
+            h = line.strip('>#\n\r')
         else:
-            sequence += line.strip('\n').upper()
+            sequence += line.strip('\n\r').upper()
 
     result.append([h, sequence])  # handle last entry
     return result

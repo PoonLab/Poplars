@@ -64,7 +64,10 @@ def run_mafft(file_path):
     if not os.path.isfile(bin_path):
         logging.error("No file exists.")
 
-    raw_output = subprocess.check_output([bin_path, '--quiet', file_path], shell=False, stderr=subprocess.STDOUT)
+    if sys.platform.startswith("win"):
+        raw_output = subprocess.check_output([bin_path, '--quiet', file_path], shell=False, stderr=subprocess.DEVNULL)
+    else:
+        raw_output = subprocess.check_output([bin_path, '--quiet --thread -1', file_path], shell=False, stderr=subprocess.STDOUT)
 
     return raw_output
 

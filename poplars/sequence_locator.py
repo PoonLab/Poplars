@@ -205,7 +205,8 @@ def sequence_align(query_sequence, reference_sequence, outfile=None):
     :param reference_sequence: The reference sequence.
     :param outfile: <option> The file stream of the output file in write mode
     """
-    result = align(query_sequence, reference_sequence)
+    result = align(query_sequence[0][1], reference_sequence)
+    print(result)
 
     if outfile is not None:
         outfile.write("Alignment:")
@@ -247,7 +248,7 @@ def get_matches(alignment):
     :return coordinates: the sequences where the query sequence aligns with the reference sequences(s) with no gaps
     """
     pat = re.compile('[A-Z]{2,}')    # Match the aligned region (minimum alignment length is 2)
-    matches = [match for match in pat.finditer(alignment)]
+    matches = [match for match in pat.finditer(alignment[1])]
     return matches
 
 
@@ -261,16 +262,24 @@ def find_genomic_regions(virus, reference_nt_sequence, coordinates):
     """
     regions = {}
     if virus == 'hiv':
-        for key in HIV_NT_REGIONS:
-            common_seqs = []
-            for coord in coordinates:
-                start = coord[0]
-                end = coord[1]
+        common_seq_coords = []
+        for coord in coordinates:
+            start = coord[0]
+            end = coord[1]
+
+            for key in HIV_NT_REGIONS:
+                # Check if aligned region is contained in a genomic region
                 if (HIV_NT_REGIONS[key][0] - 1) <= start < HIV_NT_REGIONS[key][1] and \
                         (HIV_NT_REGIONS[key][0] - 1) < end <= HIV_NT_REGIONS[key][1]:
                     if key != "Complete":
-                        common_seqs.append(reference_nt_sequence[0][1][start:end])
-                        regions[key] = common_seqs
+                        common_seq_coords.append(reference_nt_sequence[0][1][start-1:end])
+                        regions[key] = common_seq_coords
+
+                # Check if aligned region overlaps with genomic regions
+                if start < HIV_NT_REGIONS[key][1] and end > HIV_NT_REGIONS[key][0]:
+                    if key != "Complete":
+                        common_seq_coords.append(reference_nt_sequence[0][1][start-1:end])
+                        regions[key] = common_seq_coords
 
     else:
         for key in SIV_NT_REGIONS:
@@ -430,14 +439,6 @@ def retrieve(virus, reference_sequence, region, outfile, start_offset=1, end_off
 
 
 def output_relative_positions(start, end, sequence_range, region, outfile):
-    """
-    :param start:
-    :param end:
-    :param sequence_range:
-    :param region:
-    :param outfile:
-    :return:
-    """
 
     if outfile is None:
         print("\n\033[1mNucleotide position relative to CDS start: \033[0m{} --> {}\n"
@@ -471,7 +472,7 @@ def parse_args():
                     'This tool aligns a nucleotide or protein sequence relative to HIV or SIV reference genomes; '
                     'or retrieves a sequence in the HXB2 or SIVmm239 reference genome from its coordinates.',
     )
-    parser.add_argument('virus', metavar='', choices=['hiv', 'siv'],
+    parser.add_argument('virus', metavar='virus', choices=['hiv', 'siv'],
                         help='The reference virus')
     parser.add_argument('base', metavar='base', choices=['nucl', 'prot'],
                         help='Sequence base type. Allowed bases are \'nucl\' and \'prot\'')

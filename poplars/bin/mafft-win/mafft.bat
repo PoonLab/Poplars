@@ -1,7 +1,7 @@
 @echo off
 setlocal enabledelayedexpansion
-chcp 65001
 cls; 1>&2
+chcp 65001 1>&2
 for /f "usebackq tokens=*" %%i IN (`cd`) DO @set current_dir=%%i
 if /i "%current_dir%" == "%systemroot%" (
   set mafft_working_dir="%~dp0"
