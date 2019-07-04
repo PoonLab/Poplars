@@ -12,58 +12,89 @@ from poplars.mafft import *
 from poplars.common import convert_fasta
 from math import ceil
 
-HIV_NT_REGIONS = {"5'LTR":               (1, 634),      "5'LTR-R":          (456, 551),
-                  "5'LTR-U3":            (1, 455),      "5'LTR-U5":         (552, 634),
-                  "TAR":                 (453, 513),    "Gag-Pol":          (790, 5096),
-                  "Gag":                 (790, 2292),   "Matrix(p17/p15)":  (790, 1185),
-                  "Capsid(p24/p27)":     (1186, 1878),  "p2":               (1879, 1920),
-                  "Nucleocapsid(p7/p8)": (1921, 2085),  "p1":               (2086, 2133),
-                  "p6":                  (2134, 2292),  "Pol":              (2085, 5096),
-                  "GagPolTF":            (2085, 2252),  "Protease":         (2253, 2549),
-                  "RT":                  (2250, 3869),  "RNase":            (3870, 4229),
-                  "Integrase":           (4230, 5096),  "Vif":              (5041, 5619),
-                  "Vpr":                 (5559, 5850),  "Tat(with intron)": (5831, 8469),
-                  "Tat(exon1)":          (5831, 6045),  "Tat(exon2)":       (8379, 8469),
-                  "Rev(with intron)":    (5970, 8653),  "Rev(exon1)":       (5970, 6045),
-                  "Rev(exon2)":          (8739, 8653),  "Vpu":              (6062, 6310),
-                  "Env(gp160)":          (6225, 8795),  "V1":               (6615, 6692),
-                  "V2":                  (6693, 6812),  "V3":               (7110, 7217),
-                  "V4":                  (7377, 7478),  "V5":               (7602, 7634),
-                  "RRE":                 (7710, 8061),  "gp120":            (6225, 7757),
-                  "gp41":                (7758, 8795),  "Nef":              (8797, 9417),
-                  "3'LTR":               (9086, 9719),  "3'LTR-R":          (9541, 9636),
-                  "3'LTR-U3":            (9086, 9540),  "3'LTR-U5":         (9637, 9719)}
 
-SIV_NT_REGIONS = {"5'LTR":               (257, 1074),   "5'LTR-R":          (777, 950),
-                  "5'LTR-U3":            (257, 776),    "5'LTR-U5":         (951, 1074),
-                  "TAR":                 (774, 898),    "Gag-Pol":          (1309, 5666),
-                  "Gag":                 (1309, 2842),  "Matrix(p17/p15)":  (1309, 1713),
-                  "Capsid(p24/p27)":     (1714, 2400),  "p2":               (2401, 2451),
-                  "Nucleocapsid(p7/p8)": (2452, 2607),  "p1":               (2608, 2649),
-                  "p6":                  (2650, 2842),  "Pol":              (2607, 5666),
-                  "GagPolTF":            (2607, 2810),  "Protease":         (2811, 3107),
-                  "RT":                  (3108, 4424),  "RNase":            (4425, 4784),
-                  "Integrase":           (4785, 5666),  "Vif":              (5596, 6240),
-                  "Vpx":                 (6068, 6406),  "Vpr":              (6407, 6712),
-                  "Tat(with intron)":    (6558, 9158),  "Tat(exon1)":       (6558, 6853),
-                  "Tat(exon2)":          (9062, 9158),  "Rev(with intron)": (6784, 9315),
-                  "Rev(exon1)":          (6784, 6853),  "Rev(exon2)":       (9062, 9315),
-                  "Env(gp160)":          (6860, 9499),  "V1":               (7196, 7360),
-                  "V2":                  (7364, 7492),  "V3":               (7791, 7892),
-                  "V4":                  (8063, 8153),  "V5":               (8273, 8290),
-                  "RRE":                 (8380, 8735),  "gp120":            (6860, 8434),
-                  "gp41":                (8435, 9499),  "Nef":              (9333, 10124),
-                  "3'LTR":               (9719, 10535), "3'LTR-R":          (10235, 10411),
-                  "3'LTR-U3":            (9719, 10234), "3'LTR-U5":         (10412, 10535)}
+class GenomeRegion:
+    """
+    Represents information about a genomic region
+    """
+
+    def __init__(self, region_name, nt_coords, nt_seq=None, aa_coords=None, aa_seq=None):
+        """
+        Stores information about each genomic region
+        :param region_name: The name of the genomic region
+        :param nt_coords: A list containing the start and end coordinates of the nucleotide region. Ex: [(1, 890)]
+        :param nt_seq: <option> The nucleotide sequence of the genomic region
+        :param aa_coords: <option> A list containing the start and end coordinates of the protein region. Ex: [(8,78)]
+        :param aa_seq: <option> The amino acid sequence of the genomic region
+        """
+        self.region_name = region_name
+        self.nt_coords = nt_coords
+        self.nt_seq = nt_seq
+        self.aa_coords = aa_coords
+        self.aa_seq = aa_seq
+
+    def set_nt_coords(self, nt_reference):
+        """
+        Sets the coordinates of the nucleotide regions
+        :param nt_reference: The reference nucleotide sequence
+        """
+        self.nt_seq = nt_reference[self.nt_coords[0] - 1: self.nt_coords[1]]
+
+    def set_aa_coords(self, aa_reference):
+        """
+        Sets the coordinates of the amino acid regions
+        :param aa_reference: The reference amino acid sequence
+        """
+        self.aa_seq = aa_reference[self.aa_coords[0] - 1: self.aa_coords[1]]
+
+    def set_aa_seq(self, ref_aa_seq, genome_regions):
+        """
+        Sets the amino acid sequence of the genomic region
+        :param ref_aa_seq: The reference amino acid sequence
+        :param genome_regions: A list of GenomeRegion
+        """
+        for genome_reg in genome_regions:
+            for h, seq in ref_aa_seq:
+                if h == genome_reg.region_name:
+                    genome_reg.aa_seq = seq
+                else:
+                    genome_reg.aa_seq = None
+
+
+def read_coordinates(virus, coord_infile=None):
+    """
+    Reads in the start and end coordinates of the genomic regions and associates the region with its coordinates
+    :param virus: The virus (hiv or siv)
+    :param coord_infile: The file stream containing the coordinates of the genomic regions.
+                            The file stream has one genomic entry per line and has the following format:
+                            <region_name>   start,end
+    :return: A list of GenomeRegions
+    """
+    if coord_infile is None:
+        # If no coordinate sequence is specified, set default
+        if virus == 'hiv':
+            coord_infile = os.path.join(os.path.dirname(__file__), "ref_genomes/K03455_genome_coordinates.txt")
+        if virus == 'siv':
+            coord_infile = os.path.join(os.path.dirname(__file__), "ref_genomes/M33262_genome_coordinates.txt")
+
+    genome_regions = []
+    for line in coord_infile:
+        line = line.split('\t')
+        coord = line[1].split(',')
+        coords = [int(coord[0]), int(coord[1])]
+        seq_region = GenomeRegion(line[0], coords)
+        genome_regions.append(seq_region)
+
+    return genome_regions
 
 
 def valid_sequence(base, sequence):
     """
     Verifies that input sequence is valid
-    :param base: the base of the sequence (nucl or prot)
-    :param sequence: a list of lists containing header and sequence pairs
-    :raises ValueError: if the sequence is empty or if it contains invalid characters
-    :return: <true> if the input sequence uses the correct alphabet
+    :param base: The base of the sequence (nucl or prot)
+    :param sequence: A list of lists containing header and sequence pairs
+    :raises ValueError: If the sequence is empty or if it contains invalid characters
+    :return: <True> If the input sequence uses the correct alphabet, <False> otherwise
     """
     dna_alphabet = 'atgc-*xn'
     aa_alphabet = 'ARDNCEQGHILKMFPSTWYV-*X'
@@ -95,11 +126,11 @@ def valid_sequence(base, sequence):
 def valid_inputs(virus, start_coord, end_coord, region):
     """
     Checks that the start and end coordinates of the genomic region are valid
-    :param virus: the reference virus
-    :param start_coord: the starting coordinate of the genomic region
-    :param end_coord: the ending coordinate of the genomic region
-    :param region: the genomic region
-    :return: true if the coordinates are valid, false otherwise
+    :param virus: The reference virus
+    :param start_coord: The starting coordinate of the genomic region
+    :param end_coord: The ending coordinate of the genomic region
+    :param region: The genomic region
+    :return: <True> If the coordinates are valid, <False> otherwise
     """
     if start_coord <= 0:
         return False
@@ -124,9 +155,9 @@ def valid_inputs(virus, start_coord, end_coord, region):
 def get_query(base, query_file):
     """
     Gets the query sequence and checks that it is valid
-    :param base: the base (nucleotide or protein)
-    :param query_file: the file stream containing the query sequence in read mode
-    :return: a list of lists containing the sequence identifiers and the query sequences
+    :param base: The base (nucleotide or protein)
+    :param query_file: The file stream containing the query sequence in read mode
+    :return: A list of lists containing the sequence identifiers and the query sequences
     """
     line = query_file.readline()
     query_file.seek(0)              # reset pointer to beginning
@@ -153,58 +184,29 @@ def get_query(base, query_file):
 def reverse_comp(query_sequence):
     """
     Reverses and complements the query sequence
-    :param query_sequence: the query sequence
-    :return: the reverse complement of the queyr sequence
+    :param query_sequence: The query sequence
+    :return: The reverse complement of the queyr sequence
     """
     complement = {'A': 'T', 'C': 'G', 'G': 'C', 'T': 'A', '*': '*', 'N': 'N', '-': '-'}
     rev_comp = "".join(complement.get(nt, nt) for nt in reversed(query_sequence))
     return rev_comp
 
 
-def get_ref_seq(virus, base, ref_seq=None):
+def get_ref_seq(base, ref_seq):
     """
     Converts the reference sequence to a string and checks if the sequence is valid
-    :param virus: The reference virus (HIV or SIV)
     :param base: The base (nucleotide or protein)
-    :param ref_seq: <option> The file stream containing the reference sequence in read mode
-                    If no file is specified, the reference genomes for HIV and SIV will be used
-    :return reference_sequence: The reference sequence as a string
+    :param ref_seq: The path to the reference sequence
+    :return reference_sequence: The reference sequence as a list where the first element is the header
+                    and the second element is the sequence as a string
     """
-
-    if ref_seq is None:
-        if base == 'nucl':
-            # If no reference sequence is specified, set default reference sequence
-            if virus == 'hiv':
-                ref_seq = os.path.join(os.path.dirname(__file__), "ref_genomes/K03455.fasta")
-            if virus == 'siv':
-                ref_seq = os.path.join(os.path.dirname(__file__), "ref_genomes/M33262.fasta")
-        else:
-            if virus == 'hiv':
-                ref_seq = os.path.join(os.path.dirname(__file__), "ref_genomes/K03455-protein.fasta")
-            if virus == 'siv':
-                ref_seq = os.path.join(os.path.dirname(__file__), "ref_genomes/M33262-protein.fasta")
-
-        with open(ref_seq, 'r') as ref_handle:
-            reference_sequence = convert_fasta(ref_handle)
-    else:
-        reference_sequence = convert_fasta(ref_seq)
+    with open(ref_seq, 'r') as ref_handle:
+        reference_sequence = convert_fasta(ref_handle)
 
     if valid_sequence(base, reference_sequence):
         return reference_sequence
     else:
         sys.exit(0)
-
-
-def make_aa_dict(ref_aa_seq):
-    """
-    Creates a dictionary where the keys are the name of the protein and the values are the protein sequence
-    :param ref_aa_seq: the file stream containing the reference sequence in read mode
-    :return viral_prots: a dictionary of the viral proteins
-    """
-    viral_prots = {}
-    for h, seq in ref_aa_seq:
-        viral_prots[h] = seq
-    return viral_prots
 
 
 def sequence_align(query_sequence, reference_sequence, outfile=None):
@@ -241,8 +243,8 @@ def sequence_align(query_sequence, reference_sequence, outfile=None):
 def get_region_coordinates(alignment):
     """
     Gets the indices of regions where the query aligns with the reference sequence
-    :param alignment: a list containing the header of the query sequence, and the aligned query sequence
-    :return: the positions where the query sequence aligns with the reference sequences(s) with no gaps
+    :param alignment: A list containing the header of the query sequence, and the aligned query sequence
+    :return: The positions where the query sequence aligns with the reference sequences(s) with no gaps
     """
     pat = re.compile('[A-Z]{2,}')     # Match the aligned region (minimum alignment length is 2)
     coordinates = [(match.start(), match.end()) for match in pat.finditer(alignment[1])]
@@ -253,8 +255,8 @@ def get_region_coordinates(alignment):
 def get_matches(alignment):
     """
     Retrieves sequences where the query sequence matches the reference sequence
-    :param alignment: a list containing the aligned regions
-    :return coordinates: the sequences where the query sequence aligns with the reference sequences(s) with no gaps
+    :param alignment: A list containing the aligned regions
+    :return coordinates: The sequences where the query sequence aligns with the reference sequences(s) with no gaps
     """
     pat = re.compile('[A-Z]{2,}')    # Match the aligned region (minimum alignment length is 2)
     matches = [match for match in pat.finditer(alignment[1])]
@@ -265,10 +267,10 @@ def get_matches(alignment):
 def find_genomic_regions(virus, reference_nt_sequence, coordinates):
     """
     Finds the genomic regions where the query sequence aligns with the reference sequence
-    :param virus: the virus (HIV or SIV)
-    :param reference_nt_sequence: the nucleotide reference sequence
-    :param coordinates: a list of indices where the query sequence aligns with the reference sequence
-    :return regions: a list of lists containing the name of the region and positions of the alignments in this region
+    :param virus: The reference virus
+    :param reference_nt_sequence: The nucleotide reference sequence
+    :param coordinates: A list of indices where the query sequence aligns with the reference sequence
+    :return regions: A list of lists containing the name of the region and positions of the alignments in this region
     """
     regions = {}
     if virus == 'hiv':
@@ -338,9 +340,9 @@ def find_genomic_regions(virus, reference_nt_sequence, coordinates):
 def find_aa_regions(matches, viral_prots):
     """
     Finds amino acid regions where the query aligns with the references genome
-    :param matches: a list of match objects
-    :param viral_prots: a dictionary of the viral protein sequence
-    :return regions: a list of lists containing the region and the sequence of the aligned region
+    :param matches: A list of match objects
+    :param viral_prots: A dictionary of the viral protein sequence
+    :return regions: A list of lists containing the region and the sequence of the aligned region
     """
     regions = {}
     for match in matches:
@@ -396,9 +398,9 @@ def find_relative_pos(virus, base, ref_seq, result, coordinates, regions):
 def pretty_output(outfile, nt_regions=None, aa_regions=None):
     """
     Prints the output of 'align' mode
-    :param outfile: <option> the file stream for the output file in write mode
-    :param nt_regions: <option> the nucleotide regions where the query aligned with the reference sequence
-    :param aa_regions: <option> the protein regions where the query sequence aligned with th reference sequence
+    :param outfile: <option> The file stream for the output file in write mode
+    :param nt_regions: <option> The nucleotide regions where the query aligned with the reference sequence
+    :param aa_regions: <option> The protein regions where the query sequence aligned with th reference sequence
     """
     if outfile is not None:
         if nt_regions is not None:
@@ -432,13 +434,13 @@ def pretty_output(outfile, nt_regions=None, aa_regions=None):
 def retrieve(virus, reference_sequence, region, outfile, start_offset=1, end_offset='end'):
     """
     Retrieves a sequence given its coordinates
-    :param virus: the reference virus
-    :param reference_sequence: reference genome sequence
-    :param region: the genomic region
-    :param outfile: file stream of the output file
-    :param start_offset: the starting coordinate
-    :param end_offset: the end coordinate
-    :return: return the genomic region defined by the starting and ending coordinates
+    :param virus: The reference virus
+    :param reference_sequence: The reference genome sequence
+    :param region: The genomic region
+    :param outfile: The file stream of the output file
+    :param start_offset: <option> The start coordinate
+    :param end_offset: <option> The end coordinate
+    :return: The genomic region defined by the starting and ending coordinates
     """
     if virus == 'hiv':
         sequence_range = HIV_NT_REGIONS[region]
@@ -503,7 +505,7 @@ def parse_args():
     """
     Parses command line arguments
     """
-    regions = list(HIV_NT_REGIONS)  # The same genomic region options are provided for HIV and SIV
+    # regions = list(HIV_NT_REGIONS)  # The same genomic region options are provided for HIV and SIV
 
     parser = argparse.ArgumentParser(
         description='An implementation of the HIV Sequence Locator tool by the Los Alamos National Laboratory.'
@@ -514,6 +516,14 @@ def parse_args():
                         help='The reference virus')
     parser.add_argument('base', metavar='base', choices=['nucl', 'prot'],
                         help='Sequence base type. Allowed bases are \'nucl\' and \'prot\'')
+    parser.add_argument('-nt_region_coords', type=argparse.FileType('r'),
+                        help='Path to the file containing the coordinates of the nucleotide region.'
+                             'The file must be tab-delimited and contain the region name and the start and end '
+                             'coordinates separated by a comma (,). Ex: region_name    start,end')
+    parser.add_argument('-aa_region_coords', type=argparse.FileType('r'),
+                        help='Path to the file containing the coordinates of the amino acid region.'
+                             'The file must be tab-delimited and contain the region name and the start and end '
+                             'coordinates separated by a comma (,). Ex: region_name    start,end')
     subparsers = parser.add_subparsers(dest='subcommand')
 
     # Create subparser for 'align' mode
@@ -522,15 +532,15 @@ def parse_args():
                                                      'relative to the HIV or SIV reference genome')
 
     parser_align.add_argument('query', type=argparse.FileType('r'),
-                              help='File containing the query sequence.')
+                              help='Path to the file containing the query sequence.')
     parser_align.add_argument('-revcomp', default='n', choices=['y', 'n'],
                               help='Align the reverse complement of the query sequence with the reference sequence')
-    parser_align.add_argument('-ref_nt', metavar='', type=argparse.FileType('r'),
-                              help='File containing the reference nucleotide sequence')
-    parser_align.add_argument('-ref_aa', metavar='', type=argparse.FileType('r'),
-                              help='File containing the reference amino acid sequence')
+    parser_align.add_argument('-ref_nt', metavar='',
+                              help='Path to the file containing the reference nucleotide sequence')
+    parser_align.add_argument('-ref_aa', metavar='',
+                              help='Path to the file containing the reference amino acid sequence')
     parser_align.add_argument('-outfile', type=argparse.FileType('w'),
-                              help='File where results will be written. '
+                              help='Path to the file where results will be written. '
                                    'If no file is specified, the results will be printed to the console')
 
     # Create subparser for 'retrieve' mode
@@ -550,28 +560,102 @@ def parse_args():
     return parser.parse_args()
 
 
+def handle_args(virus, base, query, nt_coords, aa_coords, revcomp, ref_nt, ref_aa):
+    """
+    Handles the possible execution paths for the program
+    :param virus: The reference virus
+    :param base: The base of the reference sequence
+    :param query: The file stream containing the query sequence
+    :param nt_coords: The file stream containing the coordinates of the nucleotide region in read mode
+    :param aa_coords: The file stream containing the coordinates of the protein region in read mode
+    :param revcomp: Option to align the reverse complement of the nucleotide sequence ('y' or 'n')
+    :param ref_nt: Path to the file containing the reference nucleotide sequence
+    :param ref_aa: Path to the file stream containing the reference amino acid sequence
+    """
+
+    # Get the query sequence
+    query = get_query(base, query)
+
+    # Handle reverse complement option
+    if revcomp == 'y':
+        if base == 'prot':
+            print("Invalid option: reverse complement is not available for proteins.")
+    else:
+        query = reverse_comp(query[0][1])
+
+    # Set the reference nucleotide and/or protein sequence(s).
+    # If user specifies both references files or if neither file is specified, the program
+    # will give both amino acid and nucleotide regions that are touched by the query sequence.
+    if (ref_nt is None) == (ref_aa is None):
+
+        # If no nucleotide reference sequence is specified, set default reference sequence file
+        if ref_nt is None:
+            if virus == 'hiv':
+                ref_nt = os.path.join(os.path.dirname(__file__), "ref_genomes/K03455.fasta")
+            else:
+                ref_nt = os.path.join(os.path.dirname(__file__), "ref_genomes/M33262.fasta")
+
+            # If no nucleotide sequence coordinates are specified, set default
+            if nt_coords is None:
+                if virus == 'hiv':
+                    nt_coords = os.path.join(os.path.dirname(__file__), "ref_genomes/K03455_genome_coordinates.txt")
+                else:
+                    nt_coords = os.path.join(os.path.dirname(__file__), "ref_genomes/M33262_genome_coordinates.txt")
+
+        # If no protein reference sequence is specified, set default reference sequence file
+        if ref_aa is None:
+            if virus == 'hiv':
+                ref_aa = os.path.join(os.path.dirname(__file__), "ref_genomes/K03455-protein.fasta")
+            else:
+                ref_aa = os.path.join(os.path.dirname(__file__), "ref_genomes/M33262-protein.fasta")
+
+            # If no protein sequence coordinates are specified, set default
+            if aa_coords is None:
+                if virus == 'hiv':
+                    aa_coords = os.path.join(os.path.dirname(__file__), "ref_genomes/K03455_protein_coordinates.txt")
+                else:
+                    aa_coords = os.path.join(os.path.dirname(__file__), "ref_genomes/M33262_protein_coordinates.txt")
+
+        # Get the reference nucleotide and protein sequences
+        ref_nt_seq = get_ref_seq(base, ref_nt)
+        ref_aa_seq = get_ref_seq(base, ref_aa)
+
+    elif (ref_nt is None) and (ref_aa is not None):
+        ref_aa_seq = get_ref_seq(base, ref_aa)
+        ref_nt_seq = ref_nt
+
+    else:
+        ref_aa_seq = ref_aa
+        ref_nt_seq = get_ref_seq(base, ref_nt)
+
+    # Set the reference sequence to be used in the sequence alignment
+    if base == 'nucl':
+        reference_sequence = ref_nt_seq
+    else:
+        reference_sequence = ref_aa_seq
+
+    return query, reference_sequence, ref_nt_seq, ref_aa_seq
+
+
 def main():
     args = parse_args()
 
     if args.subcommand == "align":
-        ref_nt_seq = get_ref_seq(args.virus, args.base, args.ref_nt)
-        ref_aa_seq = get_ref_seq(args.virus, args.base, args.ref_aa)
-        query = get_query(args.base, args.query)
 
-        # Handle reverse complement option
-        if args.revcomp == 'y':
-            if args.base == 'prot':
-                print("Invalid option: reverse complement is not available for proteins.")
-            else:
-                query = reverse_comp(query[0][1])
+        sequences = handle_args(args.virus, args.base, args.query, args.nt_region_coords, args.aa_region_coords,
+                                args.revcomp, args.ref_nt, args.ref_aa)
 
-        # Set the reference sequence
-        if args.base == 'nucl':
-            reference_sequence = ref_nt_seq
-        else:
-            reference_sequence = ref_aa_seq
+        query = sequences[0]
+        reference_sequence = sequences[1]
+        ref_nt_seq = sequences[2]
+        ref_aa_seq = sequences[3]
 
-        viral_prots = make_aa_dict(ref_aa_seq)
+        # Create genomic region objects based on configuration files
+        genome_regions = read_coordinates(args.virus, args.region_coords)
+        for genome_region in genome_regions:
+            genome_region.set_nt_coords(ref_nt_seq)
+            genome_region.set_nt_coords(ref_aa_seq)
+
         alignment = sequence_align(query, reference_sequence, args.outfile)
 
         nt_regions, aa_regions = None, None
@@ -580,10 +664,6 @@ def main():
             coordinates = get_region_coordinates(alignment[-1])  # Query sequence will be the last item in the list
             nt_regions = find_genomic_regions(args.virus, ref_nt_seq, coordinates)
 
-            # If user specifies both references files or if neither file is specified, the program
-            # will give both amino acid and nucleotide regions that are touched by the query sequence.
-            # If only one reference file is specified (eg: a reference nucleotide sequence), the program
-            # will give only nucleotide regions that are touched by the query sequence.
             if (args.ref_nt is None) == (args.ref_aa is None):
                 matches = get_matches(alignment[-1])
                 aa_regions = find_aa_regions(matches, viral_prots)
@@ -592,10 +672,6 @@ def main():
             matches = get_matches(alignment[-1])
             aa_regions = find_aa_regions(matches, viral_prots)
 
-            # If user specifies both references files or if neither file is specified, the program
-            # will give both amino acid and nucleotide regions that are touched by the query sequence.
-            # If only one reference file is specified (eg: a reference protein sequence), the program
-            # will give only protein regions that are touched by the query sequence.
             if (args.ref_nt is None) == (args.ref_aa is None):
                 coordinates = get_region_coordinates(alignment[-1])
                 nt_regions = find_genomic_regions(args.virus, ref_nt_seq, coordinates)
