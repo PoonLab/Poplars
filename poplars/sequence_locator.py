@@ -209,14 +209,20 @@ def get_ref_seq(base, ref_seq):
         sys.exit(0)
 
 
-def sequence_align(query_sequence, reference_sequence, outfile=None):
+def sequence_align(base, query_sequence, genome_regions, outfile=None):
     """
     Aligns the query sequence to the reference genome
     :param query_sequence: The query sequence
-    :param reference_sequence: The reference sequence.
     :param outfile: <option> The file stream of the output file in write mode
     """
-    result = align(query_sequence[0][1], reference_sequence)
+
+    for reg in genome_regions:
+        if base == 'nucl':
+            reference_sequence = reg.nt_seq
+        else:
+            reference_sequence = reg.aa_seq
+
+        result = align(query_sequence[0][1], reference_sequence)
 
     if outfile is not None:
         outfile.write("Alignment:\n")
@@ -295,14 +301,6 @@ def find_genomic_regions(virus, reference_nt_sequence, coordinates):
                         common_seq_coords.append([start_region_coord + start_offset, end_region_coord + end_offset])
                         regions[key] = common_seq_coords
 
-                # # Check if aligned region overlaps with genomic regions
-                # if start_aln < end_region_coord and end_aln > start_region_coord:
-                #     common_seq_coords = []
-                #     if key != "Complete":
-                #         common_seq_coords.append(reference_nt_sequence[0][1][start_aln + 1: end_aln])
-                #         common_seq_coords.append([start_region_coord + start_offset, end_region_coord + end_offset])
-                #         regions[key] = common_seq_coords
-
     else:
         common_seq_coords = []
         for align_coord in coordinates:
@@ -337,7 +335,7 @@ def find_genomic_regions(virus, reference_nt_sequence, coordinates):
     return regions
 
 
-def find_aa_regions(matches, viral_prots):
+def find_aa_regions(matches):
     """
     Finds amino acid regions where the query aligns with the references genome
     :param matches: A list of match objects
@@ -507,6 +505,12 @@ def parse_args():
     """
     # regions = list(HIV_NT_REGIONS)  # The same genomic region options are provided for HIV and SIV
 
+    regions = ['5\'LTR', '5\'LTR-R', '5\'LTR-U3', '5\'LTR-U5', 'TAR', 'Gag-Pol', 'Gag', 'Matrix',
+               'Capsid', 'p2', 'Nucleocapsid', 'p1', 'p6', 'Pol', 'GagPolTF', 'Protease', 'RT', 'RNase',
+               'Integrase', 'Vif', 'Vpr', 'Tat(with intron)', 'Tat(exon1)', 'Tat(exon2)', 'Rev(with intron)',
+               'Rev(exon1)', 'Rev(exon2)', 'Vpu', 'Vpx', 'Env', 'gp160', 'V1', 'V2', 'V3', 'V4', 'V5',
+               'RRE', 'gp120', 'gp41', 'Nef', '3\'LTR', '3\'LTR-R', '3\'LTR-U3', '3\'LTR-U5', 'Complete']
+
     parser = argparse.ArgumentParser(
         description='An implementation of the HIV Sequence Locator tool by the Los Alamos National Laboratory.'
                     'This tool aligns a nucleotide or protein sequence relative to HIV or SIV reference genomes; '
@@ -571,6 +575,8 @@ def handle_args(virus, base, query, nt_coords, aa_coords, revcomp, ref_nt, ref_a
     :param revcomp: Option to align the reverse complement of the nucleotide sequence ('y' or 'n')
     :param ref_nt: Path to the file containing the reference nucleotide sequence
     :param ref_aa: Path to the file stream containing the reference amino acid sequence
+    :return sequences: a tuple containing the query sequence, reference_sequence,
+                        reference nucleotide sequence, and reference amino acid sequence
     """
 
     # Get the query sequence
@@ -620,21 +626,19 @@ def handle_args(virus, base, query, nt_coords, aa_coords, revcomp, ref_nt, ref_a
         ref_nt_seq = get_ref_seq(base, ref_nt)
         ref_aa_seq = get_ref_seq(base, ref_aa)
 
+    # If only the reference protein sequence is specified, the program
+    # will give protein regions touched by the query sequence
     elif (ref_nt is None) and (ref_aa is not None):
         ref_aa_seq = get_ref_seq(base, ref_aa)
         ref_nt_seq = ref_nt
 
+    # If only the reference nucleotide sequence is specified, the program
+    # will give nucleotide regions touched by the query sequence
     else:
         ref_aa_seq = ref_aa
         ref_nt_seq = get_ref_seq(base, ref_nt)
 
-    # Set the reference sequence to be used in the sequence alignment
-    if base == 'nucl':
-        reference_sequence = ref_nt_seq
-    else:
-        reference_sequence = ref_aa_seq
-
-    return query, reference_sequence, ref_nt_seq, ref_aa_seq
+    return query, ref_nt_seq, ref_aa_seq, nt_coords, aa_coords
 
 
 def main():
@@ -642,13 +646,14 @@ def main():
 
     if args.subcommand == "align":
 
-        sequences = handle_args(args.virus, args.base, args.query, args.nt_region_coords, args.aa_region_coords,
-                                args.revcomp, args.ref_nt, args.ref_aa)
+        sequences = handle_args(args.virus, args.base, args.query, args.nt_region_coords,
+                                args.aa_region_coords, args.revcomp, args.ref_nt, args.ref_aa)
 
         query = sequences[0]
-        reference_sequence = sequences[1]
-        ref_nt_seq = sequences[2]
-        ref_aa_seq = sequences[3]
+        ref_nt_seq = sequences[1]           # Reference nucleotide sequence
+        ref_aa_seq = sequences[2]           # Reference amino acid sequence
+        nt_coords = sequences[3]            # Reference nucleotide coordinates
+        aa_coords = sequences[4]            # Reference amino acid coordinates
 
         # Create genomic region objects based on configuration files
         genome_regions = read_coordinates(args.virus, args.region_coords)
@@ -656,7 +661,7 @@ def main():
             genome_region.set_nt_coords(ref_nt_seq)
             genome_region.set_nt_coords(ref_aa_seq)
 
-        alignment = sequence_align(query, reference_sequence, args.outfile)
+        alignment = sequence_align(query, genome_regions, args.outfile)
 
         nt_regions, aa_regions = None, None
 
@@ -666,11 +671,11 @@ def main():
 
             if (args.ref_nt is None) == (args.ref_aa is None):
                 matches = get_matches(alignment[-1])
-                aa_regions = find_aa_regions(matches, viral_prots)
+                aa_regions = find_aa_regions(matches)
 
         else:
             matches = get_matches(alignment[-1])
-            aa_regions = find_aa_regions(matches, viral_prots)
+            aa_regions = find_aa_regions(matches)
 
             if (args.ref_nt is None) == (args.ref_aa is None):
                 coordinates = get_region_coordinates(alignment[-1])
