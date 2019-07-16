@@ -1,25 +1,48 @@
-# TODO: remove redundant setUp and tearDown functions
-
 import unittest
 import os
 from io import StringIO
-from poplars.sequence_locator import valid_sequence
-from poplars.sequence_locator import valid_inputs
-from poplars.sequence_locator import get_query
-from poplars.sequence_locator import reverse_comp
-from poplars.sequence_locator import get_ref_seq
-from poplars.sequence_locator import sequence_align
-from poplars.sequence_locator import make_aa_dict
-from poplars.sequence_locator import find_genomic_regions
-from poplars.sequence_locator import find_aa_regions
-from poplars.sequence_locator import get_region_coordinates
-from poplars.sequence_locator import get_matches
-from poplars.sequence_locator import retrieve
+from poplars.sequence_locator import *
 
+NUCL_QUERY = os.path.join(os.path.dirname(__file__), 'fixtures/nucl-query.fasta')
+PROT_QUERY = os.path.join(os.path.dirname(__file__), 'fixtures/protein-query.fasta')
+
+DEFAULT_HIV_GENOME = os.path.join(os.path.dirname(__file__), '../ref_genomes/K03455.fasta')
+DEFAULT_HIV_PROTS = os.path.join(os.path.dirname(__file__), '../ref_genomes/K03455-protein.fasta')
 TEST_HIV_GENOME = os.path.join(os.path.dirname(__file__), 'fixtures/hiv-test-genome.fasta')
-TEST_SIV_GENOME = os.path.join(os.path.dirname(__file__), 'fixtures/siv-test-genome.fasta')
 TEST_HIV_PROTS = os.path.join(os.path.dirname(__file__), 'fixtures/hiv-test-proteins.fasta')
+
+DEFAULT_SIV_GENOME = os.path.join(os.path.dirname(__file__), '../ref_genomes/M33262.fasta')
+DEFAULT_SIV_PROTS = os.path.join(os.path.dirname(__file__), '../ref_genomes/M33262-protein.fasta')
+TEST_SIV_GENOME = os.path.join(os.path.dirname(__file__), 'fixtures/siv-test-genome.fasta')
 TEST_SIV_PROTS = os.path.join(os.path.dirname(__file__), 'fixtures/siv-test-proteins.fasta')
+
+DEFAULT_HIV_NT_COORDS = os.path.abspath('../ref_genomes/K03455_genome_coordinates.csv')
+DEFAULT_SIV_NT_COORDS = os.path.abspath('../ref_genomes/M33262_genome_coordinates.csv')
+TEST_HIV_COORDS = os.path.join(os.path.dirname(__file__), 'fixtures/hiv_test_coords.csv')
+TEST_SIV_COORDS = os.path.join(os.path.dirname(__file__), 'fixtures/siv_test_coords.csv')
+
+
+class TestReadCoordinates(unittest.TestCase):
+
+    def setUp(self):
+        self.test_siv_coords = open(TEST_SIV_COORDS)
+
+    def testSIVInputCoords(self):
+
+        region_names = ['Rev(with intron)', 'Rev(exon1)', 'Rev(exon2)', 'Env', 'V1', 'V2', 'V3', 'V4', 'V5',
+                        'RRE', 'gp120', 'gp41', 'Nef', '3\'LTR', '3\'LTR-R']
+
+        region_coordinates = [[6784, 9315], [6784, 6853], [9062, 9315], [6860, 9499], [7196, 7360], [7364, 7492],
+                              [7791, 7892], [8063, 8153], [8273, 8290], [8380, 8735], [6860, 8434], [8435, 9499],
+                              [9333, 10124], [9719, 10535], [10235, 10411]]
+
+        result = read_coordinates('siv', self.test_siv_coords)
+        for i in range(len(result)):
+            self.assertEqual(region_names[i], result[i].region_name)
+            self.assertEqual(region_coordinates[i], result[i].nt_coords)
+
+    def tearDown(self):
+        self.test_siv_coords.close()
 
 
 class TestValidSequence(unittest.TestCase):
@@ -211,13 +234,7 @@ class TestReverseComp(unittest.TestCase):
         self.assertEqual(expected, result)
 
 
-class TestGetReferenceSequence(unittest.TestCase):
-
-    def setUp(self):
-        self.hiv_genome_file = open(TEST_HIV_GENOME)
-        self.siv_genome_file = open(TEST_SIV_GENOME)
-        self.hiv_prot_file = open(TEST_HIV_PROTS)
-        self.siv_prot_file = open(TEST_SIV_PROTS)
+class TestGetReferenceNucl(unittest.TestCase):
 
     def testDefaultHIVGenome(self):
         expected = [["K03455|HIVHXB2CG", "TGGAAGGGCTAATTCACTCCCAACGAAGACAAGATATCCTTGATCTGTGG"
@@ -227,7 +244,7 @@ class TestGetReferenceSequence(unittest.TestCase):
                                          "TTGTTACACCCTGTGAGCCTGCATGGAATGGATGACCCGGAGAGAGAAGT" 
                                          "GTTAGAGTGGAGGTTTGACAGCCGCCTAGCATTTCATCACATGGCCCGAG" 
                                          "AGCTGCATCCGGAGTACTTCAAGAACTGCTGACATCGAGCTTGCTACAAG"]]
-        res = get_ref_seq("hiv", "nucl")
+        res = get_ref_nt_seq(DEFAULT_HIV_GENOME)
         # Check the first 350 nucleotides in the default reference sequence
         result = [[res[0][0], res[0][1][:350]]]
         self.assertEqual(expected, result)
@@ -241,74 +258,37 @@ class TestGetReferenceSequence(unittest.TestCase):
                                         "GGTTTCTGGAAGGGATTTATTACAGTGCAAGAAGACATAGAATCTTAGAC"
                                         "ATATACTTAGAAAAGGAAGAAGGCATCATACCAGATTGGCAGGATTACAC"
                                         "CTCAGGACCAGGAATTAGATACCCAAAGACATTTGGCTGGCTATGGAAAT"]]
-        res = get_ref_seq("siv", "nucl")
+        res = get_ref_nt_seq(DEFAULT_SIV_GENOME)
         # Check the first 400 nucleotides in the default reference sequence
         result = [[res[0][0], res[0][1][:400]]]
         self.assertEqual(expected, result)
 
-    def testInputHIVGenome(self):
-        expected = [["K03455|HIVHXB2CG", "TGGAAGGGCTAATTCACTCCCAACGAAGACAAGATATCCTTGATCTGTGG"
-                                         "ATCTACCACACACAAGGCTACTTCCCTGATTAGCAGAACTACACACCAGG"
-                                         "GCCAGGGATCAGATATCCACTGACCTTTGGATGGTGCTACAAGCTAGTAC"
-                                         "CAGTTGAGCCAGAGAAGTTAGAAGAAGCCAACAAAGGAGAGAACACCAGC"
-                                         "TTGTTACACCCTGTGAGCCTGCATGGAATGGATGACCCGGAGAGAGAAGT"
-                                         "GTTAGAGTGGAGGTTTGACAGCCGCCTAGCATTTCATCACATGGCCCGAG"
-                                         "AGCTGCATCCGGAGTACTTCAAGAACTGCTGACATCGAGCTTGCTACAAG"]]
-        result = get_ref_seq("hiv", "nucl", self.hiv_genome_file)
-        self.assertEqual(expected, result)
 
-    def testInputSIVGenome(self):
-        expected = [["M33262|SIVMM239", "GCATGCACATTTTAAAGGCTTTTGCTAAATATAGCCAAAAGTCCTTCTAC"
-                                        "AAATTTTCTAAGAGTTCTGATTCAAAGCAGTAACAGGCCTTGTCTCATCA"
-                                        "TGAACTTTGGCATTTCATCTACAGCTAAGTTTATATCATAAATAGTTCTT"
-                                        "TACAGGCAGCACCAACTTATACCCTTATAGCATACTTTACTGTGTGAAAA"
-                                        "TTGCATCTTTCATTAAGCTTACTGTAAATTTACTGGCTGTCTTCCTTGCA"
-                                        "GGTTTCTGGAAGGGATTTATTACAGTGCAAGAAGACATAGAATCTTAGAC"
-                                        "ATATACTTAGAAAAGGAAGAAGGCATCATACCAGATTGGCAGGATTACAC"
-                                        "CTCAGGACCAGGAATTAGATACCCAAAGACATTTGGCTGGCTATGGAAAT"]]
-        result = get_ref_seq("siv", "nucl", self.siv_genome_file)
-        self.assertEqual(expected, result)
-
-    def testDefaultHIVProteins(self):
-        expected = [["Gag|HIVHXB2CG",    "MGARASVLSGGELDRWEKIRLRPGGKKKYKLKHIVWASRELERFAVNPGL"
-                                         "LETSEGCRQILGQLQPSLQTGSEELRSLYNTVATLYCVHQRIEIKDTKEA"
-                                         "LDKIEEEQNKSKKKAQQAAADTGHSNQVSQNYPIVQNIQGQMVHQAISPR"
-                                         "TLNAWVKVVEEKAFSPEVIPMFSALSEGATPQDLNTMLNTVGGHQAAMQM"
-                                         "LKETINEEAAEWDRVHPVHAGPIAPGQMREPRGSDIAGTTSTLQEQIGWM"
-                                         "TNNPPIPVGEIYKRWIILGLNKIVRMYSPTSILDIRQGPKEPFRDYVDRF"
-                                         "YKTLRAEQASQEVKNWMTETLLVQNANPDCKTILKALGPAATLEEMMTAC"
-                                         "QGVGGPGHKARVLAEAMSQVTNSATIMMQRGNFRNQRKIVKCFNCGKEGH"
-                                         "TARNCRAPRKKGCWKCGKEGHQMKDCTERQANFLGKIWPSYKGRPGNFLQ"
-                                         "SRPEPTAPPEESFRSGVETTTPPQKQEPIDKELYPLTSLRSLFGNDPSSQ"],
-                    ["Matrix|HIVHXB2CG", "MGARASVLSGGELDRWEKIRLRPGGKKKYKLKHIVWASRELERFAVNPGL"
-                                         "LETSEGCRQILGQLQPSLQTGSEELRSLYNTVATLYCVHQRIEIKDTKEA"
-                                         "LDKIEEEQNKSKKKAQQAAADTGHSNQVSQNY"]]
-        result = get_ref_seq("hiv", "prot")[:2]
-        self.assertEqual(expected, result)
+class TestGetReferenceProt(unittest.TestCase):
 
     def testDefaultSIVProteins(self):
-        expected = [["Capsid|SIVMM239",       "PVQQIGGNYVHLPLSPRTLNAWVKLIEEKKFGAEVVPGFQALSEGCTPYD"
-                                              "INQMLNCVGDHQAAMQIIRDIINEEAADWDLQHPQPAPQQGQLREPSGSD"
-                                              "IAGTTSSVDEQIQWMYRQQNPIPVGNIYRRWIQLGLQKCVRMYNPTNILD"
-                                              "VKQGPKEPFQSYVDRFYKSLRAEQTDAAVKNWMTQTLLIQNANPDCKLVL"
-                                              "KGLGVNPTLEEMLTACQGVGGPGQKARLM"],
-                    ["p2|SIVMM239",           "AEALKEALAPVPIPFAA"],
+        expected = [["Capsid|SIVMM239", "PVQQIGGNYVHLPLSPRTLNAWVKLIEEKKFGAEVVPGFQALSEGCTPYD"
+                                        "INQMLNCVGDHQAAMQIIRDIINEEAADWDLQHPQPAPQQGQLREPSGSD"
+                                        "IAGTTSSVDEQIQWMYRQQNPIPVGNIYRRWIQLGLQKCVRMYNPTNILD"
+                                        "VKQGPKEPFQSYVDRFYKSLRAEQTDAAVKNWMTQTLLIQNANPDCKLVL"
+                                        "KGLGVNPTLEEMLTACQGVGGPGQKARLM"],
+                    ["p2|SIVMM239", "AEALKEALAPVPIPFAA"],
                     ["Nucleocapsid|SIVMM239", "AQQRGPRKPIKCWNCGKEGHSARQCRAPRRQGCWKCGKMDHVMAKCPDRQAG"]]
-        result = get_ref_seq("siv", "prot")[2:5]
+        result = get_ref_aa_seq(DEFAULT_SIV_PROTS)[2:5]
         self.assertEqual(expected, result)
 
     def testInputHIVProteins(self):
-        expected = [["Gag|HIVHXB2CG",    "MGARASVLSGGELDRWEKIRLRPGGKKKYKLKHIVWASRELERFAVNPG"
-                                         "LLETSEGCRQILGQLQPSLQTGSEELRSLYNTVATLYCVHQRIEIKDTK"
-                                         "EALDKIEEEQNKSKKKAQQAAADTGHSNQVSQNYPIVQNIQGQMVHQAI"
-                                         "SPRTLNAWVKVVEEKAFSPEVIPMFSALSEGATPQDLNTMLNTVGGHQA"
-                                         "AMQMLKETINEEAAEWDRVHPVHAGPIAPGQMREPRGSDIAGTTSTLQE"
-                                         "QIGWMTNNPPIPVGEIYKRWIILGLNKIVRMYSPTSILDIRQGPKEPFR"
-                                         "DYVDRFYKTLRAEQASQEVKNWMTETLLVQNANPDCKTILKALGPAATL"
-                                         "EEMMTACQGVGGPGHKARVLAEAMSQVTNSATIMMQRGNFRNQRKIVKC"
-                                         "FNCGKEGHTARNCRAPRKKGCWKCGKEGHQMKDCTERQANFLGKIWPSY"
-                                         "KGRPGNFLQSRPEPTAPPEESFRSGVETTTPPQKQEPIDKELYPLTSLR"
-                                         "SLFGNDPSSQ"],
+        expected = [["Gag|HIVHXB2CG", "MGARASVLSGGELDRWEKIRLRPGGKKKYKLKHIVWASRELERFAVNPG"
+                                      "LLETSEGCRQILGQLQPSLQTGSEELRSLYNTVATLYCVHQRIEIKDTK"
+                                      "EALDKIEEEQNKSKKKAQQAAADTGHSNQVSQNYPIVQNIQGQMVHQAI"
+                                      "SPRTLNAWVKVVEEKAFSPEVIPMFSALSEGATPQDLNTMLNTVGGHQA"
+                                      "AMQMLKETINEEAAEWDRVHPVHAGPIAPGQMREPRGSDIAGTTSTLQE"
+                                      "QIGWMTNNPPIPVGEIYKRWIILGLNKIVRMYSPTSILDIRQGPKEPFR"
+                                      "DYVDRFYKTLRAEQASQEVKNWMTETLLVQNANPDCKTILKALGPAATL"
+                                      "EEMMTACQGVGGPGHKARVLAEAMSQVTNSATIMMQRGNFRNQRKIVKC"
+                                      "FNCGKEGHTARNCRAPRKKGCWKCGKEGHQMKDCTERQANFLGKIWPSY"
+                                      "KGRPGNFLQSRPEPTAPPEESFRSGVETTTPPQKQEPIDKELYPLTSLR"
+                                      "SLFGNDPSSQ"],
                     ["Matrix|HIVHXB2CG", "MGARASVLSGGELDRWEKIRLRPGGKKKYKLKHIVWASRELERFAVNPGL"
                                          "LETSEGCRQILGQLQPSLQTGSEELRSLYNTVATLYCVHQRIEIKDTKEA"
                                          "LDKIEEEQNKSKKKAQQAAADTGHSNQVSQNY"],
@@ -317,71 +297,31 @@ class TestGetReferenceSequence(unittest.TestCase):
                                          "GSDIAGTTSTLQEQIGWMTNNPPIPVGEIYKRWIILGLNKIVRMYSPTSI"
                                          "LDIRQGPKEPFRDYVDRFYKTLRAEQASQEVKNWMTETLLVQNANPDCKT"
                                          "ILKALGPAATLEEMMTACQGVGGPGHKARVL"]]
-        result = get_ref_seq("hiv", "prot", self.hiv_prot_file)
+        result = get_ref_aa_seq(TEST_HIV_PROTS)
         self.assertEqual(expected, result)
 
     def testInputSIVProteins(self):
-        expected = [["RNase|SIVMM239",     "YTDGSCNKQSKEGKAGYITDRGKDKVKVLEQTTNQQAELEAFLMALTDSG"
-                                           "PKANIIVDSQYVMGIITGCPTESESRLVNQIIEEMIKKSEIYVAWVPAHK"
-                                           "GIGGNQEIDHLVSQGIRQVL"],
+        expected = [["RNase|SIVMM239", "YTDGSCNKQSKEGKAGYITDRGKDKVKVLEQTTNQQAELEAFLMALTDSG"
+                                       "PKANIIVDSQYVMGIITGCPTESESRLVNQIIEEMIKKSEIYVAWVPAHK"
+                                       "GIGGNQEIDHLVSQGIRQVL"],
                     ["Integrase|SIVMM239", "FLEKIEPAQEEHDKYHSNVKELVFKFGLPRIVARQIVDTCDKCHQKGEAI"
                                            "HGQANSDLGTWQMDCTHLEGKIIIVAVHVASGFIEAEVIPQETGRQTALF"
                                            "LLKLAGRWPITHLHTDNGANFASQEVKMVAWWAGIEHTFGVPYNPQSQGV"
                                            "VEAMNHHLKNQIDRIREQANSVETIVLMAVHCMNFKRRGGIGDMTPAERL"
                                            "INMITTEQEIQFQQSKNSKFKNFRVYYREGRDQLWKGPGELLWKGEGAVI"
                                            "LKVGTDIKVVPRRKAKIIKDYGGGKEVDSSSHMEDTGEAREVA"],
-                    ["Vif|SIVMM239",       "MEEEKRWIAVPTWRIPERLERWHSLIKYLKYKTKDLQKVCYVPHFKVGWA"
-                                           "WWTCSRVIFPLQEGSHLEVQGYWHLTPEKGWLSTYAVRITWYSKNFWTDV"
-                                           "TPNYADILLHSTYFPCFTAGEVRRAIRGEQLLSCCRFPRAHKYQVPSLQY"
-                                           "LALKVVSDVRSQGENPTWKQWRRDNRRGLRMAKQNSRGDKQRGGKPPTKG"
-                                           "ANFPGLAKVLGILA"],
-                    ["Vpx|SIVMM239",       "MSDPRERIPPGNSGEETIGEAFEWLNRTVEEINREAVNHLPRELIFQVWQ"
-                                           "RSWEYWHDEQGMSPSYVKYRYLCLIQKALFMHCKKGCRCLGEGHGAGGWR"
-                                           "PGPPPPPPPGLA"],
-                    ["Vpr|SIVMM239",       "MEERPPENEGPQREPWDEWVVEVLEELKEEALKHFDPRLLTALGNHIYNR"
-                                           "HGDTLEGAGELIRILQRALFMHFRGGCIHSRIGQPGGGNPLSAIPPSRSML"]]
-        result = get_ref_seq("siv", "prot", self.siv_prot_file)
+                    ["Vif|SIVMM239", "MEEEKRWIAVPTWRIPERLERWHSLIKYLKYKTKDLQKVCYVPHFKVGWA"
+                                     "WWTCSRVIFPLQEGSHLEVQGYWHLTPEKGWLSTYAVRITWYSKNFWTDV"
+                                     "TPNYADILLHSTYFPCFTAGEVRRAIRGEQLLSCCRFPRAHKYQVPSLQY"
+                                     "LALKVVSDVRSQGENPTWKQWRRDNRRGLRMAKQNSRGDKQRGGKPPTKG"
+                                     "ANFPGLAKVLGILA"],
+                    ["Vpx|SIVMM239", "MSDPRERIPPGNSGEETIGEAFEWLNRTVEEINREAVNHLPRELIFQVWQ"
+                                     "RSWEYWHDEQGMSPSYVKYRYLCLIQKALFMHCKKGCRCLGEGHGAGGWR"
+                                     "PGPPPPPPPGLA"],
+                    ["Vpr|SIVMM239", "MEERPPENEGPQREPWDEWVVEVLEELKEEALKHFDPRLLTALGNHIYNR"
+                                     "HGDTLEGAGELIRILQRALFMHFRGGCIHSRIGQPGGGNPLSAIPPSRSML"]]
+        result = get_ref_aa_seq(TEST_SIV_PROTS)
         self.assertEqual(expected, result)
-
-    def tearDown(self):
-        self.hiv_genome_file.close()
-        self.siv_genome_file.close()
-        self.hiv_prot_file.close()
-        self.siv_prot_file.close()
-
-
-class TestMakeAADictionary(unittest.TestCase):
-
-    def setUp(self):
-        self.hiv_prot_file = open(TEST_HIV_PROTS)
-        self.siv_prot_file = open(TEST_SIV_PROTS)
-
-    def testDefaultSequence(self):
-        expected = {"Matrix|SIVMM239":  "MGVRNSVLSGKKADELEKIRLRPNGKKKYMLKHVVWAANELDRFGLAESL"
-                                        "LENKEGCQKILSVLAPLVPTGSENLKSLYNTVCVIWCIHAEEKVKHTEEA"
-                                        "KQIVQRHLVVETGTTETMPKTSRPTAPSSGRGGNY"}
-        ref_aa_seq = get_ref_seq('siv', 'prot')
-        result = make_aa_dict(ref_aa_seq[1:2])      # second sequence
-        self.assertEqual(expected, result)
-
-    def testInputSequence(self):
-        expected = {"Gag|HIVHXB2CG":    "MGARASVLSGGELDRWEKIRLRPGGKKKYKLKHIVWASRELERFAVNPGL"
-                                        "LETSEGCRQILGQLQPSLQTGSEELRSLYNTVATLYCVHQRIEIKDTKEA"
-                                        "LDKIEEEQNKSKKKAQQAAADTGHSNQVSQNYPIVQNIQGQMVHQAISPR"
-                                        "TLNAWVKVVEEKAFSPEVIPMFSALSEGATPQDLNTMLNTVGGHQAAMQM"
-                                        "LKETINEEAAEWDRVHPVHAGPIAPGQMREPRGSDIAGTTSTLQEQIGWM"
-                                        "TNNPPIPVGEIYKRWIILGLNKIVRMYSPTSILDIRQGPKEPFRDYVDRF"
-                                        "YKTLRAEQASQEVKNWMTETLLVQNANPDCKTILKALGPAATLEEMMTAC"
-                                        "QGVGGPGHKARVLAEAMSQVTNSATIMMQRGNFRNQRKIVKCFNCGKEGH"
-                                        "TARNCRAPRKKGCWKCGKEGHQMKDCTERQANFLGKIWPSYKGRPGNFLQ"
-                                        "SRPEPTAPPEESFRSGVETTTPPQKQEPIDKELYPLTSLRSLFGNDPSSQ"}
-        ref_aa_seq = get_ref_seq('hiv', 'prot', self.hiv_prot_file)
-        result = make_aa_dict(ref_aa_seq[:1])       # first sequence
-        self.assertEqual(expected, result)
-
-    def tearDown(self):
-        self.hiv_prot_file.close()
-        self.siv_prot_file.close()
 
 
 class TestFindGenomicRegions(unittest.TestCase):
@@ -394,7 +334,7 @@ class TestFindGenomicRegions(unittest.TestCase):
 
     def testSimpleUse(self):
         query = get_query('nucl', self.hiv_genome_file)
-        reference_sequence = get_ref_seq('hiv', 'nucl')
+        reference_sequence = get_ref_nt_seq(DEFAULT_HIV_GENOME)
         sequence_alignment = sequence_align(query, reference_sequence)
         coordinates = get_region_coordinates(sequence_alignment[-1])
 
@@ -428,7 +368,7 @@ class TestGetRegionCoordinates(unittest.TestCase):
 
     def testHIVWithHIVGenome(self):
         query = get_query('nucl', self.hiv_genome_file)
-        reference_sequence = get_ref_seq('hiv', 'nucl')     # Reference genome is K03455.fasta
+        reference_sequence = get_ref_nt_seq('hiv', 'nucl')     # Reference genome is K03455.fasta
         sequence_alignment = sequence_align(query, reference_sequence)
         expected = [[0, 349]]
         result = get_region_coordinates(sequence_alignment[-1])
@@ -436,7 +376,7 @@ class TestGetRegionCoordinates(unittest.TestCase):
 
     def testHIVWithSIVGenome(self):
         query = get_query('nucl', self.hiv_genome_file)
-        reference_sequence = get_ref_seq('siv', 'nucl')
+        reference_sequence = get_ref_nt_seq('siv', 'nucl')
         sequence_alignment = sequence_align(query, reference_sequence)
         expected = [[256, 402],   [414, 429],   [595, 611],   [2453, 2466], [2855, 2869], [3390, 3406],
                     [3560, 3573], [3856, 3867], [4501, 4518], [4556, 4566], [4750, 4758], [5912, 5927],
@@ -486,3 +426,309 @@ class TestRetrieve(unittest.TestCase):
         self.siv_genome_file.close()
         self.hiv_prot_file.close()
         self.siv_prot_file.close()
+
+
+class TestHandleArgs(unittest.TestCase):
+
+    maxDiff = None
+
+    def setUp(self):
+        self.nucl_query = open(NUCL_QUERY)
+        self.prot_query = open(PROT_QUERY)
+
+        self.hiv_default_genome = open(DEFAULT_HIV_GENOME)
+        self.hiv_default_prot = open(DEFAULT_HIV_PROTS)
+        self.hiv_test_genome = open(TEST_HIV_GENOME)
+        self.hiv_test_prot = open(TEST_HIV_PROTS)
+
+        self.siv_default_genome = open(DEFAULT_SIV_GENOME)
+        self.siv_default_prot = open(DEFAULT_SIV_PROTS)
+        self.siv_test_genome = open(TEST_SIV_GENOME)
+        self.siv_test_prot = open(TEST_SIV_PROTS)
+
+    def testDefaultHIVNucl(self):
+        """
+        Tests the scenario when the user selects HIV and nucleotide alignment
+        """
+
+        result = handle_args('hiv', 'nucl', self.nucl_query, revcomp='n', ref_nt=None, ref_aa=None)
+
+        expected_query = [['query', 'GACTCGAAAGCGAAAGTTCCAGAGAAGTTCTCTCGACGCAGGACTCGGCTTGCTGAGGTG'
+                                    'CACACAGCAAGAGGCGAGAGCGGCGACTGGTGAGTACGCCAAATTTTGACTAGCGGAGGC'
+                                    'TAGAAGGAGAGAGATGGGTGCGAGAGCGTCAGTATTAAGTGGGGGAAAATTAGATGCATG'
+                                    'GGAAAAAATTCGGTTACGGCCAGGGGGAAAGAAAAAATATAGAATGAAACATTTAGTATG'
+                                    'GGCAAGCAGAGAGTTAGAAAGATTCGCACTTAACCC']]
+        result_query = result[0]
+        self.assertEqual(expected_query, result_query)
+
+        expected_ref_nt_seq = [["K03455|HIVHXB2CG", "TGGAAGGGCTAATTCACTCCCAACGAAGACAAGATATCCTTGATCTGTGG"
+                                                    "ATCTACCACACACAAGGCTACTTCCCTGATTAGCAGAACTACACACCAGG"
+                                                    "GCCAGGGATCAGATATCCACTGACCTTTGGATGGTGCTACAAGCTAGTAC"
+                                                    "CAGTTGAGCCAGAGAAGTTAGAAGAAGCCAACAAAGGAGAGAACACCAGC"
+                                                    "TTGTTACACCCTGTGAGCCTGCATGGAATGGATGACCCGGAGAGAGAAGT"
+                                                    "GTTAGAGTGGAGGTTTGACAGCCGCCTAGCATTTCATCACATGGCCCGAG"
+                                                    "AGCTGCATCCGGAGTACTTCAAGAACTGCTGACATCGAGCTTGCTACAAG"]]
+
+        # Check the first 350 nucleotides in the default reference sequence
+        seq = result[1][0][1][:350]
+        header = result[1][0][0]
+        result_ref_nt_seq = [[header, seq]]
+        self.assertEqual(expected_ref_nt_seq, result_ref_nt_seq)
+
+        expected_ref_aa_seq = [
+            ['Gag|HIVHXB2CG',    'MGARASVLSGGELDRWEKIRLRPGGKKKYKLKHIVWASRELERFAVNPGLLETSEGCRQILGQLQPSLQTGSEELRS'
+                                 'LYNTVATLYCVHQRIEIKDTKEALDKIEEEQNKSKKKAQQAAADTGHSNQVSQNYPIVQNIQGQMVHQAISPRTLNA'
+                                 'WVKVVEEKAFSPEVIPMFSALSEGATPQDLNTMLNTVGGHQAAMQMLKETINEEAAEWDRVHPVHAGPIAPGQMREP'
+                                 'RGSDIAGTTSTLQEQIGWMTNNPPIPVGEIYKRWIILGLNKIVRMYSPTSILDIRQGPKEPFRDYVDRFYKTLRAEQ'
+                                 'ASQEVKNWMTETLLVQNANPDCKTILKALGPAATLEEMMTACQGVGGPGHKARVLAEAMSQVTNSATIMMQRGNFRN'
+                                 'QRKIVKCFNCGKEGHTARNCRAPRKKGCWKCGKEGHQMKDCTERQANFLGKIWPSYKGRPGNFLQSRPEPTAPPEES'
+                                 'FRSGVETTTPPQKQEPIDKELYPLTSLRSLFGNDPSSQ'],
+            ['Matrix|HIVHXB2CG', 'MGARASVLSGGELDRWEKIRLRPGGKKKYKLKHIVWASRELERFAVNPGLLETSEGCRQILGQLQPSLQTGSEELRS'
+                                 'LYNTVATLYCVHQRIEIKDTKEALDKIEEEQNKSKKKAQQAAADTGHSNQVSQNY'],
+            ['Capsid|HIVHXB2CG', 'PIVQNIQGQMVHQAISPRTLNAWVKVVEEKAFSPEVIPMFSALSEGATPQDLNTMLNTVGGHQAAMQMLKETINEEA'
+                                 'AEWDRVHPVHAGPIAPGQMREPRGSDIAGTTSTLQEQIGWMTNNPPIPVGEIYKRWIILGLNKIVRMYSPTSILDI'
+                                 'RQGPKEPFRDYVDRFYKTLRAEQASQEVKNWMTETLLVQNANPDCKTILKALGPAATLEEMMTACQGVGGPGHKARVL'],
+            ['p2|HIVHXB2CG',     'AEAMSQVTNSATIM']]
+
+        # Check the first 4 proteins in the default reference protein sequence
+        result_ref_aa_seq = result[2][:4]
+        self.assertEqual(expected_ref_aa_seq, result_ref_aa_seq)
+
+    def testDefaultSIVProt(self):
+        """
+        Tests the scenario when the user selects SIV and protein alignment
+        """
+
+        result = handle_args('siv', 'prot', self.nucl_query, revcomp='n', ref_nt=None, ref_aa=None)
+
+        expected_query = [['query', 'GACTCGAAAGCGAAAGTTCCAGAGAAGTTCTCTCGACGCAGGACTCGGCTTGCTGAGGTG'
+                                    'CACACAGCAAGAGGCGAGAGCGGCGACTGGTGAGTACGCCAAATTTTGACTAGCGGAGGC'
+                                    'TAGAAGGAGAGAGATGGGTGCGAGAGCGTCAGTATTAAGTGGGGGAAAATTAGATGCATG'
+                                    'GGAAAAAATTCGGTTACGGCCAGGGGGAAAGAAAAAATATAGAATGAAACATTTAGTATG'
+                                    'GGCAAGCAGAGAGTTAGAAAGATTCGCACTTAACCC']]
+        result_query = result[0]
+        self.assertEqual(expected_query, result_query)
+
+        expected_ref_nt_seq = [["M33262|SIVMM239", "GCATGCACATTTTAAAGGCTTTTGCTAAATATAGCCAAAAGTCCTTCTAC"
+                                                   "AAATTTTCTAAGAGTTCTGATTCAAAGCAGTAACAGGCCTTGTCTCATCA"
+                                                   "TGAACTTTGGCATTTCATCTACAGCTAAGTTTATATCATAAATAGTTCTT"
+                                                   "TACAGGCAGCACCAACTTATACCCTTATAGCATACTTTACTGTGTGAAAA"
+                                                   "TTGCATCTTTCATTAAGCTTACTGTAAATTTACTGGCTGTCTTCCTTGCA"
+                                                   "GGTTTCTGGAAGGGATTTATTACAGTGCAAGAAGACATAGAATCTTAGAC"
+                                                   "ATATACTTAGAAAAGGAAGAAGGCATCATACCAGATTGGCAGGATTACAC"
+                                                   "CTCAGGACCAGGAATTAGATACCCAAAGACATTTGGCTGGCTATGGAAAT"]]
+
+        # Check the first 400 nucleotides in the default reference sequence
+        seq = result[1][0][1][:400]
+        header = result[1][0][0]
+        result_ref_nt_seq = [[header, seq]]
+        self.assertEqual(expected_ref_nt_seq, result_ref_nt_seq)
+
+        expected_ref_aa_seq = [["Capsid|SIVMM239",      "PVQQIGGNYVHLPLSPRTLNAWVKLIEEKKFGAEVVPGFQALSEGCTPYD"
+                                                        "INQMLNCVGDHQAAMQIIRDIINEEAADWDLQHPQPAPQQGQLREPSGSD"
+                                                        "IAGTTSSVDEQIQWMYRQQNPIPVGNIYRRWIQLGLQKCVRMYNPTNILD"
+                                                        "VKQGPKEPFQSYVDRFYKSLRAEQTDAAVKNWMTQTLLIQNANPDCKLVL"
+                                                        "KGLGVNPTLEEMLTACQGVGGPGQKARLM"],
+                              ["p2|SIVMM239",           "AEALKEALAPVPIPFAA"],
+                              ["Nucleocapsid|SIVMM239", "AQQRGPRKPIKCWNCGKEGHSARQCRAPRRQGCWKCGKMDHVMAKCPDRQAG"]]
+        result_ref_aa_seq = result[2][2:5]
+        self.assertEqual(expected_ref_aa_seq, result_ref_aa_seq)
+
+    def testDefaultRevCompHIVProt(self):
+        """
+        Tests the scenario when the user selects HIV and nucleotide alignment with the reverse complement of the query
+        """
+
+        result = handle_args('hiv', 'prot', self.nucl_query, revcomp='y', ref_nt=None, ref_aa=None)
+
+        expected_query = [['query', 'GACTCGAAAGCGAAAGTTCCAGAGAAGTTCTCTCGACGCAGGACTCGGCTTGCTGAGGTG'
+                                    'CACACAGCAAGAGGCGAGAGCGGCGACTGGTGAGTACGCCAAATTTTGACTAGCGGAGGC'
+                                    'TAGAAGGAGAGAGATGGGTGCGAGAGCGTCAGTATTAAGTGGGGGAAAATTAGATGCATG'
+                                    'GGAAAAAATTCGGTTACGGCCAGGGGGAAAGAAAAAATATAGAATGAAACATTTAGTATG'
+                                    'GGCAAGCAGAGAGTTAGAAAGATTCGCACTTAACCC']]
+        result_query = result[0]
+        self.assertEqual(expected_query, result_query)
+
+        expected_ref_nt_seq = [["K03455|HIVHXB2CG", "TGGAAGGGCTAATTCACTCCCAACGAAGACAAGATATCCTTGATCTGTGG"
+                                                    "ATCTACCACACACAAGGCTACTTCCCTGATTAGCAGAACTACACACCAGG"
+                                                    "GCCAGGGATCAGATATCCACTGACCTTTGGATGGTGCTACAAGCTAGTAC"
+                                                    "CAGTTGAGCCAGAGAAGTTAGAAGAAGCCAACAAAGGAGAGAACACCAGC"
+                                                    "TTGTTACACCCTGTGAGCCTGCATGGAATGGATGACCCGGAGAGAGAAGT"
+                                                    "GTTAGAGTGGAGGTTTGACAGCCGCCTAGCATTTCATCACATGGCCCGAG"
+                                                    "AGCTGCATCCGGAGTACTTCAAGAACTGCTGACATCGAGCTTGCTACAAG"]]
+
+        # Check the first 350 nucleotides in the default reference sequence
+        seq = result[1][0][1][:350]
+        header = result[1][0][0]
+        result_ref_nt_seq = [[header, seq]]
+        self.assertEqual(expected_ref_nt_seq, result_ref_nt_seq)
+
+        expected_ref_aa_seq = [
+            ['Gag|HIVHXB2CG', 'MGARASVLSGGELDRWEKIRLRPGGKKKYKLKHIVWASRELERFAVNPGLLETSEGCRQILGQLQPSLQTGSEELRS'
+                              'LYNTVATLYCVHQRIEIKDTKEALDKIEEEQNKSKKKAQQAAADTGHSNQVSQNYPIVQNIQGQMVHQAISPRTLNA'
+                              'WVKVVEEKAFSPEVIPMFSALSEGATPQDLNTMLNTVGGHQAAMQMLKETINEEAAEWDRVHPVHAGPIAPGQMREP'
+                              'RGSDIAGTTSTLQEQIGWMTNNPPIPVGEIYKRWIILGLNKIVRMYSPTSILDIRQGPKEPFRDYVDRFYKTLRAEQ'
+                              'ASQEVKNWMTETLLVQNANPDCKTILKALGPAATLEEMMTACQGVGGPGHKARVLAEAMSQVTNSATIMMQRGNFRN'
+                              'QRKIVKCFNCGKEGHTARNCRAPRKKGCWKCGKEGHQMKDCTERQANFLGKIWPSYKGRPGNFLQSRPEPTAPPEES'
+                              'FRSGVETTTPPQKQEPIDKELYPLTSLRSLFGNDPSSQ'],
+            ['Matrix|HIVHXB2CG', 'MGARASVLSGGELDRWEKIRLRPGGKKKYKLKHIVWASRELERFAVNPGLLETSEGCRQILGQLQPSLQTGSEELRS'
+                                 'LYNTVATLYCVHQRIEIKDTKEALDKIEEEQNKSKKKAQQAAADTGHSNQVSQNY'],
+            ['Capsid|HIVHXB2CG', 'PIVQNIQGQMVHQAISPRTLNAWVKVVEEKAFSPEVIPMFSALSEGATPQDLNTMLNTVGGHQAAMQMLKETINEEA'
+                                 'AEWDRVHPVHAGPIAPGQMREPRGSDIAGTTSTLQEQIGWMTNNPPIPVGEIYKRWIILGLNKIVRMYSPTSILDI'
+                                 'RQGPKEPFRDYVDRFYKTLRAEQASQEVKNWMTETLLVQNANPDCKTILKALGPAATLEEMMTACQGVGGPGHKARVL'],
+            ['p2|HIVHXB2CG', 'AEAMSQVTNSATIM']]
+
+        # Check the first 4 proteins in the default reference protein sequence
+        result_ref_aa_seq = result[2][:4]
+        self.assertEqual(expected_ref_aa_seq, result_ref_aa_seq)
+
+    def testDefaultRevCompSIVNucl(self):
+        """
+        Tests the scenario when the user selects SIV and nucleotide alignment with the reverse complement of the query
+        """
+
+        result = handle_args('siv', 'nucl', self.nucl_query, revcomp='y', ref_nt=None, ref_aa=None)
+
+        expected_query = [['query', 'GGGTTAAGTGCGAATCTTTCTAACTCTCTGCTTGCCCATACTAAATGTTTCATTCTATATTTTTTC'
+                                    'TTTCCCCCTGGCCGTAACCGAATTTTTTCCCATGCATCTAATTTTCCCCCACTTAATACTGACGCT'
+                                    'CTCGCACCCATCTCTCTCCTTCTAGCCTCCGCTAGTCAAAATTTGGCGTACTCACCAGTCGCCGCT'
+                                    'CTCGCCTCTTGCTGTGTGCACCTCAGCAAGCCGAGTCCTGCGTCGAGAGAACTTCTCTGGAACTTT'
+                                    'CGCTTTCGAGTC']]
+        result_query = result[0]
+        self.assertEqual(expected_query, result_query)
+
+        expected_ref_nt_seq = [["M33262|SIVMM239", "GCATGCACATTTTAAAGGCTTTTGCTAAATATAGCCAAAAGTCCTTCTAC"
+                                                   "AAATTTTCTAAGAGTTCTGATTCAAAGCAGTAACAGGCCTTGTCTCATCA"
+                                                   "TGAACTTTGGCATTTCATCTACAGCTAAGTTTATATCATAAATAGTTCTT"
+                                                   "TACAGGCAGCACCAACTTATACCCTTATAGCATACTTTACTGTGTGAAAA"
+                                                   "TTGCATCTTTCATTAAGCTTACTGTAAATTTACTGGCTGTCTTCCTTGCA"
+                                                   "GGTTTCTGGAAGGGATTTATTACAGTGCAAGAAGACATAGAATCTTAGAC"
+                                                   "ATATACTTAGAAAAGGAAGAAGGCATCATACCAGATTGGCAGGATTACAC"
+                                                   "CTCAGGACCAGGAATTAGATACCCAAAGACATTTGGCTGGCTATGGAAAT"]]
+
+        # Check the first 400 nucleotides in the default reference sequence
+        seq = result[1][0][1][:400]
+        header = result[1][0][0]
+        result_ref_nt_seq = [[header, seq]]
+        self.assertEqual(expected_ref_nt_seq, result_ref_nt_seq)
+
+        expected_ref_aa_seq = [["Capsid|SIVMM239", "PVQQIGGNYVHLPLSPRTLNAWVKLIEEKKFGAEVVPGFQALSEGCTPYD"
+                                                   "INQMLNCVGDHQAAMQIIRDIINEEAADWDLQHPQPAPQQGQLREPSGSD"
+                                                   "IAGTTSSVDEQIQWMYRQQNPIPVGNIYRRWIQLGLQKCVRMYNPTNILD"
+                                                   "VKQGPKEPFQSYVDRFYKSLRAEQTDAAVKNWMTQTLLIQNANPDCKLVL"
+                                                   "KGLGVNPTLEEMLTACQGVGGPGQKARLM"],
+                               ["p2|SIVMM239", "AEALKEALAPVPIPFAA"],
+                               ["Nucleocapsid|SIVMM239", "AQQRGPRKPIKCWNCGKEGHSARQCRAPRRQGCWKCGKMDHVMAKCPDRQAG"]]
+        result_ref_aa_seq = result[2][2:5]
+        self.assertEqual(expected_ref_aa_seq, result_ref_aa_seq)
+
+    def testInputNuclProtHIV(self):
+        """
+        Tests the scenario when the user selects HIV, specifies the reference sequences,
+        and selects nucleotide alignment
+        """
+        result = handle_args('hiv', 'nucl', self.nucl_query, revcomp='n',
+                             ref_nt=TEST_HIV_GENOME, ref_aa=TEST_HIV_PROTS)
+
+        expected_query = [['query', 'GACTCGAAAGCGAAAGTTCCAGAGAAGTTCTCTCGACGCAGGACTCGGCTTGCTGAGGTG'
+                                    'CACACAGCAAGAGGCGAGAGCGGCGACTGGTGAGTACGCCAAATTTTGACTAGCGGAGGC'
+                                    'TAGAAGGAGAGAGATGGGTGCGAGAGCGTCAGTATTAAGTGGGGGAAAATTAGATGCATG'
+                                    'GGAAAAAATTCGGTTACGGCCAGGGGGAAAGAAAAAATATAGAATGAAACATTTAGTATG'
+                                    'GGCAAGCAGAGAGTTAGAAAGATTCGCACTTAACCC']]
+        result_query = result[0]
+        self.assertEqual(expected_query, result_query)
+
+        expected_ref_nt = [["K03455|HIVHXB2CG", "TGGAAGGGCTAATTCACTCCCAACGAAGACAAGATATCCTTGATCTGTGG"
+                                                "ATCTACCACACACAAGGCTACTTCCCTGATTAGCAGAACTACACACCAGG"
+                                                "GCCAGGGATCAGATATCCACTGACCTTTGGATGGTGCTACAAGCTAGTAC"
+                                                "CAGTTGAGCCAGAGAAGTTAGAAGAAGCCAACAAAGGAGAGAACACCAGC"
+                                                "TTGTTACACCCTGTGAGCCTGCATGGAATGGATGACCCGGAGAGAGAAGT"
+                                                "GTTAGAGTGGAGGTTTGACAGCCGCCTAGCATTTCATCACATGGCCCGAG"
+                                                "AGCTGCATCCGGAGTACTTCAAGAACTGCTGACATCGAGCTTGCTACAAG"]]
+        result_ref_nt = result[1]
+        self.assertEqual(expected_ref_nt, result_ref_nt)
+
+        expected_ref_prot = [["Gag|HIVHXB2CG",    "MGARASVLSGGELDRWEKIRLRPGGKKKYKLKHIVWASRELERFAVNPG"
+                                                  "LLETSEGCRQILGQLQPSLQTGSEELRSLYNTVATLYCVHQRIEIKDTK"
+                                                  "EALDKIEEEQNKSKKKAQQAAADTGHSNQVSQNYPIVQNIQGQMVHQAI"
+                                                  "SPRTLNAWVKVVEEKAFSPEVIPMFSALSEGATPQDLNTMLNTVGGHQA"
+                                                  "AMQMLKETINEEAAEWDRVHPVHAGPIAPGQMREPRGSDIAGTTSTLQE"
+                                                  "QIGWMTNNPPIPVGEIYKRWIILGLNKIVRMYSPTSILDIRQGPKEPFR"
+                                                  "DYVDRFYKTLRAEQASQEVKNWMTETLLVQNANPDCKTILKALGPAATL"
+                                                  "EEMMTACQGVGGPGHKARVLAEAMSQVTNSATIMMQRGNFRNQRKIVKC"
+                                                  "FNCGKEGHTARNCRAPRKKGCWKCGKEGHQMKDCTERQANFLGKIWPSY"
+                                                  "KGRPGNFLQSRPEPTAPPEESFRSGVETTTPPQKQEPIDKELYPLTSLR"
+                                                  "SLFGNDPSSQ"],
+                            ["Matrix|HIVHXB2CG",  "MGARASVLSGGELDRWEKIRLRPGGKKKYKLKHIVWASRELERFAVNPGL"
+                                                  "LETSEGCRQILGQLQPSLQTGSEELRSLYNTVATLYCVHQRIEIKDTKEA"
+                                                  "LDKIEEEQNKSKKKAQQAAADTGHSNQVSQNY"],
+                            ["Capsid|HIVHXB2CG",  "PIVQNIQGQMVHQAISPRTLNAWVKVVEEKAFSPEVIPMFSALSEGATPQ"
+                                                  "DLNTMLNTVGGHQAAMQMLKETINEEAAEWDRVHPVHAGPIAPGQMREPR"
+                                                  "GSDIAGTTSTLQEQIGWMTNNPPIPVGEIYKRWIILGLNKIVRMYSPTSI"
+                                                  "LDIRQGPKEPFRDYVDRFYKTLRAEQASQEVKNWMTETLLVQNANPDCKT"
+                                                  "ILKALGPAATLEEMMTACQGVGGPGHKARVL"]]
+        result_ref_prot = result[2]
+        self.assertEqual(expected_ref_prot, result_ref_prot)
+
+    def testInputAllSIV(self):
+        """
+        Tests the scenario when the user selects SIV, specifies the reference sequences, and selects protein alignment
+        """
+        result = handle_args('siv', 'prot', self.prot_query, revcomp='n',
+                             ref_nt=TEST_SIV_GENOME, ref_aa=TEST_SIV_PROTS)
+
+        expected_query = [['query', 'MAYTQTATTSALLDTVRGNNSLVNDLAKRRLYDTAVEEFNARDRRPKVNFSKVISEEQTL'
+                                    'IATRAYPEFQITFYNTQNAVHSLAGGLRSLELEYLMMQIPYGSLTYDIGGNFASHLFKGR'
+                                    'AYVHCCMPNLDVRDIMRHEGQKDSIELYLSRLERGGKTVPNFQKEAFDRYAEIPEDAVCH'
+                                    'NTFQTMRHQPMQQSGRVYAIALHSIYDIPADEFGAALLRKNVHTCYAAFHFSENLLLEDS'
+                                    'YVNLDEINACFSRDGDKLTFSFASESTLNYCHSYSNILKYVCKTYFPASNREVYMKEFLV']]
+        result_query = result[0]
+        self.assertEqual(expected_query, result_query)
+
+        expected_ref_nt = [["M33262|SIVMM239", "GCATGCACATTTTAAAGGCTTTTGCTAAATATAGCCAAAAGTCCTTCTAC"
+                                               "AAATTTTCTAAGAGTTCTGATTCAAAGCAGTAACAGGCCTTGTCTCATCA"
+                                               "TGAACTTTGGCATTTCATCTACAGCTAAGTTTATATCATAAATAGTTCTT"
+                                               "TACAGGCAGCACCAACTTATACCCTTATAGCATACTTTACTGTGTGAAAA"
+                                               "TTGCATCTTTCATTAAGCTTACTGTAAATTTACTGGCTGTCTTCCTTGCA"
+                                               "GGTTTCTGGAAGGGATTTATTACAGTGCAAGAAGACATAGAATCTTAGAC"
+                                               "ATATACTTAGAAAAGGAAGAAGGCATCATACCAGATTGGCAGGATTACAC"
+                                               "CTCAGGACCAGGAATTAGATACCCAAAGACATTTGGCTGGCTATGGAAAT"]]
+        result_ref_nt = result[1]
+        self.assertEqual(expected_ref_nt, result_ref_nt)
+
+        expected_ref_prot = [["RNase|SIVMM239",     "YTDGSCNKQSKEGKAGYITDRGKDKVKVLEQTTNQQAELEAFLMALTDSG"
+                                                    "PKANIIVDSQYVMGIITGCPTESESRLVNQIIEEMIKKSEIYVAWVPAHK"
+                                                    "GIGGNQEIDHLVSQGIRQVL"],
+                            ["Integrase|SIVMM239",  "FLEKIEPAQEEHDKYHSNVKELVFKFGLPRIVARQIVDTCDKCHQKGEAI"
+                                                    "HGQANSDLGTWQMDCTHLEGKIIIVAVHVASGFIEAEVIPQETGRQTALF"
+                                                    "LLKLAGRWPITHLHTDNGANFASQEVKMVAWWAGIEHTFGVPYNPQSQGV"
+                                                    "VEAMNHHLKNQIDRIREQANSVETIVLMAVHCMNFKRRGGIGDMTPAERL"
+                                                    "INMITTEQEIQFQQSKNSKFKNFRVYYREGRDQLWKGPGELLWKGEGAVI"
+                                                    "LKVGTDIKVVPRRKAKIIKDYGGGKEVDSSSHMEDTGEAREVA"],
+                            ["Vif|SIVMM239",        "MEEEKRWIAVPTWRIPERLERWHSLIKYLKYKTKDLQKVCYVPHFKVGWA"
+                                                    "WWTCSRVIFPLQEGSHLEVQGYWHLTPEKGWLSTYAVRITWYSKNFWTDV"
+                                                    "TPNYADILLHSTYFPCFTAGEVRRAIRGEQLLSCCRFPRAHKYQVPSLQY"
+                                                    "LALKVVSDVRSQGENPTWKQWRRDNRRGLRMAKQNSRGDKQRGGKPPTKG"
+                                                    "ANFPGLAKVLGILA"],
+                            ["Vpx|SIVMM239",        "MSDPRERIPPGNSGEETIGEAFEWLNRTVEEINREAVNHLPRELIFQVWQ"
+                                                    "RSWEYWHDEQGMSPSYVKYRYLCLIQKALFMHCKKGCRCLGEGHGAGGWR"
+                                                    "PGPPPPPPPGLA"],
+                            ["Vpr|SIVMM239",        "MEERPPENEGPQREPWDEWVVEVLEELKEEALKHFDPRLLTALGNHIYNR"
+                                                    "HGDTLEGAGELIRILQRALFMHFRGGCIHSRIGQPGGGNPLSAIPPSRSML"]]
+        result_ref_prot = result[2]
+        self.assertEqual(expected_ref_prot, result_ref_prot)
+
+    def tearDown(self):
+        self.nucl_query.close()
+        self.prot_query.close()
+
+        self.hiv_default_genome.close()
+        self.hiv_default_prot.close()
+        self.hiv_test_genome.close()
+        self.hiv_test_prot.close()
+
+        self.siv_default_genome.close()
+        self.siv_default_prot.close()
+        self.siv_test_genome.close()
+        self.siv_test_prot.close()
+
