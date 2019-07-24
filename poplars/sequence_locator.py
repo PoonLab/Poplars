@@ -33,25 +33,50 @@ class GenomeRegion:
         self.aa_coords = aa_coords
         self.aa_seq = aa_seq
 
-        self.pos_from_cds = []       # Nucleotide position relative to CDS start
+        self.pos_from_cds = []         # Nucleotide position relative to CDS start
         self.pos_from_gstart = None    # Nucleotide position relative to the reference genome start
         self.pos_from_qstart = None    # Nucleotide position relative to the start of the query sequence
+        self.pos_from_rstart = None
         self.pos_from_aa_start = None  # Amino acid position relative to protein start
+        self.codon_aln = ''            # Amino acid sequence aligned with the nucleotide sequence
 
-    def set_nt_seq(self, nt_reference):
-        self.nt_seq = nt_reference[self.nt_coords[0] - 1: self.nt_coords[1]]
+    def get_coords(self, base):
+        if base == 'nucl':
+            coords = self.nt_coords
+        else:
+            coords = self.aa_coords
+        return coords
 
-    def set_aa_seq(self, aa_reference):
-        self.aa_seq = aa_reference[self.aa_coords[0] - 1: self.aa_coords[1]]
+    def get_sequence(self, base):
+        if base == 'nucl':
+            sequence = self.nt_seq
+        else:
+            sequence = self.aa_seq
+        return sequence
 
-    def set_aa_coords(self, aa_coords):
-        self.aa_coords = aa_coords
+    def set_coords(self, coord_pair, base):
+        if base == 'nucl':
+            self.nt_coords = coord_pair
+        else:
+            self.aa_coords = coord_pair
 
-    def set_nt_coords(self, nt_coords):
-        self.nt_coords = nt_coords
+    def set_seq_from_ref(self, sequence, base):
+        if base == 'nucl':
+            self.nt_seq = sequence[self.nt_coords[0] - 1: self.nt_coords[1]]
+        else:
+            self.aa_seq = sequence[self.aa_coords[0] - 1: self.aa_coords[1]]
+
+    def set_sequence(self, seq, base):
+        if base == 'nucl':
+            self.nt_seq = seq
+        else:
+            self.aa_seq = seq
 
     def set_pos_from_cds(self, virus):
-        if '5\'LTR' in self.region_name or not self.region_name == 'TAR':
+        """
+        Gives the position of a sequence relative to the start of the coding sequence
+        """
+        if '5\'LTR' in self.region_name:
             self.pos_from_cds = ['N/A']
         else:
             if virus == 'hiv':
@@ -61,14 +86,60 @@ class GenomeRegion:
             self.pos_from_cds.append((self.nt_coords[0] + 1 - cds_start))
             self.pos_from_cds.append((self.nt_coords[1] + 1 - cds_start))
 
-    def set_pos_from_gstart(self):
-        self.pos_from_gstart = self.nt_coords
-
     def set_pos_from_aa_start(self):
-        if '5\'LTR' in self.region_name or self.region_name == 'TAR':
+        """
+        Gives the position of the sequence relative to the start of the protein sequence
+        """
+        if '5\'LTR' in self.region_name:
             self.pos_from_aa_start = None
         else:
-            self.pos_from_aa_start = (self.nt_coords[1] - self.nt_coords[0]) // 3
+            self.pos_from_aa_start = [1, (self.nt_coords[1] - self.nt_coords[0]) // 3]
+
+    def make_codon_aln(self):
+        """
+        Aligns the protein sequence with its associated nucleotide sequence
+        """
+        if self.nt_seq is not None and self.aa_seq is not None:
+            codon_aln = []
+            codons = [''.join(t) for t in zip(*[iter(self.nt_seq)] * 3)]
+            for aa in self.aa_seq:
+                codon_aln.append('-{}-'.format(aa))
+            self.codon_aln = ''.join(codon_aln)
+        return self.codon_aln
+
+    def global_to_local_index(self, coord_pair, base):
+        """
+        Converts a pair of global indices to local indices, relative to the sequence region of interest
+        """
+        start = self.get_coords(base)[0] - 1         # 0-based inclusive indexing
+        start_offset = coord_pair[0] - start
+        end_offset = coord_pair[1] - start
+        local_pair = [start_offset, end_offset]
+        return local_pair
+
+    def local_to_global_index(self, local_pair, base):
+        """
+        Converts a pair of local indices (relative to the region of interest) to global indices
+        """
+        start = local_pair[0] + self.get_coords(base)[0]
+        end = self.get_coords(base)[0] + local_pair[1] - 1
+        global_pair = [start, end]
+        return global_pair
+
+    def get_overlap(self, coord_pair, base):
+        """
+        Gets the sequence regions that overlap with the region of interest
+        :param coord_pair: the coordinates
+        :param base: The base of the sequence
+        :return: the sequence of the overlap, and the indices of the overlap
+        """
+        local_pair = self.global_to_local_index(coord_pair, base)
+        seq = self.get_sequence(base)
+
+        # Check if local coordinates are in the range of the sequence
+        start = max(local_pair[0], 0)
+        end = min(local_pair[1] + 1, len(seq))
+        return seq[start: end], self.local_to_global_index([start, end], base)
 
 
 def set_regions(virus, nt_reference, nt_coords, aa_reference, aa_coords):
@@ -94,10 +165,10 @@ def set_regions(virus, nt_reference, nt_coords, aa_reference, aa_coords):
             nt_line = nt_line.split(',')
             nucl_coords = [int(nt_line[1]), int(nt_line[2])]
             seq_region = GenomeRegion(nt_line[0])
-            seq_region.set_nt_coords(nucl_coords)
-            seq_region.set_nt_seq(nt_reference)
+            seq_region.set_coords(nucl_coords, 'nucl')
+            seq_region.set_seq_from_ref(nt_reference, 'nucl')
             seq_region.set_pos_from_cds(virus)
-            seq_region.set_pos_from_gstart()
+            seq_region.pos_from_gstart = nucl_coords
             seq_region.set_pos_from_aa_start()
             genome_regions.append(seq_region)
 
@@ -114,11 +185,8 @@ def set_regions(virus, nt_reference, nt_coords, aa_reference, aa_coords):
         for i in range(len(prot_names)):
             for genome_region in genome_regions:
                 if prot_names[i] in genome_region.region_name:
-                    genome_region.set_aa_coords(prot_coords_list[i])
-                    genome_region.set_aa_seq(aa_reference)
-                    seq_region.set_pos_from_cds(virus)
-                    seq_region.set_pos_from_gstart()
-                    seq_region.set_pos_from_aa_start()
+                    genome_region.set_coords(prot_coords_list[i], 'prot')
+                    genome_region.set_seq_from_ref(aa_reference, 'prot')
 
     return genome_regions
 
@@ -168,7 +236,7 @@ def valid_inputs(virus, start_coord, end_coord, region):
     :return: <True> If the coordinates are valid, <False> otherwise
     """
 
-    if type(start_coord) != str:
+    if type(start_coord) == str:
         print("Invalid start coordinate type: {}".format(type(start_coord)))
 
     if start_coord <= 0:
@@ -295,16 +363,10 @@ def sequence_align(query_sequence, reference_sequence, outfile=None):
     for h, s in result:
         if outfile is not None:
             outfile.write(">{}\n".format(h))
+            outfile.write(textwrap.fill(s, 60))
         else:
             print(">{}".format(h))
-
-        # Ouput 60 characters per line
-        seq_lines = [s[i:i + 60] for i in range(0, len(s), 60)]
-        for line in seq_lines:
-            if outfile is not None:
-                outfile.write('{}\n'.format(line))
-            else:
-                print("{}".format(line))
+            print(textwrap.fill(s, 60))
 
     return result
 
@@ -320,41 +382,11 @@ def get_region_coordinates(alignment):
     return coordinates
 
 
-def translate(sequence):
-    codon_table = {'TTT': 'F', 'TTC': 'F', 'TTA': 'L', 'TTG': 'L', 'TCT': 'S', 'TCC': 'S',
-                   'TCA': 'S', 'TCG': 'S', 'TAT': 'Y', 'TAC': 'Y', 'TAA': '*', 'TAG': '*',
-                   'TGT': 'C', 'TGC': 'C', 'TGA': '*', 'TGG': 'W', 'CTT': 'L', 'CTC': 'L',
-                   'CTA': 'L', 'CTG': 'L', 'CCT': 'P', 'CCC': 'P', 'CCA': 'P', 'CCG': 'P',
-                   'CAT': 'H', 'CAC': 'H', 'CAA': 'Q', 'CAG': 'Q', 'CGT': 'R', 'CGC': 'R',
-                   'CGA': 'R', 'CGG': 'R', 'ATT': 'I', 'ATC': 'I', 'ATA': 'I', 'ATG': 'M',
-                   'ACT': 'T', 'ACC': 'T', 'ACA': 'T', 'ACG': 'T', 'AAT': 'N', 'AAC': 'N',
-                   'AAA': 'K', 'AAG': 'K', 'AGT': 'S', 'AGC': 'S', 'AGA': 'R', 'AGG': 'R',
-                   'GTT': 'V', 'GTC': 'V', 'GTA': 'V', 'GTG': 'V', 'GCT': 'A', 'GCC': 'A',
-                   'GCA': 'A', 'GCG': 'A', 'GAT': 'D', 'GAC': 'D', 'GAA': 'E', 'GAG': 'E',
-                   'GGT': 'G', 'GGC': 'G', 'GGA': 'G', 'GGG': 'G', '---': '-', 'XXX': '?'}
-
-    reverse_codon_table = {'F': ['TTT', 'TTC'],  'L': ['TTA', 'TTG', 'CTT', 'CTC', 'CTA', 'CTG'],
-                           'S': ['TCT', 'TCC', 'TCA', 'TCG', 'AGT', 'AGC'], 'Y': ['TAT', 'TAC'],
-                           '*': ['TAA', 'TAG', 'TGA'], 'C': ['TGT', 'TGC'], 'W': ['TGG'],
-                           'P': ['CCT', 'CCC', 'CCA', 'CCG'], 'H': ['CAT', 'CAC'], 'Q': ['CAA', 'CAG'],
-                           'R': ['CGT', 'CGC', 'CGA', 'CGG', 'AGA', 'AGG'], 'I': ['ATT', 'ATC', 'ATA'],
-                           'M': ['ATG'], 'T': ['ACT', 'ACC', 'ACA', 'ACG'], 'N': ['AAT', 'AAC'],
-                           'K': ['AAA', 'AAG'], 'V': ['GTT', 'GTC', 'GTA', 'GTG'], 'A': ['GCT', 'GCC', 'GCA', 'GCG'],
-                           'D': ['GAT', 'GAC'], 'E': ['GAA', 'GAG'], 'G': ['GGT', 'GGC', 'GGA', 'GGG'],
-                           '-': ['---'], 'X': ['XXX']}
-
-    prot_seq = ''
-    codons = [''.join(t) for t in zip(*[iter(sequence)] * 3)]
-    for codon in codons:
-        prot_seq.__add__(codon_table[codon])
-
-    return prot_seq
-
-
-def find_matches(virus, ref_regions, match_coordinates):
+def find_matches(virus, base, ref_regions, match_coordinates):
     """
     Finds the genomic regions where the query sequence aligns with the reference sequence
     :param virus: The organism (HIV or SIV)
+    :param base: The base of the query sequence
     :param ref_regions: A list of GenomeRegion objects
     :param match_coordinates: A list of indices where the query sequence aligns with the reference sequence
     :return matches: A dictionary of matches, where the key is the region name and the value is the coordinates
@@ -363,98 +395,66 @@ def find_matches(virus, ref_regions, match_coordinates):
 
     for coord in match_coordinates:
         start_aln = coord[0]
-        end_aln = coord[1]
+        end_aln = coord[1] - 1  # -1 to account for match.end() in regex
 
         for ref_region in ref_regions:
-            if ref_region.nt_coords is not None and ref_region.nt_seq is not None:
+            if ref_region.region_name != "Complete":
+                ov_seq, ov_coord = ref_region.get_overlap([start_aln, end_aln], base)
 
-                start_nt = ref_region.nt_coords[0] - 1       # Start coordinate of the genomic region
-                end_nt = ref_region.nt_coords[1] - 1         # End coordinate of the genomic region
-                start_offset = start_aln - start_nt
-                end_offset = end_aln - end_nt
+                if ov_seq:
+                    query_region = GenomeRegion(ref_region.region_name)
+                    query_region.set_coords(ov_coord, base)
+                    query_region.set_sequence(ov_seq, base)
+                    query_region.set_pos_from_cds(virus)
+                    query_region.pos_from_gstart = [start_aln, end_aln]
+                    query_region.set_pos_from_aa_start()
 
-                # Check if aligned region is contained in a genomic region
-                if start_nt <= start_aln < end_aln <= end_nt:
-                    if ref_region.region_name != "Complete":
-                        query_region = GenomeRegion(ref_region.region_name)
-
-                        # Portion of the query sequence where it aligns with the reference sequence
-                        query_region.nt_seq = ref_region.nt_seq[start_aln: end_aln]
-                        # Indices of nucleotide matches
-                        query_region.nt_coords = [start_nt + start_offset, end_nt + end_offset]
-
-                        query_region.set_pos_from_cds(virus)
-                        query_region.set_pos_from_gstart()
-                        query_region.set_pos_from_aa_start()
-                        query_region.aa_seq = set_protein_equivalents(query_region, ref_regions)
-                        query_regions.append(query_region)
-
-            elif ref_region.aa_coords is not None and ref_region.aa_seq is not None:
-
-                start_aa = ref_region.aa_coords[0] - 1  # Start coordinate of the genomic region
-                end_aa = ref_region.aa_coords[1] - 1  # End coordinate of the genomic region
-                start_offset = start_aln - start_aa
-                end_offset = end_aln - end_aa
-
-                # Check if aligned region is contained in a genomic region
-                if start_aa <= start_aln < end_aln <= end_aa:
-                    if ref_region.region_name != "Complete":
-                        query_region = GenomeRegion(ref_region.region_name)
-
-                        # Portion of the query sequence where it aligns with the reference sequence
-                        query_region.aa_seq = ref_region.aa_seq[start_aln: end_aln]
-                        # Indices of nucleotide matches
-                        query_region.aa_coords = [start_aa + start_offset, end_aa + end_offset]
-
-                        query_region.set_pos_from_cds(virus)
-                        query_region.set_pos_from_gstart()
-                        query_region.set_pos_from_aa_start()
-                        query_regions.append(query_region)
-
-                    # TODO: add check for nucleotide equivalent
+                    if base == 'nucl':
+                        set_protein_equivalents(query_region, ref_regions)
+                    else:
+                        set_nucleotide_equivalents(query_region, ref_regions)
+                    query_regions.append(query_region)
 
     return query_regions
 
 
-def set_protein_equivalents(query_regions, ref_regions):
-
-    prot_seqs = []
+def set_protein_equivalents(query_reg, ref_regions):
+    """
+    Finds the protein equivalent of the nucleotide sequence
+    :param query_reg: the region that aligns with the query sequence
+    :param ref_regions: a list of GenomeRegion objects
+    :return prot_equiv: the protein equivalent of the nucleotide sequence
+    """
+    prot_equiv = None
+    non_coding = ["5'LTR", "TAR", "3'LTR"]
     for ref_reg in ref_regions:
-        for query_reg in query_regions:
-            if ref_reg.region_name == query_reg.region_name:
-                if ref_reg.aa_coords is not None and query_reg.aa_coords is not None:
-                    start_index, end_index = 0, 0
+        if ref_reg.region_name == query_reg.region_name and ref_reg.region_name not in non_coding:
+            if ref_reg.codon_aln is not None and query_reg.aa_coords is not None:
+                prot_equiv = ref_reg.codon_aln[query_reg.nt_coords[0]: query_reg.nt_coords[1]]
+                prot_equiv = re.sub('[-]', '', prot_equiv)
+                query_reg.set_aa_seq(prot_equiv)
 
-                    # If the query alignment begins at a codon
-                    if (query_reg.aa_coords[0] - ref_reg.aa_coords[0]) % 3 == 0:
-                        start_index = query_reg.aa_coords[0]
+    return prot_equiv
 
-                    elif (query_reg.aa_coords[0] - ref_reg.aa_coords[0]) % 3 == 1:
-                        prev_codon_index = query_reg.aa_coords[0] - 1
-                        start_index = ref_regions.nt_seq[prev_codon_index]
 
-                    elif (query_reg.aa_coords[0] - ref_reg.aa_coords[0]) % 3 == 2:
-                        prev_codon_index = query_reg.aa_coords[0] - 2
-                        start_index = ref_regions.nt_seq[prev_codon_index]
+def set_nucleotide_equivalents(query_reg, ref_regions):
+    """
+    Finds the nucleotide equivalent of the protein sequence
+    :param query_reg: the region that aligns with the query sequence
+    :param ref_regions: a list of GenomeRegion objects
+    :return nt_equiv: the nucleotide equivalent of the protein sequence
+    """
+    nt_equiv = None
+    for ref_reg in ref_regions:
+        if ref_reg.region_name == query_reg.region_name and ref_reg.codon_aln is not None:
+            if query_reg.nt_coords is not None:
+                query_reg.make_codon_aln()
+                regex = re.compile(query_reg.codon_aln)
+                coords = regex.search(ref_reg.codon_aln).span()
+                nt_equiv = ref_reg.nt_seq[coords[0]: coords[1]]
+                query_reg.set_nt_seq(nt_equiv)
 
-                    # If the query alignment ends at a codon
-                    if (ref_reg.aa_coords[1] - query_reg.aa_coords[1]) % 3 == 0:
-                        end_index = query_reg.aa_coords[1]
-
-                    elif (ref_reg.aa_coords[1] - query_reg.aa_coords[1]) % 3 == 1:
-                        next_codon_index = query_reg.aa_coords[1] + 2
-                        end_index = ref_regions.nt_seq[next_codon_index]
-
-                    elif (ref_reg.aa_coords[1] - query_reg.aa_coords[1]) % 3 == 2:
-                        next_codon_index = query_reg.aa_coords[1] + 1
-                        end_index = ref_regions.nt_seq[next_codon_index]
-
-                    nt_seq = ref_reg.nt_seq[start_index: end_index + 1]
-                    prot_seq = translate(nt_seq)
-                    query_reg.set_aa_seq(prot_seq)
-                    prot_seqs.append(prot_seq)
-
-    return prot_seqs
+    return nt_equiv
 
 
 def output(query_regions, outfile=None):
@@ -464,24 +464,20 @@ def output(query_regions, outfile=None):
     :param outfile: The file stream for the output file in write mode
     """
     if outfile is None:
-        print("\n\n\033[1mNucleotide regions touched by the query sequence:\033[0m")
-        for reg in query_regions:
-            if reg.nt_seq is not None and reg.nt_coords is not None:
-                print("\t{}".format(reg.region_name))
-                if reg.region_name.startswith('5\'LTR'):
-                    print("\t3'LTR\n")
+        print("\n\n\033[1mRegions touched by the query sequence:\033[0m")
 
-                print("Region:\t{}".format(reg.region_name))
-                print(textwrap.fill(reg.nt_seq, 60))
-
-        print("\n\n\033[1mProtein regions touched by the query sequence:\033[0m")
         for reg in query_regions:
-            if reg.aa_seq is not None and reg.aa_coords is not None:
-                print("\nRegion:\t{}".format(reg.region_name))
+            if reg.region_name.startswith('5\'LTR'):
+                print("\t3'LTR\n")
+
+            print("\nRegion:\t{}".format(reg.region_name))
+            print(textwrap.fill(reg.nt_seq, 60))
+
+            if reg.aa_seq is not None:
                 print(textwrap.fill(reg.aa_seq, 60))
 
-        print("\n\n\033[1mRelative Positions:\033[0m")
-        for reg in query_regions:
+            print("\n\033[1mRelative Positions:\033[0m\n")
+
             if len(reg.pos_from_cds) == 2:
                 print("\tNucleotide position relative to CDS start: {} --> {}"
                       .format(reg.pos_from_cds[0], reg.pos_from_cds[1]))
@@ -490,16 +486,15 @@ def output(query_regions, outfile=None):
 
             if reg.pos_from_gstart is not None:
                 print("\tNucleotide position relative to genome start: {} --> {}"
-                      .format(reg.pos_from_gstart[0] + 1, reg.pos_from_gstart[1]))
+                      .format(reg.pos_from_gstart[0] + 1, reg.pos_from_gstart[1] + 1))
 
             if reg.pos_from_aa_start is not None:
                 print("\tAmino acid position relative to protein start: {} --> {}"
                       .format(reg.pos_from_aa_start[0], reg.pos_from_aa_start[1]))
 
     else:
-        outfile.write("\n\nNucleotide regions touched by the query sequence:")
+        outfile.write("\n\nRegions touched by the query sequence:")
         for reg in query_regions:
-            outfile.write("\t{}".format(reg.region_name))
             if reg.region_name.startswith('5\'LTR'):
                 outfile.write("\t3'LTR\n")
 
@@ -507,14 +502,11 @@ def output(query_regions, outfile=None):
             outfile.write(textwrap.fill(reg.nt_seq, 60))
             outfile.write('\n')
 
-        outfile.write("\n\nProtein regions touched by the query sequence:")
-        for reg in query_regions:
-            outfile.write("\nRegion:\t{}\n".format(reg.region_name))
-            outfile.write(textwrap.fill(reg.aa_seq, 60))
-            outfile.write('\n')
+            if reg.aa_seq is not None:
+                outfile.write(textwrap.fill(reg.aa_seq, 60))
+                outfile.write('\n')
 
-        outfile.write("\n\nRelative Positions:\n")
-        for reg in query_regions:
+            outfile.write("\n\nRelative Positions:\n")
             if len(reg.pos_from_cds) == 2:
                 outfile.write("\tNucleotide position relative to CDS: {} to {}\n"
                               .format(reg.pos_from_cds[0], reg.pos_from_cds[1]))
@@ -530,9 +522,10 @@ def output(query_regions, outfile=None):
                               .format(reg.pos_from_aa_start[0], reg.pos_from_aa_start[1]))
 
 
-def retrieve(base, ref_regions, region, outfile, start_offset=1, end_offset='end'):
+def retrieve(virus, base, ref_regions, region, outfile=None, start_offset=1, end_offset='end'):
     """
     Retrieves a sequence given its coordinates
+    :param virus: The organism (HIV or SIV)
     :param base: The base of the sequence (nucleotide or protein)
     :param ref_regions: A list of GenomeRegion objects
     :param region: The genomic region
@@ -541,16 +534,8 @@ def retrieve(base, ref_regions, region, outfile, start_offset=1, end_offset='end
     :param end_offset: <option> The end coordinate
     :return: The genomic region defined by the starting and ending coordinates
     """
-
-    region_to_retrieve = ""
-
     for ref_region in ref_regions:
-
-        if base == 'nucl':
-            sequence_range = ref_region.nt_coords
-        else:
-            sequence_range = ref_region.aa_coords
-
+        sequence_range = ref_region.get_coords(base)
         region_start = sequence_range[0]
         region_end = sequence_range[1]
 
@@ -567,19 +552,27 @@ def retrieve(base, ref_regions, region, outfile, start_offset=1, end_offset='end
 
         retrieved_region = None
         if ref_region.region_name == region:
+            s = ref_region.get_sequence(base)
+            region_to_retrieve = s[start - 1: end]
+
             if base == 'nucl':
-                region_to_retrieve = ref_region.nt_seq[0][1][start - 1: end]
                 retrieved_region = GenomeRegion(region, [start, end], region_to_retrieve,
                                                 ref_region.aa_coords, ref_region.aa_seq)
             else:
-                region_to_retrieve = ref_region.nt_seq[0][1][start - 1: end]
                 retrieved_region = GenomeRegion(region, ref_region.nt_coords, ref_region.nt_seq,
                                                 [start, end], region_to_retrieve)
 
-        if retrieved_region:
-            if outfile is not None:
-                print("\033[1mRetrieved sequence: \033[0m\n\n")
+            retrieved_region.set_pos_from_cds(virus)
+            retrieved_region.pos_from_gstart = retrieved_region.local_to_global_index([start, end], base)
+            retrieved_region.set_pos_from_aa_start()
 
+        if retrieved_region:
+            if outfile is None:
+                print("\033[1mRetrieved sequence: \033[0m\n")
+                print("Region:\t{}".format(retrieved_region.region_name))
+                print(textwrap.fill(retrieved_region.get_sequence(base)))
+
+                print("\n\033[1mRelative Positions: \033[0m")
                 if len(retrieved_region.pos_from_cds) == 2:
                     print("\tNucleotide position relative to CDS start: {} --> {}"
                           .format(retrieved_region.pos_from_cds[0], retrieved_region.pos_from_cds[1]))
@@ -595,8 +588,11 @@ def retrieve(base, ref_regions, region, outfile, start_offset=1, end_offset='end
                           .format(retrieved_region.pos_from_aa_start[0], retrieved_region.pos_from_aa_start[1]))
 
             else:
-                outfile.write("\n\nRetrieved sequence:\n".format(region_to_retrieve))
+                outfile.write("\n\nRetrieved sequence:\n")
+                outfile.write("\nRegion:\t{}".format(retrieved_region.region_name))
+                outfile.write("\n" + textwrap.fill(retrieved_region.get_sequence(base)))
 
+                outfile.write("\n\nRelative Positions: \n")
                 if len(retrieved_region.pos_from_cds) == 2:
                     outfile.write("\tNucleotide position relative to CDS: {} to {}\n"
                                   .format(retrieved_region.pos_from_cds[0], retrieved_region.pos_from_cds[1]))
@@ -625,7 +621,6 @@ def handle_args(virus, base, ref_nt, nt_coords, ref_aa, aa_coords):
     :param aa_coords: Path to the csv file containing the coordinates of the protein regions
     :return configs: a list containing the query sequence and paths to the reference nucleotide and protein sequences
     """
-
     if virus == 'hiv':
         if ref_nt is None:
             ref_nt = os.path.join(os.path.dirname(__file__), "ref_genomes/K03455.fasta")
@@ -687,21 +682,20 @@ def parse_args():
     parser.add_argument('-aa_coords', default=None,
                         help='Path to the csv file containing the coordinates of the amino acid region.'
                              'The file must contain the region name, start coordinate, and end coordinate')
+    parser.add_argument('-ref_nt', metavar='',
+                        help='Path to the file containing the reference nucleotide sequence')
+    parser.add_argument('-ref_aa', metavar='',
+                        help='Path to the file containing the reference amino acid sequence')
     subparsers = parser.add_subparsers(dest='subcommand')
 
     # Create subparser for 'align' mode
     parser_align = subparsers.add_parser('align', formatter_class=argparse.ArgumentDefaultsHelpFormatter,
                                          description='Align a nucleotide or protein sequence '
                                                      'relative to the HIV or SIV reference genome')
-
     parser_align.add_argument('query', type=argparse.FileType('r'),
                               help='Path to the file containing the query sequence.')
     parser_align.add_argument('-revcomp', default='n', choices=['y', 'n'],
                               help='Align the reverse complement of the query sequence with the reference sequence')
-    parser_align.add_argument('-ref_nt', metavar='',
-                              help='Path to the file containing the reference nucleotide sequence')
-    parser_align.add_argument('-ref_aa', metavar='',
-                              help='Path to the file containing the reference amino acid sequence')
     parser_align.add_argument('-outfile', type=argparse.FileType('w'),
                               help='Path to the file where results will be written. '
                                    'If no file is specified, the results will be printed to the console')
@@ -709,7 +703,6 @@ def parse_args():
     # Create subparser for 'retrieve' mode
     parser_retrieve = subparsers.add_parser('retrieve', formatter_class=argparse.ArgumentDefaultsHelpFormatter,
                                             description='Retrieve a sequence in HXB2 or SIVmm239 from its coordinates')
-
     parser_retrieve.add_argument('-start', default=1, type=int,
                                  help='Starting coordinate of the genomic region')
     parser_retrieve.add_argument('-end', default="end",
@@ -743,11 +736,7 @@ def main():
 
         # Find indices where the query sequence aligns with the reference sequence
         match_coords = get_region_coordinates(alignment[-1])  # Query sequence will be the last item in the list
-
-        if args.base == 'nucl':
-            query_regions = find_matches(args.virus, ref_regions, match_coords)
-        else:
-            query_regions = find_matches(args.virus, ref_regions, match_coords)
+        query_regions = find_matches(args.virus, args.base, ref_regions, match_coords)
 
         output(query_regions, args.outfile)
 
@@ -757,7 +746,7 @@ def main():
         if not valid_in:
             sys.exit(0)
         else:
-            retrieve(args.virus, reference_sequence, args.region, args.start, args.end, args.outfile)
+            retrieve(args.virus, args.base, ref_regions, args.region, args.outfile, args.start, args.end)
 
 
 if __name__ == '__main__':
