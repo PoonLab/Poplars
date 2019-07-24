@@ -1,5 +1,4 @@
 import unittest
-import os
 from io import StringIO
 from poplars.sequence_locator import *
 
@@ -7,25 +6,196 @@ NUCL_QUERY = os.path.join(os.path.dirname(__file__), 'fixtures/nucl-query.fasta'
 PROT_QUERY = os.path.join(os.path.dirname(__file__), 'fixtures/protein-query.fasta')
 
 DEFAULT_HIV_GENOME = os.path.join(os.path.dirname(__file__), '../ref_genomes/K03455.fasta')
-DEFAULT_HIV_PROTS = os.path.join(os.path.dirname(__file__), '../ref_genomes/K03455-protein.fasta')
 TEST_HIV_GENOME = os.path.join(os.path.dirname(__file__), 'fixtures/hiv-test-genome.fasta')
-TEST_HIV_PROTS = os.path.join(os.path.dirname(__file__), 'fixtures/hiv-test-proteins.fasta')
-
 DEFAULT_SIV_GENOME = os.path.join(os.path.dirname(__file__), '../ref_genomes/M33262.fasta')
-DEFAULT_SIV_PROTS = os.path.join(os.path.dirname(__file__), '../ref_genomes/M33262-protein.fasta')
 TEST_SIV_GENOME = os.path.join(os.path.dirname(__file__), 'fixtures/siv-test-genome.fasta')
-TEST_SIV_PROTS = os.path.join(os.path.dirname(__file__), 'fixtures/siv-test-proteins.fasta')
 
 DEFAULT_HIV_NT_COORDS = os.path.abspath('../ref_genomes/K03455_genome_coordinates.csv')
+TEST_HIV_NT_COORDS = os.path.join(os.path.dirname(__file__), 'fixtures/hiv_test_nt_coords.csv')
 DEFAULT_SIV_NT_COORDS = os.path.abspath('../ref_genomes/M33262_genome_coordinates.csv')
-TEST_HIV_COORDS = os.path.join(os.path.dirname(__file__), 'fixtures/hiv_test_coords.csv')
-TEST_SIV_COORDS = os.path.join(os.path.dirname(__file__), 'fixtures/siv_test_coords.csv')
+TEST_SIV_NT_COORDS = os.path.join(os.path.dirname(__file__), 'fixtures/siv_test_nt_coords.csv')
+
+DEFAULT_HIV_PROTS = os.path.join(os.path.dirname(__file__), '../ref_genomes/K03455-protein.fasta')
+TEST_HIV_PROTS = os.path.join(os.path.dirname(__file__), 'fixtures/hiv-test-proteins.fasta')
+DEFAULT_SIV_PROTS = os.path.join(os.path.dirname(__file__), '../ref_genomes/M33262-protein.fasta')
+TEST_SIV_PROTS = os.path.join(os.path.dirname(__file__), 'fixtures/siv-test-proteins.fasta')
+
+DEFAULT_HIV_AA_COORDS = os.path.abspath('../ref_genomes/K03455_protein_coordinates.csv')
+TEST_HIV_AA_COORDS = os.path.join(os.path.dirname(__file__), 'fixtures/hiv_test_prot_coords.csv')
+DEFAULT_SIV_AA_COORDS = os.path.abspath('../ref_genomes/M33262_protein_coordinates.csv')
+TEST_SIV_AA_COORDS = os.path.join(os.path.dirname(__file__), 'fixtures/siv_test_prot_coords.csv')
+
+
+class TestGetCoords(unittest.TestCase):
+
+    def testNuclCoords(self):
+        region = GenomeRegion('test', TEST_HIV_NT_COORDS, TEST_HIV_GENOME)
+        result = region.get_coords('nucl')
+        expected = os.path.abspath('./fixtures/hiv_test_nt_coords.csv')
+        self.assertEqual(expected, result)
+
+    def testProtCoords(self):
+        region = GenomeRegion('test', None, None, TEST_SIV_AA_COORDS)
+        result = region.get_coords('prot')
+        expected = os.path.abspath('./fixtures/siv_test_prot_coords.csv')
+        self.assertEqual(expected, result)
+
+
+class TestGetSequence(unittest.TestCase):
+
+    def testGetNuclSeq(self):
+        region = GenomeRegion('test', None, TEST_SIV_GENOME)
+        result = region.get_sequence('nucl')
+        expected = os.path.abspath('fixtures/siv-test-genome.fasta')
+        self.assertEqual(result, expected)
+
+    def testGetProtSeq(self):
+        region = GenomeRegion('test', None, None, None, TEST_HIV_PROTS)
+        result = region.get_sequence('prot')
+        expected = os.path.abspath('fixtures/hiv-test-proteins.fasta')
+        self.assertEqual(result, expected)
+
+
+class TestSetCoords(unittest.TestCase):
+
+    def testSetNuclCoords(self):
+        region = GenomeRegion('test', DEFAULT_SIV_NT_COORDS, None, None, None)
+        region.set_coords([1, 10], 'nucl')
+        expected = [1, 10]
+        result = region.nt_coords
+        self.assertEqual(expected, result)
+
+    def testSetProtCoords(self):
+        region = GenomeRegion('test', None, None, TEST_HIV_AA_COORDS)
+        region.set_coords([1, 900], 'prot')
+        expected = [1, 900]
+        result = region.aa_coords
+        self.assertEqual(expected, result)
+
+
+class TestSetSeqFromRef(unittest.TestCase):
+
+    def testSetNuclSeq(self):
+        region = GenomeRegion('test', [1, 8])
+        sequence = 'ATGCGACGACGACGACGTTAGCAGTCGATCATCATGCTGATC'
+        region.set_seq_from_ref(sequence, 'nucl')
+        expected = 'ATGCGACG'
+        result = region.nt_seq
+        self.assertEqual(expected, result)
+
+    def testSetProtSeq(self):
+        region = GenomeRegion('test', None, None, [1, 9])
+        sequence = 'ATVLHGLKLKAMAIMTIM'
+        region.set_seq_from_ref(sequence, 'prot')
+        expected = 'ATVLHGLKL'
+        result = region.aa_seq
+        self.assertEqual(expected, result)
+
+
+class TestSetSequence(unittest.TestCase):
+
+    def testNuclSequence(self):
+        region = GenomeRegion('test')
+        sequence = 'ATGCGACGACGACGACGTTAGCAGTCGATCATCATGCTGATC'
+        region.set_sequence(sequence, 'nucl')
+        expected = 'ATGCGACGACGACGACGTTAGCAGTCGATCATCATGCTGATC'
+        result = region.nt_seq
+        self.assertEqual(expected, result)
+
+    def testProtSequence(self):
+        region = GenomeRegion('test')
+        sequence = 'ATVLHGLKLKAMAIMTIM'
+        region.set_sequence(sequence, 'prot')
+        expected = 'ATVLHGLKLKAMAIMTIM'
+        result = region.aa_seq
+        self.assertEqual(expected, result)
+
+
+class TestSetPosFromCDS(unittest.TestCase):
+
+    def testHIVLTR5Start(self):
+        region = GenomeRegion('5\'LTR')
+        region.set_pos_from_cds('hiv')
+        expected = ['N/A']
+        result = region.pos_from_cds
+        self.assertEqual(expected, result)
+
+    def testFromSIVLTR5Start(self):
+        region = GenomeRegion('5\'LTR')
+        region.set_pos_from_cds('siv')
+        expected = ['N/A']
+        result = region.pos_from_cds
+        self.assertEqual(expected, result)
+
+    def testFromHIVStart(self):
+        region = GenomeRegion('Gag', [790, 2292])
+        region.set_pos_from_cds('hiv')
+        expected = [1, 1503]
+        result = region.pos_from_cds
+        self.assertEqual(expected, result)
+
+    def testFromSIVStart(self):
+        region = GenomeRegion('Integrase', [4785, 5666])
+        region.set_pos_from_cds('siv')
+        expected = [3477, 4358]
+        result = region.pos_from_cds
+        self.assertEqual(expected, result)
+
+
+class TestSetPosFromAAStart(unittest.TestCase):
+
+    def testCapsidFromAAStart(self):
+        region = GenomeRegion('Capsid', [1186, 1878], DEFAULT_HIV_GENOME, None,
+                              'PIVQNIQGQMVHQAISPRTLNAWVKVVEEKAFSPEVIPMFSALSEGATPQDLNTMLNTVGGHQAAMQMLKETINEEAAEW'
+                              'DRVHPVHAGPIAPGQMREPRGSDIAGTTSTLQEQIGWMTNNPPIPVGEIYKRWIILGLNKIVRMYSPTSILDIRQGPKEP'
+                              'FRDYVDRFYKTLRAEQASQEVKNWMTETLLVQNANPDCKTILKALGPAATLEEMMTACQGVGGPGHKARVL')
+        region.set_pos_from_aa_start('hiv')
+        expected = [1, 231]
+        result = region.pos_from_aa_start
+        self.assertEqual(expected, result)
+
+    def testLTR5FromAAStart(self):
+        region = GenomeRegion('5\'LTR')
+        region.set_pos_from_aa_start('hiv')
+        expected = None
+        result = region.pos_from_aa_start
+        self.assertEqual(expected, result)
+
+    def testGagFromAAStart(self):
+        region = GenomeRegion('Gag', [1186, 1878], DEFAULT_HIV_GENOME, None,
+                              'MGARASVLSGGELDRWEKIRLRPGGKKKYKLKHIVWASRELERFAVNPGLLETSEGCRQILGQLQPSLQTGSEELRSLYN'
+                              'TVATLYCVHQRIEIKDTKEALDKIEEEQNKSKKKAQQAAADTGHSNQVSQNYPIVQNIQGQMVHQAISPRTLNAWVKVVE'
+                              'EKAFSPEVIPMFSALSEGATPQDLNTMLNTVGGHQAAMQMLKETINEEAAEWDRVHPVHAGPIAPGQMREPRGSDIAGTT'
+                              'STLQEQIGWMTNNPPIPVGEIYKRWIILGLNKIVRMYSPTSILDIRQGPKEPFRDYVDRFYKTLRAEQASQEVKNWMTET'
+                              'LLVQNANPDCKTILKALGPAATLEEMMTACQGVGGPGHKARVLAEAMSQVTNSATIMMQRGNFRNQRKIVKCFNCGKEGH'
+                              'TARNCRAPRKKGCWKCGKEGHQMKDCTERQANFLGKIWPSYKGRPGNFLQSRPEPTAPPEESFRSGVETTTPPQKQEPID'
+                              'KELYPLTSLRSLFGNDPSSQ')
+        region.set_pos_from_aa_start('hiv')
+        expected = [133, 363]
+        result = region.pos_from_aa_start
+        self.assertEqual(expected, result)
+
+
+class TestMakeCodonAln(unittest.TestCase):
+    pass
+
+
+class TestGlobalToLocalIndex(unittest.TestCase):
+    pass
+
+
+class TestLocalToGlobalIndex(unittest.TestCase):
+    pass
+
+
+class TestGetOverlap(unittest.TestCase):
+    pass
 
 
 class TestReadCoordinates(unittest.TestCase):
 
     def setUp(self):
-        self.test_siv_coords = open(TEST_SIV_COORDS)
+        self.test_siv_coords = open(TEST_SIV_NT_COORDS)
 
     def testSIVInputCoords(self):
 
@@ -524,13 +694,13 @@ class TestHandleArgs(unittest.TestCase):
         result_ref_nt_seq = [[header, seq]]
         self.assertEqual(expected_ref_nt_seq, result_ref_nt_seq)
 
-        expected_ref_aa_seq = [["Capsid|SIVMM239",      "PVQQIGGNYVHLPLSPRTLNAWVKLIEEKKFGAEVVPGFQALSEGCTPYD"
-                                                        "INQMLNCVGDHQAAMQIIRDIINEEAADWDLQHPQPAPQQGQLREPSGSD"
-                                                        "IAGTTSSVDEQIQWMYRQQNPIPVGNIYRRWIQLGLQKCVRMYNPTNILD"
-                                                        "VKQGPKEPFQSYVDRFYKSLRAEQTDAAVKNWMTQTLLIQNANPDCKLVL"
-                                                        "KGLGVNPTLEEMLTACQGVGGPGQKARLM"],
-                              ["p2|SIVMM239",           "AEALKEALAPVPIPFAA"],
-                              ["Nucleocapsid|SIVMM239", "AQQRGPRKPIKCWNCGKEGHSARQCRAPRRQGCWKCGKMDHVMAKCPDRQAG"]]
+        expected_ref_aa_seq = [["Capsid|SIVMM239",       "PVQQIGGNYVHLPLSPRTLNAWVKLIEEKKFGAEVVPGFQALSEGCTPYD"
+                                                         "INQMLNCVGDHQAAMQIIRDIINEEAADWDLQHPQPAPQQGQLREPSGSD"
+                                                         "IAGTTSSVDEQIQWMYRQQNPIPVGNIYRRWIQLGLQKCVRMYNPTNILD"
+                                                         "VKQGPKEPFQSYVDRFYKSLRAEQTDAAVKNWMTQTLLIQNANPDCKLVL"
+                                                         "KGLGVNPTLEEMLTACQGVGGPGQKARLM"],
+                               ["p2|SIVMM239",           "AEALKEALAPVPIPFAA"],
+                               ["Nucleocapsid|SIVMM239", "AQQRGPRKPIKCWNCGKEGHSARQCRAPRRQGCWKCGKMDHVMAKCPDRQAG"]]
         result_ref_aa_seq = result[2][2:5]
         self.assertEqual(expected_ref_aa_seq, result_ref_aa_seq)
 
@@ -648,25 +818,25 @@ class TestHandleArgs(unittest.TestCase):
         result_ref_nt = result[1]
         self.assertEqual(expected_ref_nt, result_ref_nt)
 
-        expected_ref_prot = [["Gag|HIVHXB2CG",    "MGARASVLSGGELDRWEKIRLRPGGKKKYKLKHIVWASRELERFAVNPG"
-                                                  "LLETSEGCRQILGQLQPSLQTGSEELRSLYNTVATLYCVHQRIEIKDTK"
-                                                  "EALDKIEEEQNKSKKKAQQAAADTGHSNQVSQNYPIVQNIQGQMVHQAI"
-                                                  "SPRTLNAWVKVVEEKAFSPEVIPMFSALSEGATPQDLNTMLNTVGGHQA"
-                                                  "AMQMLKETINEEAAEWDRVHPVHAGPIAPGQMREPRGSDIAGTTSTLQE"
-                                                  "QIGWMTNNPPIPVGEIYKRWIILGLNKIVRMYSPTSILDIRQGPKEPFR"
-                                                  "DYVDRFYKTLRAEQASQEVKNWMTETLLVQNANPDCKTILKALGPAATL"
-                                                  "EEMMTACQGVGGPGHKARVLAEAMSQVTNSATIMMQRGNFRNQRKIVKC"
-                                                  "FNCGKEGHTARNCRAPRKKGCWKCGKEGHQMKDCTERQANFLGKIWPSY"
-                                                  "KGRPGNFLQSRPEPTAPPEESFRSGVETTTPPQKQEPIDKELYPLTSLR"
-                                                  "SLFGNDPSSQ"],
-                            ["Matrix|HIVHXB2CG",  "MGARASVLSGGELDRWEKIRLRPGGKKKYKLKHIVWASRELERFAVNPGL"
-                                                  "LETSEGCRQILGQLQPSLQTGSEELRSLYNTVATLYCVHQRIEIKDTKEA"
-                                                  "LDKIEEEQNKSKKKAQQAAADTGHSNQVSQNY"],
-                            ["Capsid|HIVHXB2CG",  "PIVQNIQGQMVHQAISPRTLNAWVKVVEEKAFSPEVIPMFSALSEGATPQ"
-                                                  "DLNTMLNTVGGHQAAMQMLKETINEEAAEWDRVHPVHAGPIAPGQMREPR"
-                                                  "GSDIAGTTSTLQEQIGWMTNNPPIPVGEIYKRWIILGLNKIVRMYSPTSI"
-                                                  "LDIRQGPKEPFRDYVDRFYKTLRAEQASQEVKNWMTETLLVQNANPDCKT"
-                                                  "ILKALGPAATLEEMMTACQGVGGPGHKARVL"]]
+        expected_ref_prot = [["Gag|HIVHXB2CG",     "MGARASVLSGGELDRWEKIRLRPGGKKKYKLKHIVWASRELERFAVNPG"
+                                                   "LLETSEGCRQILGQLQPSLQTGSEELRSLYNTVATLYCVHQRIEIKDTK"
+                                                   "EALDKIEEEQNKSKKKAQQAAADTGHSNQVSQNYPIVQNIQGQMVHQAI"
+                                                   "SPRTLNAWVKVVEEKAFSPEVIPMFSALSEGATPQDLNTMLNTVGGHQA"
+                                                   "AMQMLKETINEEAAEWDRVHPVHAGPIAPGQMREPRGSDIAGTTSTLQE"
+                                                   "QIGWMTNNPPIPVGEIYKRWIILGLNKIVRMYSPTSILDIRQGPKEPFR"
+                                                   "DYVDRFYKTLRAEQASQEVKNWMTETLLVQNANPDCKTILKALGPAATL"
+                                                   "EEMMTACQGVGGPGHKARVLAEAMSQVTNSATIMMQRGNFRNQRKIVKC"
+                                                   "FNCGKEGHTARNCRAPRKKGCWKCGKEGHQMKDCTERQANFLGKIWPSY"
+                                                   "KGRPGNFLQSRPEPTAPPEESFRSGVETTTPPQKQEPIDKELYPLTSLR"
+                                                   "SLFGNDPSSQ"],
+                             ["Matrix|HIVHXB2CG",  "MGARASVLSGGELDRWEKIRLRPGGKKKYKLKHIVWASRELERFAVNPGL"
+                                                   "LETSEGCRQILGQLQPSLQTGSEELRSLYNTVATLYCVHQRIEIKDTKEA"
+                                                   "LDKIEEEQNKSKKKAQQAAADTGHSNQVSQNY"],
+                             ["Capsid|HIVHXB2CG",  "PIVQNIQGQMVHQAISPRTLNAWVKVVEEKAFSPEVIPMFSALSEGATPQ"
+                                                   "DLNTMLNTVGGHQAAMQMLKETINEEAAEWDRVHPVHAGPIAPGQMREPR"
+                                                   "GSDIAGTTSTLQEQIGWMTNNPPIPVGEIYKRWIILGLNKIVRMYSPTSI"
+                                                   "LDIRQGPKEPFRDYVDRFYKTLRAEQASQEVKNWMTETLLVQNANPDCKT"
+                                                   "ILKALGPAATLEEMMTACQGVGGPGHKARVL"]]
         result_ref_prot = result[2]
         self.assertEqual(expected_ref_prot, result_ref_prot)
 
@@ -696,25 +866,25 @@ class TestHandleArgs(unittest.TestCase):
         result_ref_nt = result[1]
         self.assertEqual(expected_ref_nt, result_ref_nt)
 
-        expected_ref_prot = [["RNase|SIVMM239",     "YTDGSCNKQSKEGKAGYITDRGKDKVKVLEQTTNQQAELEAFLMALTDSG"
-                                                    "PKANIIVDSQYVMGIITGCPTESESRLVNQIIEEMIKKSEIYVAWVPAHK"
-                                                    "GIGGNQEIDHLVSQGIRQVL"],
-                            ["Integrase|SIVMM239",  "FLEKIEPAQEEHDKYHSNVKELVFKFGLPRIVARQIVDTCDKCHQKGEAI"
-                                                    "HGQANSDLGTWQMDCTHLEGKIIIVAVHVASGFIEAEVIPQETGRQTALF"
-                                                    "LLKLAGRWPITHLHTDNGANFASQEVKMVAWWAGIEHTFGVPYNPQSQGV"
-                                                    "VEAMNHHLKNQIDRIREQANSVETIVLMAVHCMNFKRRGGIGDMTPAERL"
-                                                    "INMITTEQEIQFQQSKNSKFKNFRVYYREGRDQLWKGPGELLWKGEGAVI"
-                                                    "LKVGTDIKVVPRRKAKIIKDYGGGKEVDSSSHMEDTGEAREVA"],
-                            ["Vif|SIVMM239",        "MEEEKRWIAVPTWRIPERLERWHSLIKYLKYKTKDLQKVCYVPHFKVGWA"
-                                                    "WWTCSRVIFPLQEGSHLEVQGYWHLTPEKGWLSTYAVRITWYSKNFWTDV"
-                                                    "TPNYADILLHSTYFPCFTAGEVRRAIRGEQLLSCCRFPRAHKYQVPSLQY"
-                                                    "LALKVVSDVRSQGENPTWKQWRRDNRRGLRMAKQNSRGDKQRGGKPPTKG"
-                                                    "ANFPGLAKVLGILA"],
-                            ["Vpx|SIVMM239",        "MSDPRERIPPGNSGEETIGEAFEWLNRTVEEINREAVNHLPRELIFQVWQ"
-                                                    "RSWEYWHDEQGMSPSYVKYRYLCLIQKALFMHCKKGCRCLGEGHGAGGWR"
-                                                    "PGPPPPPPPGLA"],
-                            ["Vpr|SIVMM239",        "MEERPPENEGPQREPWDEWVVEVLEELKEEALKHFDPRLLTALGNHIYNR"
-                                                    "HGDTLEGAGELIRILQRALFMHFRGGCIHSRIGQPGGGNPLSAIPPSRSML"]]
+        expected_ref_prot = [["RNase|SIVMM239",      "YTDGSCNKQSKEGKAGYITDRGKDKVKVLEQTTNQQAELEAFLMALTDSG"
+                                                     "PKANIIVDSQYVMGIITGCPTESESRLVNQIIEEMIKKSEIYVAWVPAHK"
+                                                     "GIGGNQEIDHLVSQGIRQVL"],
+                             ["Integrase|SIVMM239",  "FLEKIEPAQEEHDKYHSNVKELVFKFGLPRIVARQIVDTCDKCHQKGEAI"
+                                                     "HGQANSDLGTWQMDCTHLEGKIIIVAVHVASGFIEAEVIPQETGRQTALF"
+                                                     "LLKLAGRWPITHLHTDNGANFASQEVKMVAWWAGIEHTFGVPYNPQSQGV"
+                                                     "VEAMNHHLKNQIDRIREQANSVETIVLMAVHCMNFKRRGGIGDMTPAERL"
+                                                     "INMITTEQEIQFQQSKNSKFKNFRVYYREGRDQLWKGPGELLWKGEGAVI"
+                                                     "LKVGTDIKVVPRRKAKIIKDYGGGKEVDSSSHMEDTGEAREVA"],
+                             ["Vif|SIVMM239",        "MEEEKRWIAVPTWRIPERLERWHSLIKYLKYKTKDLQKVCYVPHFKVGWA"
+                                                     "WWTCSRVIFPLQEGSHLEVQGYWHLTPEKGWLSTYAVRITWYSKNFWTDV"
+                                                     "TPNYADILLHSTYFPCFTAGEVRRAIRGEQLLSCCRFPRAHKYQVPSLQY"
+                                                     "LALKVVSDVRSQGENPTWKQWRRDNRRGLRMAKQNSRGDKQRGGKPPTKG"
+                                                     "ANFPGLAKVLGILA"],
+                             ["Vpx|SIVMM239",        "MSDPRERIPPGNSGEETIGEAFEWLNRTVEEINREAVNHLPRELIFQVWQ"
+                                                     "RSWEYWHDEQGMSPSYVKYRYLCLIQKALFMHCKKGCRCLGEGHGAGGWR"
+                                                     "PGPPPPPPPGLA"],
+                             ["Vpr|SIVMM239",        "MEERPPENEGPQREPWDEWVVEVLEELKEEALKHFDPRLLTALGNHIYNR"
+                                                     "HGDTLEGAGELIRILQRALFMHFRGGCIHSRIGQPGGGNPLSAIPPSRSML"]]
         result_ref_prot = result[2]
         self.assertEqual(expected_ref_prot, result_ref_prot)
 
@@ -731,4 +901,3 @@ class TestHandleArgs(unittest.TestCase):
         self.siv_default_prot.close()
         self.siv_test_genome.close()
         self.siv_test_prot.close()
-

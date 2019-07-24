@@ -86,14 +86,24 @@ class GenomeRegion:
             self.pos_from_cds.append((self.nt_coords[0] + 1 - cds_start))
             self.pos_from_cds.append((self.nt_coords[1] + 1 - cds_start))
 
-    def set_pos_from_aa_start(self):
+    def set_pos_from_aa_start(self, virus):
         """
         Gives the position of the sequence relative to the start of the protein sequence
         """
-        if '5\'LTR' in self.region_name:
-            self.pos_from_aa_start = None
-        else:
-            self.pos_from_aa_start = [1, (self.nt_coords[1] - self.nt_coords[0]) // 3]
+        if self.aa_seq is not None:
+            # Before coding sequence
+            if '5\'LTR' in self.region_name:
+                self.pos_from_aa_start = None
+
+            # Within coding sequence
+            else:
+                if self.pos_from_cds is not None:
+                    self.set_pos_from_cds(virus)
+                if len(self.aa_seq) == ((self.nt_coords[1] - self.nt_coords[0]) // 3):
+                    self.pos_from_aa_start = [1, ((self.nt_coords[1] - self.nt_coords[0]) // 3) + 1]
+                else:
+                    if len(self.pos_from_cds) == 2:
+                        self.pos_from_aa_start = [(self.pos_from_cds[0] // 3) + 1, self.pos_from_cds[1] // 3]
 
     def make_codon_aln(self):
         """
@@ -169,7 +179,7 @@ def set_regions(virus, nt_reference, nt_coords, aa_reference, aa_coords):
             seq_region.set_seq_from_ref(nt_reference, 'nucl')
             seq_region.set_pos_from_cds(virus)
             seq_region.pos_from_gstart = nucl_coords
-            seq_region.set_pos_from_aa_start()
+            seq_region.set_pos_from_aa_start(virus)
             genome_regions.append(seq_region)
 
     # Parse protein coordinates file
@@ -407,7 +417,7 @@ def find_matches(virus, base, ref_regions, match_coordinates):
                     query_region.set_sequence(ov_seq, base)
                     query_region.set_pos_from_cds(virus)
                     query_region.pos_from_gstart = [start_aln, end_aln]
-                    query_region.set_pos_from_aa_start()
+                    query_region.set_pos_from_aa_start(virus)
 
                     if base == 'nucl':
                         set_protein_equivalents(query_region, ref_regions)
@@ -564,7 +574,7 @@ def retrieve(virus, base, ref_regions, region, outfile=None, start_offset=1, end
 
             retrieved_region.set_pos_from_cds(virus)
             retrieved_region.pos_from_gstart = retrieved_region.local_to_global_index([start, end], base)
-            retrieved_region.set_pos_from_aa_start()
+            retrieved_region.set_pos_from_aa_start(virus)
 
         if retrieved_region:
             if outfile is None:
