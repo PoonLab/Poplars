@@ -91,19 +91,20 @@ class GenomeRegion:
         Gives the position of the sequence relative to the start of the protein sequence
         """
         if self.aa_seq is not None:
-            # Before coding sequence
-            if '5\'LTR' in self.region_name:
-                self.pos_from_aa_start = None
+            if self.pos_from_cds is not None:
+                self.set_pos_from_cds(virus)
 
-            # Within coding sequence
-            else:
-                if self.pos_from_cds is not None:
-                    self.set_pos_from_cds(virus)
-                if len(self.aa_seq) == ((self.nt_coords[1] - self.nt_coords[0]) // 3):
-                    self.pos_from_aa_start = [1, ((self.nt_coords[1] - self.nt_coords[0]) // 3) + 1]
+            # If the region is within the CDS
+            if len(self.pos_from_cds) == 2:
+                # If the whole protein sequence is encompassed in the CDS range
+                if len(self.aa_seq) == (((self.pos_from_cds[1] - self.pos_from_cds[0]) // 3) + 1):
+                    self.pos_from_aa_start = [1, (((self.pos_from_cds[1] - self.pos_from_cds[0]) // 3) + 1)]
                 else:
-                    if len(self.pos_from_cds) == 2:
-                        self.pos_from_aa_start = [(self.pos_from_cds[0] // 3) + 1, self.pos_from_cds[1] // 3]
+                    self.pos_from_aa_start = [(self.pos_from_cds[0] // 3) + 1, self.pos_from_cds[1] // 3]
+
+            # If the region is outside the CDS
+            else:
+                self.pos_from_aa_start = None
 
     def make_codon_aln(self):
         """
@@ -112,8 +113,12 @@ class GenomeRegion:
         if self.nt_seq is not None and self.aa_seq is not None:
             codon_aln = []
             codons = [''.join(t) for t in zip(*[iter(self.nt_seq)] * 3)]
-            for aa in self.aa_seq:
-                codon_aln.append('-{}-'.format(aa))
+            for i in range(len(codons)):
+                # Check if stop codon
+                if codons[i] == 'TAA' or codons[i] == 'TGA' or codons[i] == 'TAG':
+                    codon_aln.append('-*-')
+                else:
+                    codon_aln.append('-{}-'.format(self.aa_seq[i]))
             self.codon_aln = ''.join(codon_aln)
         return self.codon_aln
 
@@ -131,7 +136,7 @@ class GenomeRegion:
         """
         Converts a pair of local indices (relative to the region of interest) to global indices
         """
-        start = local_pair[0] + self.get_coords(base)[0]
+        start = local_pair[0] + self.get_coords(base)[0] - 1
         end = self.get_coords(base)[0] + local_pair[1] - 1
         global_pair = [start, end]
         return global_pair
@@ -149,7 +154,11 @@ class GenomeRegion:
         # Check if local coordinates are in the range of the sequence
         start = max(local_pair[0], 0)
         end = min(local_pair[1] + 1, len(seq))
-        return seq[start: end], self.local_to_global_index([start, end], base)
+        if base == 'nucl':
+            overlap = (seq[start: end], self.local_to_global_index([start, end], base))
+        else:
+            overlap = (seq[start - 1: end - 1], self.local_to_global_index([start, end - 1], base))
+        return overlap
 
 
 def set_regions(virus, nt_reference, nt_coords, aa_reference, aa_coords):
