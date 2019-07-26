@@ -1,15 +1,8 @@
-Pol,2085,5096
-GagPolTF,2085,2252
-Protease,2253,2549
-RT,2250,3869
-RNase,3870,4229
-Integrase,4230,5096
-Vif,5041,5619
-Vpr,5559,5850
-Tat(with intron),5831,8469
-Tat(exon1),5831,6045
-Tat(exon2),8379,8469
-Rev(with intron),5970,8653
-Rev(exon1),5970,6045
-Rev(exon2),8739,8653
-Vpu,6062,6310
+5'LTR,1,634
+Gag,790,2292
+Matrix,790,1185
+Capsid,1186,1878
+p2,1879,1920
+Nucleocapsid,1921,2085
+p1,2086,2133
+p6,2134,2292

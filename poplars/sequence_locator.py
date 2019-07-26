@@ -577,9 +577,12 @@ def retrieve(virus, base, ref_regions, region, outfile=None, start_offset=1, end
             if base == 'nucl':
                 retrieved_region = GenomeRegion(region, [start, end], region_to_retrieve,
                                                 ref_region.aa_coords, ref_region.aa_seq)
+                retrieved_region.set_sequence(region_to_retrieve, 'nucl')
             else:
                 retrieved_region = GenomeRegion(region, ref_region.nt_coords, ref_region.nt_seq,
                                                 [start, end], region_to_retrieve)
+                retrieved_region.set_sequence(region_to_retrieve, 'prot')
+
 
             retrieved_region.set_pos_from_cds(virus)
             retrieved_region.pos_from_gstart = retrieved_region.local_to_global_index([start, end], base)
@@ -626,7 +629,7 @@ def retrieve(virus, base, ref_regions, region, outfile=None, start_offset=1, end
                     outfile.write("\tAmino acid position relative to protein start: {} --> {}\n"
                                   .format(retrieved_region.pos_from_aa_start[0], retrieved_region.pos_from_aa_start[1]))
 
-    return region_to_retrieve
+    return retrieved_region
 
 
 def handle_args(virus, base, ref_nt, nt_coords, ref_aa, aa_coords):
