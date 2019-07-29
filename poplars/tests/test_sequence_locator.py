@@ -25,45 +25,91 @@ TEST_SIV_AA_COORDS = os.path.join(os.path.dirname(__file__), 'fixtures/siv_test_
 
 class TestGetCoords(unittest.TestCase):
 
+    def setUp(self):
+        self.test_nt_coords_file = open(TEST_HIV_NT_COORDS)
+        self.nt_coords = self.test_nt_coords_file.read()
+
+        self.test_aa_coords_file = open(TEST_SIV_AA_COORDS)
+        self.aa_coords = self.test_aa_coords_file.read()
+
     def testNuclCoords(self):
-        region = GenomeRegion('test', TEST_HIV_NT_COORDS, TEST_HIV_GENOME)
+        region = GenomeRegion('test', self.nt_coords)
         result = region.get_coords('nucl')
-        expected = os.path.abspath('./fixtures/hiv_test_nt_coords.csv')
+        expected = '5\'LTR,1,634\nGag,790,2292\nMatrix,790,1185\nCapsid,1186,1878\np2,1879,1920\n' \
+                   'Nucleocapsid,1921,2085\np1,2086,2133\np6,2134,2292'
         self.assertEqual(expected, result)
 
     def testProtCoords(self):
-        region = GenomeRegion('test', None, None, TEST_SIV_AA_COORDS)
+        region = GenomeRegion('test', None, None, self.aa_coords)
         result = region.get_coords('prot')
-        expected = os.path.abspath('./fixtures/siv_test_prot_coords.csv')
+        expected = 'Rev,2087,2193\nRev(exon1),2087,2110\nRev(exon2),2111,2193\ngp160,2194,3072\n' \
+                   'gp120,2194,2718\ngp41,2719,3072\nNef,3073,3335'
         self.assertEqual(expected, result)
+
+    def tearDown(self):
+        self.test_nt_coords_file.close()
+        self.test_aa_coords_file.close()
 
 
 class TestGetSequence(unittest.TestCase):
 
+    def setUp(self):
+        self.siv_genome_file = open(TEST_SIV_GENOME)
+        self.nt_seq = self.siv_genome_file.read()
+
+        self.hiv_protein_file = open(TEST_HIV_PROTS)
+        self.aa_seq = self.hiv_protein_file.read()
+
     def testGetNuclSeq(self):
-        region = GenomeRegion('test', None, TEST_SIV_GENOME)
-        result = region.get_sequence('nucl')
-        expected = os.path.abspath('fixtures/siv-test-genome.fasta')
-        self.assertEqual(result, expected)
+        region = GenomeRegion('test', None, self.nt_seq)
+        result = region.get_sequence('nucl')[0:1218]
+        expected = '>M33262|SIVMM239\n' \
+                   'AATGGTGATTATTCAGAAGTGGCCCTTAATGTTACAGAAAGCTTTGATGCCTGGAATAATACAGTCACAGAACAGGCAAT\n' \
+                   'AGAGGATGTATGGCAACTCTTTGAGACCTCAATAAAGCCTTGTGTAAAATTATCCCCATTATGCATTACTATGAGATGCA\n' \
+                   'ATAAAAGTGAGACAGATAGATGGGGATTGACAAAATCAATAACAACAACAGCATCAACAACATCAACGACAGCATCAGCA\n' \
+                   'AAAGTAGACATGGTCAATGAGACTAGTTCTTGTATAGCCCAGGATAATTGCACAGGCTTGGAACAAGAGCAAATGATAAG\n' \
+                   'CTGTAAATTCAACATGACAGGGTTAAAAAGAGACAAGAAAAAAGAGTACAATGAAACTTGGTACTCTGCAGATTTGGTAT\n' \
+                   'GTGAACAAGGGAATAACACTGGTAATGAAAGTAGATGTTACATGAACCACTGTAACACTTCTGTTATCCAAGAGTCTTGT\n' \
+                   'GACAAACATTATTGGGATGCTATTAGATTTAGGTATTGTGCACCTCCAGGTTATGCTTTGCTTAGATGTAATGACACAAA\n' \
+                   'TTATTCAGGCTTTATGCCTAAATGTTCTAAGGTGGTGGTCTCTTCATGCACAAGGATGATGGAGACACAGACTTCTACTT\n' \
+                   'GGTTTGGCTTTAATGGAACTAGAGCAGAAAATAGAACTTATATTTACTGGCATGGTAGGGATAATAGGACTATAATTAGT\n' \
+                   'TTAAATAAGTATTATAATCTAACAATGAAATGTAGAAGACCAGGAAATAAGACAGTTTTACCAGTCACCATTATGTCTGG\n' \
+                   'ATTGGTTTTCCACTCACAACCAATCAATGATAGGCCAAAGCAGGCATGGTGTTGGTTTGGAGGAAAATGGAAGGATGCAA\n' \
+                   'TAAAAGAGGTGAAGCAGACCATTGTCAAACATCCCAGGTATACTGGAACTAACAATACTGATAAAATCAATTTGACGGCT\n' \
+                   'CCTGGAGGAGGAGATCCGGAAGTTACCTTCATGTGGACAAATTGCAGAGGAGAGTTCCTCTACTGTAAAATGAATTGGTT\n' \
+                   'TCTAAATTGGGTAGAAGATAGGAATACAGCTAACCAGAAGCCAAAGGAACAGCATAAAAGGAATTACGTGCCATGTCATA\n' \
+                   'TTAGACAAATAATCAACACTTGGCATAAAGTAGGCAAAAATGTTTATTTGCCTCCAAGAGAGGGAGA'
+        self.assertEqual(expected, result)
 
     def testGetProtSeq(self):
-        region = GenomeRegion('test', None, None, None, TEST_HIV_PROTS)
+        region = GenomeRegion('test', None, None, None, self.aa_seq)
         result = region.get_sequence('prot')
-        expected = os.path.abspath('fixtures/hiv-test-proteins.fasta')
-        self.assertEqual(result, expected)
+        expected = '>test|HIVHXB2CG\n' \
+                   'MGARASVLSGGELDRWEKIRLRPGGKKKYKLKHIVWASRELERFAVNPGLLETSEGCRQILGQLQPSLQTGSEELRSLYN\n' \
+                   'TVATLYCVHQRIEIKDTKEALDKIEEEQNKSKKKAQQAAADTGHSNQVSQNYPIVQNIQGQMVHQAISPRTLNAWVKVVE\n' \
+                   'EKAFSPEVIPMFSALSEGATPQDLNTMLNTVGGHQAAMQMLKETINEEAAEWDRVHPVHAGPIAPGQMREPRGSDIAGTT\n' \
+                   'STLQEQIGWMTNNPPIPVGEIYKRWIILGLNKIVRMYSPTSILDIRQGPKEPFRDYVDRFYKTLRAEQASQEVKNWMTET\n' \
+                   'LLVQNANPDCKTILKALGPAATLEEMMTACQGVGGPGHKARVLAEAMSQVTNSATIMMQRGNFRNQRKIVKCFNCGKEGH\n' \
+                   'TARNCRAPRKKGCWKCGKEGHQMKDCTERQANFLGKIWPSYKGRPGNFLQSRPEPTAPPEESFRSGVETTTPPQKQEPID\n' \
+                   'KELYPLTSLRSLFGNDPSSQ'
+        self.assertEqual(expected, result)
+
+    def tearDown(self):
+        self.siv_genome_file.close()
+        self.hiv_protein_file.close()
 
 
 class TestSetCoords(unittest.TestCase):
 
     def testSetNuclCoords(self):
-        region = GenomeRegion('test', DEFAULT_SIV_NT_COORDS, None, None, None)
+        region = GenomeRegion('test', 'ATGCGACGACGACGACGTTAGCAGTCGATCATCATGCTGATC', None, None, None)
         region.set_coords([1, 10], 'nucl')
         expected = [1, 10]
         result = region.nt_coords
         self.assertEqual(expected, result)
 
     def testSetProtCoords(self):
-        region = GenomeRegion('test', None, None, TEST_HIV_AA_COORDS)
+        region = GenomeRegion('test', None, None, 'ATVLHGLKLKAMAIMTIM')
         region.set_coords([1, 900], 'prot')
         expected = [1, 900]
         result = region.aa_coords
@@ -74,16 +120,14 @@ class TestSetSeqFromRef(unittest.TestCase):
 
     def testSetNuclSeq(self):
         region = GenomeRegion('test', [1, 8])
-        sequence = 'ATGCGACGACGACGACGTTAGCAGTCGATCATCATGCTGATC'
-        region.set_seq_from_ref(sequence, 'nucl')
+        region.set_seq_from_ref('ATGCGACGACGACGACGTTAGCAGTCGATCATCATGCTGATC', 'nucl')
         expected = 'ATGCGACG'
         result = region.nt_seq
         self.assertEqual(expected, result)
 
     def testSetProtSeq(self):
         region = GenomeRegion('test', None, None, [1, 9])
-        sequence = 'ATVLHGLKLKAMAIMTIM'
-        region.set_seq_from_ref(sequence, 'prot')
+        region.set_seq_from_ref('ATVLHGLKLKAMAIMTIM', 'prot')
         expected = 'ATVLHGLKL'
         result = region.aa_seq
         self.assertEqual(expected, result)
@@ -93,16 +137,14 @@ class TestSetSequence(unittest.TestCase):
 
     def testNuclSequence(self):
         region = GenomeRegion('test')
-        sequence = 'ATGCGACGACGACGACGTTAGCAGTCGATCATCATGCTGATC'
-        region.set_sequence(sequence, 'nucl')
+        region.set_sequence('ATGCGACGACGACGACGTTAGCAGTCGATCATCATGCTGATC', 'nucl')
         expected = 'ATGCGACGACGACGACGTTAGCAGTCGATCATCATGCTGATC'
         result = region.nt_seq
         self.assertEqual(expected, result)
 
     def testProtSequence(self):
         region = GenomeRegion('test')
-        sequence = 'ATVLHGLKLKAMAIMTIM'
-        region.set_sequence(sequence, 'prot')
+        region.set_sequence('ATVLHGLKLKAMAIMTIM', 'prot')
         expected = 'ATVLHGLKLKAMAIMTIM'
         result = region.aa_seq
         self.assertEqual(expected, result)
@@ -142,7 +184,7 @@ class TestSetPosFromCDS(unittest.TestCase):
 class TestSetPosFromAAStart(unittest.TestCase):
 
     def testCapsidFromAAStart(self):
-        region = GenomeRegion('Capsid', [1186, 1878], DEFAULT_HIV_GENOME, None,
+        region = GenomeRegion('Capsid', [1186, 1878], None, None,
                               'PIVQNIQGQMVHQAISPRTLNAWVKVVEEKAFSPEVIPMFSALSEGATPQDLNTMLNTVGGHQAAMQMLKETINEEAAEW'
                               'DRVHPVHAGPIAPGQMREPRGSDIAGTTSTLQEQIGWMTNNPPIPVGEIYKRWIILGLNKIVRMYSPTSILDIRQGPKEP'
                               'FRDYVDRFYKTLRAEQASQEVKNWMTETLLVQNANPDCKTILKALGPAATLEEMMTACQGVGGPGHKARVL')
@@ -159,7 +201,7 @@ class TestSetPosFromAAStart(unittest.TestCase):
         self.assertEqual(expected, result)
 
     def testGagFromAAStart(self):
-        region = GenomeRegion('Gag', [1186, 1878], DEFAULT_HIV_GENOME, None,
+        region = GenomeRegion('Gag', [1186, 1878], None, None,
                               'MGARASVLSGGELDRWEKIRLRPGGKKKYKLKHIVWASRELERFAVNPGLLETSEGCRQILGQLQPSLQTGSEELRSLYN'
                               'TVATLYCVHQRIEIKDTKEALDKIEEEQNKSKKKAQQAAADTGHSNQVSQNYPIVQNIQGQMVHQAISPRTLNAWVKVVE'
                               'EKAFSPEVIPMFSALSEGATPQDLNTMLNTVGGHQAAMQMLKETINEEAAEWDRVHPVHAGPIAPGQMREPRGSDIAGTT'
@@ -176,11 +218,10 @@ class TestSetPosFromAAStart(unittest.TestCase):
 class TestMakeCodonAln(unittest.TestCase):
 
     def testSimpleUse(self):
-        region = GenomeRegion('p6',
-                              [2134, 2298], 'CTTCAGAGCAGACCAGAGCCAACAGCCCCACCAGAAGAGAGCTTCAGGTCTGGGGTAGAGACAACAACTCCCC'
-                                            'CTCAGAAGCAGGAGCCGATAGACAAGGAACTGTATCCTTTAACTTCCCTCAGGTCACTCTTTGGCAACGACCC'
-                                            'CTCGTCACAATAA',
-                              [449, 500],   'LQSRPEPTAPPEESFRSGVETTTPPQKQEPIDKELYPLTSLRSLFGNDPSSQ')
+        region = GenomeRegion('p6', [2134, 2298], 'CTTCAGAGCAGACCAGAGCCAACAGCCCCACCAGAAGAGAGCTTCAGGTCTGGGGTAGAGACAACAAC'
+                                                  'TCCCCCTCAGAAGCAGGAGCCGATAGACAAGGAACTGTATCCTTTAACTTCCCTCAGGTCACTCTTTG'
+                                                  'GCAACGACCCCTCGTCACAATAA',
+                                    [449, 500],   'LQSRPEPTAPPEESFRSGVETTTPPQKQEPIDKELYPLTSLRSLFGNDPSSQ')
         region.make_codon_aln()
         expected = '-L--Q--S--R--P--E--P--T--A--P--P--E--E--S--F--R--S--G--V--E--T--T--T--P--P--Q-' \
                    '-K--Q--E--P--I--D--K--E--L--Y--P--L--T--S--L--R--S--L--F--G--N--D--P--S--S--Q--*-'
@@ -196,17 +237,15 @@ class TestMakeCodonAln(unittest.TestCase):
 class TestGlobalToLocalIndex(unittest.TestCase):
 
     def testNuclCoords(self):
-        region = GenomeRegion('p1',
-                              [2086, 2133], 'TTTTTAGGGAAGATCTGGCCTTCCTACAAGGGAAGGCCAGGGAATTTT',
-                              [433, 448],   'FLGKIWPSYKGRPGNF')
+        region = GenomeRegion('p1', [2086, 2133], 'TTTTTAGGGAAGATCTGGCCTTCCTACAAGGGAAGGCCAGGGAATTTT',
+                                    [433, 448],   'FLGKIWPSYKGRPGNF')
         expected = [1, 48]
         result = region.global_to_local_index([2086, 2133], 'nucl')
         self.assertEqual(expected, result)
 
     def testProtCoords(self):
-        region = GenomeRegion('p2',
-                              [1879, 1920], 'GCTGAAGCAATGAGCCAAGTAACAAATTCAGCTACCATAATG',
-                              [364, 377],   'AEAMSQVTNSATIM')
+        region = GenomeRegion('p2', [1879, 1920], 'GCTGAAGCAATGAGCCAAGTAACAAATTCAGCTACCATAATG',
+                                    [364, 377],   'AEAMSQVTNSATIM')
         expected = [1, 14]
         result = region.global_to_local_index([364, 377], 'prot')
         self.assertEqual(expected, result)
@@ -215,24 +254,23 @@ class TestGlobalToLocalIndex(unittest.TestCase):
 class TestLocalToGlobalIndex(unittest.TestCase):
 
     def testNuclCoords(self):
-        region = GenomeRegion('Nucleocapsid',
-                              [1921, 2085], 'ATGCAGAGAGGCAATTTTAGGAACCAAAGAAAGATTGTTAAGTGTTTCAATTGTGGCAAAGAAGGGCACACAGC'
-                                            'CAGAAATTGCAGGGCCCCTAGGAAAAAGGGCTGTTGGAAATGTGGAAAGGAAGGACACCAAATGAAAGATTGTA'
-                                            'CTGAGAGACAGGCTAAT',
-                              [1, 55],      'MQRGNFRNQRKIVKCFNCGKEGHTARNCRAPRKKGCWKCGKEGHQMKDCTERQAN')
+        region = GenomeRegion('Nucleocapsid', [1921, 2085], 'ATGCAGAGAGGCAATTTTAGGAACCAAAGAAAGATTGTTAAGTGTTTCAATTGTGGCA'
+                                                            'AAGAAGGGCACACAGCCAGAAATTGCAGGGCCCCTAGGAAAAAGGGCTGTTGGAAATG'
+                                                            'TGGAAAGGAAGGACACCAAATGAAAGATTGTACTGAGAGACAGGCTAAT',
+                                              [1, 55],      'MQRGNFRNQRKIVKCFNCGKEGHTARNCRAPRKKGCWKCGKEGHQMKDCTERQAN')
         expected = [1921, 2085]
         result = region.local_to_global_index([1, 165], 'nucl')
         self.assertEqual(expected, result)
 
     def testProtCoords(self):
-        region = GenomeRegion('RNase',
-                              [3870, 4229], 'TATGTAGATGGGGCAGCTAACAGGGAGACTAAATTAGGAAAAGCAGGATATGTTACTAATAGAGGAAGACAAA'
-                                            'AAGTTGTCACCCTAACTGACACAACAAATCAGAAGACTGAGTTACAAGCAATTTATCTAGCTTTGCAGGATTC'
-                                            'GGGATTAGAAGTAAACATAGTAACAGACTCACAATATGCATTAGGAATCATTCAAGCACAACCAGATCAAAGT'
-                                            'GAATCAGAGTTAGTCAATCAAATAATAGAGCAGTTAATAAAAAAGGAAAAGGTCTATCTGGCATGGGTACCAG'
-                                            'CACACAAAGGAATTGGAGGAAATGAACAAGTAGATAAATTAGTCAGTGCTGGAATCAGGAAAGTACTA',
-                              [1096, 1215], 'YVDGAANRETKLGKAGYVTNRGRQKVVTLTDTTNQKTELQAIYLALQDSGLEVNIVTDSQYALGIIQAQPDQS'
-                                            'ESELVNQIIEQLIKKEKVYLAWVPAHKGIGGNEQVDKLVSAGIRKVL')
+        region = GenomeRegion('RNase', [3870, 4229], 'TATGTAGATGGGGCAGCTAACAGGGAGACTAAATTAGGAAAAGCAGGATATGTTACTAATAGAGG'
+                                                     'AAGACAAAAAGTTGTCACCCTAACTGACACAACAAATCAGAAGACTGAGTTACAAGCAATTTATC'
+                                                     'TAGCTTTGCAGGATTCGGGATTAGAAGTAAACATAGTAACAGACTCACAATATGCATTAGGAATC'
+                                                     'ATTCAAGCACAACCAGATCAAAGTGAATCAGAGTTAGTCAATCAAATAATAGAGCAGTTAATAAA'
+                                                     'AAAGGAAAAGGTCTATCTGGCATGGGTACCAGCACACAAAGGAATTGGAGGAAATGAACAAGTAG'
+                                                     'ATAAATTAGTCAGTGCTGGAATCAGGAAAGTACTA',
+                                       [1096, 1215], 'YVDGAANRETKLGKAGYVTNRGRQKVVTLTDTTNQKTELQAIYLALQDSGLEVNIVTDSQYALGI'
+                                                     'IQAQPDQSESELVNQIIEQLIKKEKVYLAWVPAHKGIGGNEQVDKLVSAGIRKVL')
         expected = [1096, 1215]
         result = region.local_to_global_index([1, 120], 'prot')
         self.assertEqual(expected, result)
@@ -241,42 +279,43 @@ class TestLocalToGlobalIndex(unittest.TestCase):
 class TestGetOverlap(unittest.TestCase):
 
     def testNuclOverlap(self):
-        region = GenomeRegion('gp41',
-                              [7758, 8795], 'GCAGTGGGAATAGGAGCTTTGTTCCTTGGGTTCTTGGGAGCAGCAGGAAGCACTATGGGCGCAGCCTCAATGA'
-                                            'CGCTGACGGTACAGGCCAGACAATTATTGTCTGGTATAGTGCAGCAGCAGAACAATTTGCTGAGGGCTATTGA'
-                                            'GGCGCAACAGCATCTGTTGCAACTCACAGTCTGGGGCATCAAGCAGCTCCAGGCAAGAATCCTGGCTGTGGAA'
-                                            'AGATACCTAAAGGATCAACAGCTCCTGGGGATTTGGGGTTGCTCTGGAAAACTCATTTGCACCACTGCTGTGC'
-                                            'CTTGGAATGCTAGTTGGAGTAATAAATCTCTGGAACAGATTTGGAATCACACGACCTGGATGGAGTGGGACAG'
-                                            'AGAAATTAACAATTACACAAGCTTAATACACTCCTTAATTGAAGAATCGCAAAACCAGCAAGAAAAGAATGAA'
-                                            'CAAGAATTATTGGAATTAGATAAATGGGCAAGTTTGTGGAATTGGTTTAACATAACAAATTGGCTGTGGTATA'
-                                            'TAAAATTATTCATAATGATAGTAGGAGGCTTGGTAGGTTTAAGAATAGTTTTTGCTGTACTTTCTATAGTGAA'
-                                            'TAGAGTTAGGCAGGGATATTCACCATTATCGTTTCAGACCCACCTCCCAACCCCGAGGGGACCCGACAGGCCC'
-                                            'GAAGGAATAGAAGAAGAAGGTGGAGAGAGAGACAGAGACAGATCCATTCGATTAGTGAACGGATCCTTGGCAC'
-                                            'TTATCTGGGACGATCTGCGGAGCCTGTGCCTCTTCAGCTACCACCGCTTGAGAGACTTACTCTTGATTGTAAC'
-                                            'GAGGATTGTGGAACTTCTGGGACGCAGGGGGTGGGAAGCCCTCAAATATTGGTGGAATCTCCTACAGTATTGG'
-                                            'AGTCAGGAACTAAAGAATAGTGCTGTTAGCTTGCTCAATGCCACAGCCATAGCAGTAGCTGAGGGGACAGATA'
-                                            'GGGTTATAGAAGTAGTACAAGGAGCTTGTAGAGCTATTCGCCACATACCTAGAAGAATAAGACAGGGCTTGGA'
-                                            'AAGGATTTTGCTATAA',
-                              [2602, 2946], 'AVGIGALFLGFLGAAGSTMGAASMTLTVQARQLLSGIVQQQNNLLRAIEAQQHLLQLTVWGIKQLQARILAVE'
-                                            'RYLKDQQLLGIWGCSGKLICTTAVPWNASWSNKSLEQIWNHTTWMEWDREINNYTSLIHSLIEESQNQQEKNE'
-                                            'QELLELDKWASLWNWFNITNWLWYIKLFIMIVGGLVGLRIVFAVLSIVNRVRQGYSPLSFQTHLPTPRGPDRP'
-                                            'EGIEEEGGERDRDRSIRLVNGSLALIWDDLRSLCLFSYHRLRDLLLIVTRIVELLGRRGWEALKYWWNLLQYW'
-                                            'SQELKNSAVSLLNATAIAVAEGTDRVIEVVQGACRAIRHIPRRIRQGLERILL')
+        region = GenomeRegion('gp41', [7758, 8795], 'GCAGTGGGAATAGGAGCTTTGTTCCTTGGGTTCTTGGGAGCAGCAGGAAGCACTATGGGCGCAGCC'
+                                                    'TCAATGACGCTGACGGTACAGGCCAGACAATTATTGTCTGGTATAGTGCAGCAGCAGAACAATTTG'
+                                                    'CTGAGGGCTATTGAGGCGCAACAGCATCTGTTGCAACTCACAGTCTGGGGCATCAAGCAGCTCCAG'
+                                                    'GCAAGAATCCTGGCTGTGGAAAGATACCTAAAGGATCAACAGCTCCTGGGGATTTGGGGTTGCTCT'
+                                                    'GGAAAACTCATTTGCACCACTGCTGTGCCTTGGAATGCTAGTTGGAGTAATAAATCTCTGGAACAG'
+                                                    'ATTTGGAATCACACGACCTGGATGGAGTGGGACAGAGAAATTAACAATTACACAAGCTTAATACAC'
+                                                    'TCCTTAATTGAAGAATCGCAAAACCAGCAAGAAAAGAATGAACAAGAATTATTGGAATTAGATAAA'
+                                                    'TGGGCAAGTTTGTGGAATTGGTTTAACATAACAAATTGGCTGTGGTATATAAAATTATTCATAATG'
+                                                    'ATAGTAGGAGGCTTGGTAGGTTTAAGAATAGTTTTTGCTGTACTTTCTATAGTGAATAGAGTTAGG'
+                                                    'CAGGGATATTCACCATTATCGTTTCAGACCCACCTCCCAACCCCGAGGGGACCCGACAGGCCCGAA'
+                                                    'GGAATAGAAGAAGAAGGTGGAGAGAGAGACAGAGACAGATCCATTCGATTAGTGAACGGATCCTTG'
+                                                    'GCACTTATCTGGGACGATCTGCGGAGCCTGTGCCTCTTCAGCTACCACCGCTTGAGAGACTTACTC'
+                                                    'TTGATTGTAACGAGGATTGTGGAACTTCTGGGACGCAGGGGGTGGGAAGCCCTCAAATATTGGTGG'
+                                                    'AATCTCCTACAGTATTGGAGTCAGGAACTAAAGAATAGTGCTGTTAGCTTGCTCAATGCCACAGCC'
+                                                    'ATAGCAGTAGCTGAGGGGACAGATAGGGTTATAGAAGTAGTACAAGGAGCTTGTAGAGCTATTCGC'
+                                                    'CACATACCTAGAAGAATAAGACAGGGCTTGGAAAGGATTTTGCTATAA',
+                                      [2602, 2946], 'AVGIGALFLGFLGAAGSTMGAASMTLTVQARQLLSGIVQQQNNLLRAIEAQQHLLQLTVWGIKQLQ'
+                                                    'ARILAVERYLKDQQLLGIWGCSGKLICTTAVPWNASWSNKSLEQIWNHTTWMEWDREINNYTSLIH'
+                                                    'SLIEESQNQQEKNEQELLELDKWASLWNWFNITNWLWYIKLFIMIVGGLVGLRIVFAVLSIVNRVR'
+                                                    'QGYSPLSFQTHLPTPRGPDRPEGIEEEGGERDRDRSIRLVNGSLALIWDDLRSLCLFSYHRLRDLL'
+                                                    'LIVTRIVELLGRRGWEALKYWWNLLQYWSQELKNSAVSLLNATAIAVAEGTDRVIEVVQGACRAIR'
+                                                    'HIPRRIRQGLERILL')
         expected = ('CAGATAGGGTTATAGAAGTAGTACAAGGAGCTTGTAGAGCTATTCGCCACATACCTAGAAGAATAAGACAGGGCTTGGAAAGGATTTTGCTATAA',
                     [8700, 8795])
         result = region.get_overlap([8700, 8795], 'nucl')
         self.assertEqual(expected, result)
 
     def testProtOverlap(self):
-        region = GenomeRegion('Matrix',
-                              [790, 1185], 'ATGGGTGCGAGAGCGTCAGTATTAAGCGGGGGAGAATTAGATCGATGGGAAAAAATTCGGTTAAGGCCAGGGG'
-                                           'GAAAGAAAAAATATAAATTAAAACATATAGTATGGGCAAGCAGGGAGCTAGAACGATTCGCAGTTAATCCTGG'
-                                           'CCTGTTAGAAACATCAGAAGGCTGTAGACAAATACTGGGACAGCTACAACCATCCCTTCAGACAGGATCAGAA'
-                                           'GAACTTAGATCATTATATAATACAGTAGCAACCCTCTATTGTGTGCATCAAAGGATAGAGATAAAAGACACCA'
-                                           'AGGAAGCTTTAGACAAGATAGAGGAAGAGCAAAACAAAAGTAAGAAAAAAGCACAGCAAGCAGCAGCTGACAC'
-                                           'AGGACACAGCAATCAGGTCAGCCAAAATTAC',
-                              [1, 132],    'MGARASVLSGGELDRWEKIRLRPGGKKKYKLKHIVWASRELERFAVNPGLLETSEGCRQILGQLQPSLQTGSE'
-                                           'ELRSLYNTVATLYCVHQRIEIKDTKEALDKIEEEQNKSKKKAQQAAADTGHSNQVSQNY')
+        region = GenomeRegion('Matrix', [790, 1185], 'ATGGGTGCGAGAGCGTCAGTATTAAGCGGGGGAGAATTAGATCGATGGGAAAAAATTCGGTTAAG'
+                                                     'GCCAGGGGGAAAGAAAAAATATAAATTAAAACATATAGTATGGGCAAGCAGGGAGCTAGAACGAT'
+                                                     'TCGCAGTTAATCCTGGCCTGTTAGAAACATCAGAAGGCTGTAGACAAATACTGGGACAGCTACAA'
+                                                     'CCATCCCTTCAGACAGGATCAGAAGAACTTAGATCATTATATAATACAGTAGCAACCCTCTATTG'
+                                                     'TGTGCATCAAAGGATAGAGATAAAAGACACCAAGGAAGCTTTAGACAAGATAGAGGAAGAGCAAA'
+                                                     'ACAAAAGTAAGAAAAAAGCACAGCAAGCAGCAGCTGACACAGGACACAGCAATCAGGTCAGCCAA'
+                                                     'AATTAC',
+                                        [1, 132], 'MGARASVLSGGELDRWEKIRLRPGGKKKYKLKHIVWASRELERFAVNPGLLETSEGCRQILGQLQPSL'
+                                                  'QTGSEELRSLYNTVATLYCVHQRIEIKDTKEALDKIEEEQNKSKKKAQQAAADTGHSNQVSQNY')
         expected = ('MGARASVLSGGELDR', [1, 15])
         result = region.get_overlap([1, 15], 'prot')
         self.assertEqual(expected, result)
@@ -346,7 +385,7 @@ class TestValidInputs(unittest.TestCase):
 
     def testInvalidStartHIV(self):
         expected = False
-        result = valid_inputs("hiv", -0, 100, "Complete")
+        result = valid_inputs("hiv", -1, 100, "Complete")
         self.assertEqual(expected, result)
 
     def testInvalidEndSIV(self):
@@ -751,86 +790,26 @@ class TestFindMatches(unittest.TestCase):
 class TestRetrieve(unittest.TestCase):
 
     def setUp(self):
-        self.hiv_genome_file = open(TEST_HIV_GENOME)
+        self.hiv_nt_seq_file = open(TEST_HIV_GENOME)
+        self.hiv_aa_seq_file = open(TEST_HIV_PROTS)
+        self.hiv_nt_seq = convert_fasta(self.hiv_nt_seq_file)[0][1]
+        self.hiv_aa_seq = convert_fasta(self.hiv_aa_seq_file)[0][1]
+
+        self.hiv_nt_coords = open(TEST_HIV_NT_COORDS)
+        self.hiv_aa_coords = open(TEST_HIV_AA_COORDS)
+
         self.siv_genome_file = open(TEST_SIV_GENOME)
-        self.hiv_prot_file = open(TEST_HIV_PROTS)
         self.siv_prot_file = open(TEST_SIV_PROTS)
 
     def testDefaultInput(self):
-        ref_regions = [
-            GenomeRegion(
-                '5\'LTR',
-                [1, 634],
-                'TGGAAGGGCTAATTCACTCCCAACGAAGACAAGATATCCTTGATCTGTGGATCTACCACACACAAGGCTACTTCCCTGATTAGCAGAACTACACACCAGGGC'
-                'CAGGGATCAGATATCCACTGACCTTTGGATGGTGCTACAAGCTAGTACCAGTTGAGCCAGAGAAGTTAGAAGAAGCCAACAAAGGAGAGAACACCAGCTTGT'
-                'TACACCCTGTGAGCCTGCATGGAATGGATGACCCGGAGAGAGAAGTGTTAGAGTGGAGGTTTGACAGCCGCCTAGCATTTCATCACATGGCCCGAGAGCTGC'
-                'ATCCGGAGTACTTCAAGAACTGCTGACATCGAGCTTGCTACAAGGGACTTTCCGCTGGGGACTTTCCAGGGAGGCGTGGCCTGGGCGGGACTGGGGAGTGGC'
-                'GAGCCCTCAGATCCTGCATATAAGCAGCTGCTTTTTGCCTGTACTGGGTCTCTCTGGTTAGACCAGATCTGAGCCTGGGAGCTCTCTGGCTAACTAGGGAAC'
-                'CCACTGCTTAAGCCTCAATAAAGCTTGCCTTGAGTGCTTCAAGTAGTGTGTGCCCGTCTGTTGTGTGACTCTGGTAACTAGAGATCCCTCAGACCCTTTTAG'
-                'TCAGTGTGGAAAATCTCTAGCA',
-                None, None),
-            GenomeRegion(
-                'Gag',
-                [790, 2292],
-                'ATGGGTGCGAGAGCGTCAGTATTAAGCGGGGGAGAATTAGATCGATGGGAAAAAATTCGGTTAAGGCCAGGGGGAAAGAAAAAATATAAATTAAAACATATA'
-                'GTATGGGCAAGCAGGGAGCTAGAACGATTCGCAGTTAATCCTGGCCTGTTAGAAACATCAGAAGGCTGTAGACAAATACTGGGACAGCTACAACCATCCCTT'
-                'CAGACAGGATCAGAAGAACTTAGATCATTATATAATACAGTAGCAACCCTCTATTGTGTGCATCAAAGGATAGAGATAAAAGACACCAAGGAAGCTTTAGAC'
-                'AAGATAGAGGAAGAGCAAAACAAAAGTAAGAAAAAAGCACAGCAAGCAGCAGCTGACACAGGACACAGCAATCAGGTCAGCCAAAATTACCCTATAGTGCAG'
-                'AACATCCAGGGGCAAATGGTACATCAGGCCATATCACCTAGAACTTTAAATGCATGGGTAAAAGTAGTAGAAGAGAAGGCTTTCAGCCCAGAAGTGATACCC'
-                'ATGTTTTCAGCATTATCAGAAGGAGCCACCCCACAAGATTTAAACACCATGCTAAACACAGTGGGGGGACATCAAGCAGCCATGCAAATGTTAAAAGAGACC'
-                'ATCAATGAGGAAGCTGCAGAATGGGATAGAGTGCATCCAGTGCATGCAGGGCCTATTGCACCAGGCCAGATGAGAGAACCAAGGGGAAGTGACATAGCAGGA'
-                'ACTACTAGTACCCTTCAGGAACAAATAGGATGGATGACAAATAATCCACCTATCCCAGTAGGAGAAATTTATAAAAGATGGATAATCCTGGGATTAAATAAA'
-                'ATAGTAAGAATGTATAGCCCTACCAGCATTCTGGACATAAGACAAGGACCAAAGGAACCCTTTAGAGACTATGTAGACCGGTTCTATAAAACTCTAAGAGCC'
-                'GAGCAAGCTTCACAGGAGGTAAAAAATTGGATGACAGAAACCTTGTTGGTCCAAAATGCGAACCCAGATTGTAAGACTATTTTAAAAGCATTGGGACCAGCG'
-                'GCTACACTAGAAGAAATGATGACAGCATGTCAGGGAGTAGGAGGACCCGGCCATAAGGCAAGAGTTTTGGCTGAAGCAATGAGCCAAGTAACAAATTCAGCT'
-                'ACCATAATGATGCAGAGAGGCAATTTTAGGAACCAAAGAAAGATTGTTAAGTGTTTCAATTGTGGCAAAGAAGGGCACACAGCCAGAAATTGCAGGGCCCCT'
-                'AGGAAAAAGGGCTGTTGGAAATGTGGAAAGGAAGGACACCAAATGAAAGATTGTACTGAGAGACAGGCTAATTTTTTAGGGAAGATCTGGCCTTCCTACAAG'
-                'GGAAGGCCAGGGAATTTTCTTCAGAGCAGACCAGAGCCAACAGCCCCACCAGAAGAGAGCTTCAGGTCTGGGGTAGAGACAACAACTCCCCCTCAGAAGCAG'
-                'GAGCCGATAGACAAGGAACTGTATCCTTTAACTTCCCTCAGGTCACTCTTTGGCAACGACCCCTCGTCACAATAA',
-                [1, 500],
-                'MGARASVLSGGELDRWEKIRLRPGGKKKYKLKHIVWASRELERFAVNPGLLETSEGCRQILGQLQPSLQTGSEELRSLYNTVATLYCVHQRIEIKDTKEALD'
-                'KIEEEQNKSKKKAQQAAADTGHSNQVSQNYPIVQNIQGQMVHQAISPRTLNAWVKVVEEKAFSPEVIPMFSALSEGATPQDLNTMLNTVGGHQAAMQMLKET'
-                'INEEAAEWDRVHPVHAGPIAPGQMREPRGSDIAGTTSTLQEQIGWMTNNPPIPVGEIYKRWIILGLNKIVRMYSPTSILDIRQGPKEPFRDYVDRFYKTLRA'
-                'EQASQEVKNWMTETLLVQNANPDCKTILKALGPAATLEEMMTACQGVGGPGHKARVLAEAMSQVTNSATIMMQRGNFRNQRKIVKCFNCGKEGHTARNCRAP'
-                'RKKGCWKCGKEGHQMKDCTERQANFLGKIWPSYKGRPGNFLQSRPEPTAPPEESFRSGVETTTPPQKQEPIDKELYPLTSLRSLFGNDPSSQ'),
-            GenomeRegion(
-                'Matrix',
-                [790, 1185],
-                'ATGGGTGCGAGAGCGTCAGTATTAAGCGGGGGAGAATTAGATCGATGGGAAAAAATTCGGTTAAGGCCAGGGGGAAAGAAAAAATATAAATTAAAACATATA'
-                'GTATGGGCAAGCAGGGAGCTAGAACGATTCGCAGTTAATCCTGGCCTGTTAGAAACATCAGAAGGCTGTAGACAAATACTGGGACAGCTACAACCATCCCTT'
-                'CAGACAGGATCAGAAGAACTTAGATCATTATATAATACAGTAGCAACCCTCTATTGTGTGCATCAAAGGATAGAGATAAAAGACACCAAGGAAGCTTTAGAC'
-                'AAGATAGAGGAAGAGCAAAACAAAAGTAAGAAAAAAGCACAGCAAGCAGCAGCTGACACAGGACACAGCAATCAGGTCAGCCAAAATTAC',
-                [1, 132],
-                'MGARASVLSGGELDRWEKIRLRPGGKKKYKLKHIVWASRELERFAVNPGLLETSEGCRQILGQLQPSLQTGSEELRSLYNTVATLYCVHQRIEIKDTKEALD'
-                'KIEEEQNKSKKKAQQAAADTGHSNQVSQNY'),
-            GenomeRegion(
-                'Capsid',
-                [1186, 1878],
-                'CCTATAGTGCAGAACATCCAGGGGCAAATGGTACATCAGGCCATATCACCTAGAACTTTAAATGCATGGGTAAAAGTAGTAGAAGAGAAGGCTTTCAGCCCA'
-                'GAAGTGATACCCATGTTTTCAGCATTATCAGAAGGAGCCACCCCACAAGATTTAAACACCATGCTAAACACAGTGGGGGGACATCAAGCAGCCATGCAAATG'
-                'TTAAAAGAGACCATCAATGAGGAAGCTGCAGAATGGGATAGAGTGCATCCAGTGCATGCAGGGCCTATTGCACCAGGCCAGATGAGAGAACCAAGGGGAAGT'
-                'GACATAGCAGGAACTACTAGTACCCTTCAGGAACAAATAGGATGGATGACAAATAATCCACCTATCCCAGTAGGAGAAATTTATAAAAGATGGATAATCCTG'
-                'GGATTAAATAAAATAGTAAGAATGTATAGCCCTACCAGCATTCTGGACATAAGACAAGGACCAAAGGAACCCTTTAGAGACTATGTAGACCGGTTCTATAAA'
-                'ACTCTAAGAGCCGAGCAAGCTTCACAGGAGGTAAAAAATTGGATGACAGAAACCTTGTTGGTCCAAAATGCGAACCCAGATTGTAAGACTATTTTAAAAGCA'
-                'TTGGGACCAGCGGCTACACTAGAAGAAATGATGACAGCATGTCAGGGAGTAGGAGGACCCGGCCATAAGGCAAGAGTTTTG',
-                [133, 363],
-                'PIVQNIQGQMVHQAISPRTLNAWVKVVEEKAFSPEVIPMFSALSEGATPQDLNTMLNTVGGHQAAMQMLKETINEEAAEWDRVHPVHAGPIAPGQMREPRGS'
-                'DIAGTTSTLQEQIGWMTNNPPIPVGEIYKRWIILGLNKIVRMYSPTSILDIRQGPKEPFRDYVDRFYKTLRAEQASQEVKNWMTETLLVQNANPDCKTILKA'
-                'LGPAATLEEMMTACQGVGGPGHKARVL'),
-            GenomeRegion(
-                'p2', [1879, 1920], 'GCTGAAGCAATGAGCCAAGTAACAAATTCAGCTACCATAATG', [364, 377], 'AEAMSQVTNSATIM'),
-            GenomeRegion(
-                'Nucleocapsid',
-                [1921, 2085], 'ATGCAGAGAGGCAATTTTAGGAACCAAAGAAAGATTGTTAAGTGTTTCAATTGTGGCAAAGAAGGGCACACAGCCAGAAATTGCAGGG'
-                              'CCCCTAGGAAAAAGGGCTGTTGGAAATGTGGAAAGGAAGGACACCAAATGAAAGATTGTACTGAGAGACAGGCTAAT',
-                [378, 342], 'MQRGNFRNQRKIVKCFNCGKEGHTARNCRAPRKKGCWKCGKEGHQMKDCTERQAN'),
-            GenomeRegion(
-                'p1', [2086, 2133], 'TTTTTAGGGAAGATCTGGCCTTCCTACAAGGGAAGGCCAGGGAATTTT', [433, 448], 'FLGKIWPSYKGRPGNF'),
-            GenomeRegion(
-                'p6', [2134, 2292], 'CTTCAGAGCAGACCAGAGCCAACAGCCCCACCAGAAGAGAGCTTCAGGTCTGGGGTAGAGACAACAACTCCCCCTCAGAAGC'
-                                    'AGGAGCCGATAGACAAGGAACTGTATCCTTTAACTTCCCTCAGGTCACTCTTTGGCAACGACCCCTCGTCACAATAA',
-                [449, 500], 'LQSRPEPTAPPEESFRSGVETTTPPQKQEPIDKELYPLTSLRSLFGNDPSSQ')]
-
+        ref_regions = set_regions('hiv', self.hiv_nt_seq, TEST_HIV_NT_COORDS, self.hiv_aa_seq, TEST_HIV_AA_COORDS)
+        for ref in ref_regions:
+            print(ref.region_name)
+            print(ref.nt_seq)
+            print(ref.nt_coords)
+            print(ref.aa_seq)
+            print(ref.aa_coords)
+            print()
         expected_seq = 'TTTTTAGGGAAGATCTGGCCTTCCTACAAGGGAAGGCCAGGGAATTTT'
         result = retrieve('hiv', 'nucl', ref_regions, 'p1')
         result_seq = result.nt_seq
@@ -852,9 +831,12 @@ class TestRetrieve(unittest.TestCase):
         self.assertEqual(expected_seq, result_seq)
 
     def tearDown(self):
-        self.hiv_genome_file.close()
+        self.hiv_nt_seq_file.close()
+        self.hiv_aa_seq_file.close()
+        self.hiv_nt_coords.close()
+        self.hiv_aa_coords.close()
+
         self.siv_genome_file.close()
-        self.hiv_prot_file.close()
         self.siv_prot_file.close()
 
 

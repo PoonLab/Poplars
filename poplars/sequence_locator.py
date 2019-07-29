@@ -258,7 +258,7 @@ def valid_inputs(virus, start_coord, end_coord, region):
     if type(start_coord) == str:
         print("Invalid start coordinate type: {}".format(type(start_coord)))
 
-    if start_coord <= 0:
+    if start_coord < 0:
         print("Invalid start coordinate: {}".format(start_coord))
         return False
 
@@ -511,6 +511,14 @@ def output(query_regions, outfile=None):
                 print("\tAmino acid position relative to protein start: {} --> {}"
                       .format(reg.pos_from_aa_start[0], reg.pos_from_aa_start[1]))
 
+            if reg.pos_from_qstart is not None:
+                print("\tPosition relative to query start: {} --> {}\n"
+                      .format(reg.pos_from_qstart[0], reg.pos_from_qstart[1]))
+
+            if reg.pos_from_rstart is not None:
+                print("\tPosition relative to region start: {} --> {}\n"
+                      .format(reg.pos_from_rstart[0], reg.pos_from_rstart[1]))
+
     else:
         outfile.write("\n\nRegions touched by the query sequence:")
         for reg in query_regions:
@@ -540,6 +548,14 @@ def output(query_regions, outfile=None):
                 outfile.write("\tAmino acid position relative to protein start: {} --> {}\n"
                               .format(reg.pos_from_aa_start[0], reg.pos_from_aa_start[1]))
 
+            if reg.pos_from_qstart is not None:
+                outfile.write("\tPosition relative to query start: {} --> {}\n"
+                              .format(reg.pos_from_qstart[0], reg.pos_from_qstart[1]))
+
+            if reg.pos_from_rstart is not None:
+                outfile.write("\tPosition relative to region start: {} --> {}\n"
+                              .format(reg.pos_from_rstart[0], reg.pos_from_rstart[1]))
+
 
 def retrieve(virus, base, ref_regions, region, outfile=None, start_offset=1, end_offset='end'):
     """
@@ -554,82 +570,27 @@ def retrieve(virus, base, ref_regions, region, outfile=None, start_offset=1, end
     :return: The genomic region defined by the starting and ending coordinates
     """
     for ref_region in ref_regions:
-        sequence_range = ref_region.get_coords(base)
-        region_start = sequence_range[0]
-        region_end = sequence_range[1]
-
-        if start_offset <= region_start:
-            start = region_start
-        else:
-            start = region_start + (start_offset - region_start)
-
-        # If end_coord is greater than the region's end coordinate, set end_coord to region's end coordinate
-        if end_offset == 'end' or end_offset > region_end:
-            end = region_end
-        else:
-            end = region_end + (region_end - end_offset)
-
-        retrieved_region = None
         if ref_region.region_name == region:
-            s = ref_region.get_sequence(base)
-            region_to_retrieve = s[start - 1: end]
+            sequence_range = ref_region.get_coords(base)
+            region_start = sequence_range[0]
+            region_end = sequence_range[1]
 
-            if base == 'nucl':
-                retrieved_region = GenomeRegion(region, [start, end], region_to_retrieve,
-                                                ref_region.aa_coords, ref_region.aa_seq)
-                retrieved_region.set_sequence(region_to_retrieve, 'nucl')
+            if start_offset <= region_start:
+                start = region_start
             else:
-                retrieved_region = GenomeRegion(region, ref_region.nt_coords, ref_region.nt_seq,
-                                                [start, end], region_to_retrieve)
-                retrieved_region.set_sequence(region_to_retrieve, 'prot')
+                start = region_start + (start_offset - region_start)
 
-
-            retrieved_region.set_pos_from_cds(virus)
-            retrieved_region.pos_from_gstart = retrieved_region.local_to_global_index([start, end], base)
-            retrieved_region.set_pos_from_aa_start(virus)
-
-        if retrieved_region:
-            if outfile is None:
-                print("\033[1mRetrieved sequence: \033[0m\n")
-                print("Region:\t{}".format(retrieved_region.region_name))
-                print(textwrap.fill(retrieved_region.get_sequence(base)))
-
-                print("\n\033[1mRelative Positions: \033[0m")
-                if len(retrieved_region.pos_from_cds) == 2:
-                    print("\tNucleotide position relative to CDS start: {} --> {}"
-                          .format(retrieved_region.pos_from_cds[0], retrieved_region.pos_from_cds[1]))
-                else:
-                    print("\tNucleotide position relative to CDS start: N/A")
-
-                if retrieved_region.pos_from_gstart is not None:
-                    print("\tNucleotide position relative to genome start: {} --> {}"
-                          .format(retrieved_region.pos_from_gstart[0] + 1, retrieved_region.pos_from_gstart[1]))
-
-                if retrieved_region.pos_from_aa_start is not None:
-                    print("\tAmino acid position relative to protein start: {} --> {}"
-                          .format(retrieved_region.pos_from_aa_start[0], retrieved_region.pos_from_aa_start[1]))
-
+            # If end_coord is greater than the region's end coordinate, set end_coord to region's end coordinate
+            if end_offset == 'end' or end_offset > region_end:
+                end = region_end
             else:
-                outfile.write("\n\nRetrieved sequence:\n")
-                outfile.write("\nRegion:\t{}".format(retrieved_region.region_name))
-                outfile.write("\n" + textwrap.fill(retrieved_region.get_sequence(base)))
+                end = region_end + (region_end - end_offset)
 
-                outfile.write("\n\nRelative Positions: \n")
-                if len(retrieved_region.pos_from_cds) == 2:
-                    outfile.write("\tNucleotide position relative to CDS: {} to {}\n"
-                                  .format(retrieved_region.pos_from_cds[0], retrieved_region.pos_from_cds[1]))
-                else:
-                    outfile.write("\tNucleotide position relative to CDS start: N/A\n")
+            # TODO: sort retrieved_regions to print region first
+            retrieved_regions = find_matches(virus, base, ref_regions, [[start, end]])
+            output(retrieved_regions, outfile)
 
-                if retrieved_region.pos_from_gstart is not None:
-                    outfile.write("\tNucleotide position relative to start of genome: {} --> {}\n"
-                                  .format(retrieved_region.pos_from_gstart[0] + 1, retrieved_region.pos_from_gstart[1]))
-
-                if retrieved_region.pos_from_aa_start is not None:
-                    outfile.write("\tAmino acid position relative to protein start: {} --> {}\n"
-                                  .format(retrieved_region.pos_from_aa_start[0], retrieved_region.pos_from_aa_start[1]))
-
-    return retrieved_region
+    return retrieved_regions
 
 
 def handle_args(virus, base, ref_nt, nt_coords, ref_aa, aa_coords):
