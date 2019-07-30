@@ -35,14 +35,14 @@ class TestGetCoords(unittest.TestCase):
     def testNuclCoords(self):
         region = GenomeRegion('test', self.nt_coords)
         result = region.get_coords('nucl')
-        expected = '5\'LTR,1,634\nGag,790,2292\nMatrix,790,1185\nCapsid,1186,1878\np2,1879,1920\n' \
-                   'Nucleocapsid,1921,2085\np1,2086,2133\np6,2134,2292'
+        expected = '5\'LTR,1,634\nGag,790,2292\nMatrix(p17/p15),790,1185\nCapsid(p24/p27),1186,1878\np2,1879,1920\n' \
+                   'Nucleocapsid(p7/p8),1921,2085\np1,2086,2133\np6,2134,2292'
         self.assertEqual(expected, result)
 
     def testProtCoords(self):
         region = GenomeRegion('test', None, None, self.aa_coords)
         result = region.get_coords('prot')
-        expected = 'Rev,2087,2193\nRev(exon1),2087,2110\nRev(exon2),2111,2193\ngp160,2194,3072\n' \
+        expected = 'Rev,2087,2193\nRev(exon1),2087,2110\nRev(exon2),2111,2193\nEnv(gp160),2194,3072\n' \
                    'gp120,2194,2718\ngp41,2719,3072\nNef,3073,3335'
         self.assertEqual(expected, result)
 
@@ -188,16 +188,16 @@ class TestSetPosFromAAStart(unittest.TestCase):
                               'PIVQNIQGQMVHQAISPRTLNAWVKVVEEKAFSPEVIPMFSALSEGATPQDLNTMLNTVGGHQAAMQMLKETINEEAAEW'
                               'DRVHPVHAGPIAPGQMREPRGSDIAGTTSTLQEQIGWMTNNPPIPVGEIYKRWIILGLNKIVRMYSPTSILDIRQGPKEP'
                               'FRDYVDRFYKTLRAEQASQEVKNWMTETLLVQNANPDCKTILKALGPAATLEEMMTACQGVGGPGHKARVL')
-        region.set_pos_from_aa_start('hiv')
+        region.set_pos_from_pstart('hiv')
         expected = [1, 231]
-        result = region.pos_from_aa_start
+        result = region.pos_from_pstart
         self.assertEqual(expected, result)
 
     def testLTR5FromAAStart(self):
         region = GenomeRegion('5\'LTR')
-        region.set_pos_from_aa_start('hiv')
+        region.set_pos_from_pstart('hiv')
         expected = None
-        result = region.pos_from_aa_start
+        result = region.pos_from_pstart
         self.assertEqual(expected, result)
 
     def testGagFromAAStart(self):
@@ -209,9 +209,9 @@ class TestSetPosFromAAStart(unittest.TestCase):
                               'LLVQNANPDCKTILKALGPAATLEEMMTACQGVGGPGHKARVLAEAMSQVTNSATIMMQRGNFRNQRKIVKCFNCGKEGH'
                               'TARNCRAPRKKGCWKCGKEGHQMKDCTERQANFLGKIWPSYKGRPGNFLQSRPEPTAPPEESFRSGVETTTPPQKQEPID'
                               'KELYPLTSLRSLFGNDPSSQ')
-        region.set_pos_from_aa_start('hiv')
+        region.set_pos_from_pstart('hiv')
         expected = [133, 363]
-        result = region.pos_from_aa_start
+        result = region.pos_from_pstart
         self.assertEqual(expected, result)
 
 
@@ -324,7 +324,7 @@ class TestGetOverlap(unittest.TestCase):
 class TestSetRegions(unittest.TestCase):
 
     def testSIVInputCoords(self):
-        region_names = ['Rev(with intron)', 'Rev(exon1)', 'Rev(exon2)', 'gp160', 'gp120', 'gp41', 'Nef', '3\'LTR']
+        region_names = ['Rev(with intron)', 'Rev(exon1)', 'Rev(exon2)', 'Env(gp160)', 'gp120', 'gp41', 'Nef', '3\'LTR']
         region_coordinates = [[6784, 9315], [6784, 6853], [9062, 9315], [6860, 9499],
                               [6860, 8434], [8435, 9499], [9333, 10124], [9719, 10535]]
         result = set_regions('siv', TEST_SIV_GENOME, TEST_SIV_NT_COORDS, TEST_SIV_PROTS, TEST_SIV_AA_COORDS)
@@ -449,25 +449,25 @@ class TestGetQuery(unittest.TestCase):
     def testNucleotideQuery(self):
         expected = [["query", "ATGCGCG"]]
         handle = StringIO(">query\natgcgcg\n")
-        result = get_query("nucl", handle, 'n')
+        result = get_query("nucl", handle, False)
         self.assertEqual(expected, result)
 
     def testProteinQuery(self):
         expected = [["query", "MPPLMMADLADLGG"]]
         handle = StringIO(">query\nMPPLMMADLADLGG\n")
-        result = get_query("prot", handle, 'n')
+        result = get_query("prot", handle, False)
         self.assertEqual(expected, result)
 
     def testLongNucleotideSequence(self):
         expected = [["query", "ATGCGCGAATTAGCGA"]]
         handle = StringIO(">query\natgcgcg\naattagcga\n")
-        result = get_query("nucl", handle, 'n')
+        result = get_query("nucl", handle, False)
         self.assertEqual(expected, result)
 
     def testRevCompNucl(self):
         handle = StringIO(">query\nTCGCTAATTCGCGCATN*")
         expected = [["query", "*NATGCGCGAATTAGCGA"]]
-        result = get_query("nucl", handle, 'y')
+        result = get_query("nucl", handle, True)
         self.assertEqual(expected, result)
 
     def testInvalidNucleotideQuery(self):
@@ -485,25 +485,25 @@ class TestGetQuery(unittest.TestCase):
     def testRevCompProt(self):
         handle = StringIO(">query\nMPPLMMADLADLGG\n")
         expected = [["query", "MPPLMMADLADLGG"]]
-        result = get_query('prot', handle, 'y')
+        result = get_query('prot', handle, True)
         self.assertEqual(expected, result)
 
     def testPlainText(self):
         handle = StringIO("atgatcg\n")
         expected = [["Sequence1", "ATGATCG"]]
-        result = get_query("nucl", handle, 'n')
+        result = get_query("nucl", handle, False)
         self.assertEqual(expected, result)
 
     def testMultipleQueries(self):
         handle = StringIO("atgct--agc\natgca---ga\n")
         expected = [["Sequence1", "ATGCT--AGC"], ["Sequence2", "ATGCA---GA"]]
-        result = get_query("nucl", handle, 'n')
+        result = get_query("nucl", handle, False)
         self.assertEqual(expected, result)
 
     def testMultipleFasta(self):
         handle = StringIO(">q1\natgct--agc\n>q2\natgca---ga\n")
         expected = [["q1", "ATGCT--AGC"], ["q2", "ATGCA---GA"]]
-        result = get_query("nucl", handle, 'n')
+        result = get_query("nucl", handle, False)
         self.assertEqual(expected, result)
 
 
@@ -795,31 +795,62 @@ class TestRetrieve(unittest.TestCase):
         self.hiv_nt_seq = convert_fasta(self.hiv_nt_seq_file)[0][1]
         self.hiv_aa_seq = convert_fasta(self.hiv_aa_seq_file)[0][1]
 
-        self.hiv_nt_coords = open(TEST_HIV_NT_COORDS)
-        self.hiv_aa_coords = open(TEST_HIV_AA_COORDS)
-
-        self.siv_genome_file = open(TEST_SIV_GENOME)
-        self.siv_prot_file = open(TEST_SIV_PROTS)
+        self.siv_nt_seq_file = open(TEST_SIV_GENOME)
+        self.siv_aa_seq_file = open(TEST_SIV_PROTS)
+        self.siv_nt_seq = convert_fasta(self.siv_nt_seq_file)[0][1]
+        self.siv_aa_seq = convert_fasta(self.siv_aa_seq_file)[0][1]
 
     def testDefaultInput(self):
         ref_regions = set_regions('hiv', self.hiv_nt_seq, TEST_HIV_NT_COORDS, self.hiv_aa_seq, TEST_HIV_AA_COORDS)
-        for ref in ref_regions:
-            print(ref.region_name)
-            print(ref.nt_seq)
-            print(ref.nt_coords)
-            print(ref.aa_seq)
-            print(ref.aa_coords)
-            print()
-        expected_seq = 'TTTTTAGGGAAGATCTGGCCTTCCTACAAGGGAAGGCCAGGGAATTTT'
+
         result = retrieve('hiv', 'nucl', ref_regions, 'p1')
-        result_seq = result.nt_seq
-        self.assertEqual(expected_seq, result_seq)
+        result_region = result[0]
+        expected_region = 'p1'
+        expected_seq = 'TTTTTAGGGAAGATCTGGCCTTCCTACAAGGGAAGGCCAGGGAATTTT'
+        self.assertEqual(expected_region, result_region.region_name)
+        self.assertEqual(expected_seq, result_region.get_sequence('nucl'))
+
+        found_regions = result[1]
+        exp_region_names = ['Gag',               'p1',               'Pol', ]
+        exp_pos_from_cds = [[1297, 1344],        [1, 48],            [2, 49]]
+        exp_pos_from_qstart = [[1, 48],          [1, 48],            [1, 48]]
+        exp_pos_from_gstart = [[2086, 2133],     [2086, 2133],       [2086, 2133]]
+        exp_pos_from_pstart = [[433, 448],       [1, 16],            [1, 17]]
+        expected_proteins = ['FLGKIWPSYKGRPGNF', 'FLGKIWPSYKGRPGNF', 'FREDLAFLQGKAREF']
+
+        for i in range(len(found_regions)):
+            self.assertEqual(exp_region_names[i], found_regions[i].region_name)
+            self.assertEqual(exp_pos_from_cds[i], found_regions[i].pos_from_cds)
+            self.assertEqual(exp_pos_from_qstart[i], found_regions[i].pos_from_qstart)
+            self.assertEqual(exp_pos_from_gstart[i], found_regions[i].pos_from_gstart)
+            self.assertEqual(exp_pos_from_pstart[i], found_regions[i].pos_from_pstart)
+            self.assertEqual(expected_proteins[i], found_regions[i].get_sequence('prot'))
 
     def testSIVInput(self):
-        expected_seq = 'GTATTCAAATTTGGATTACCCAGAATAGTGGCCAGACAGATAGTAGACACCTGTGATAAATGTCATCAGAAAGGAGAGG' \
-                       'CTATACATGGGCAGGCAAATTCAGATCTAGGGACTTGGCAAAT'
-        result_seq = retrieve('siv', reference_sequence, 'Integrase', 67, 188)
-        self.assertEqual(expected_seq, result_seq)
+        ref_regions = set_regions('siv', self.siv_nt_seq, TEST_SIV_NT_COORDS, self.siv_aa_seq, TEST_SIV_AA_COORDS)
+
+        result = retrieve('siv', 'nucl', ref_regions, 'Nef', None, 20, 80)
+        result_region = result[0]
+        expected_region = 'Nef'
+        expected_seq = 'TGAGGCGGTCCAGGCCGTCTGGAGATCTGCGACAGAGACTCTTGCGGGCGCGTGGGGAGAC'
+        self.assertEqual(expected_region, result_region.region_name)
+        self.assertEqual(expected_seq, result_region.get_sequence('nucl'))
+
+        found_regions = result[1]
+        exp_region_names = ['Env(gp160)',       'gp41',            'Nef']
+        exp_pos_from_cds = [[2493, 2553],       [918, 978],        [20, 80]]
+        exp_pos_from_qstart = [[1, 61],         [1, 61],           [1, 61]]
+        exp_pos_from_gstart = [[9096, 9156],    [9096, 9156],      [9096, 9156]]
+        exp_pos_from_pstart = [[832, 851],      [307, 326],        [7, 27]]
+        expected_proteins = ['VWRSATETLAGAWGD', 'VWRSATETLAGAWGD', 'SGDLRQRLLRARGE']
+
+        for i in range(len(found_regions)):
+            self.assertEqual(exp_region_names[i], found_regions[i].region_name)
+            self.assertEqual(exp_pos_from_cds[i], found_regions[i].pos_from_cds)
+            self.assertEqual(exp_pos_from_qstart[i], found_regions[i].pos_from_qstart)
+            self.assertEqual(exp_pos_from_gstart[i], found_regions[i].pos_from_gstart)
+            self.assertEqual(exp_pos_from_pstart[i], found_regions[i].pos_from_pstart)
+            self.assertEqual(expected_proteins[i], found_regions[i].get_sequence('prot'))
 
     def testBeyondEnd(self):
         reference_sequence = get_ref_seq('hiv', 'nucl')
@@ -833,11 +864,8 @@ class TestRetrieve(unittest.TestCase):
     def tearDown(self):
         self.hiv_nt_seq_file.close()
         self.hiv_aa_seq_file.close()
-        self.hiv_nt_coords.close()
-        self.hiv_aa_coords.close()
-
-        self.siv_genome_file.close()
-        self.siv_prot_file.close()
+        self.siv_nt_seq_file.close()
+        self.siv_aa_seq_file.close()
 
 
 class TestHandleArgs(unittest.TestCase):

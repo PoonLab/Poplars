@@ -123,6 +123,3 @@ class TestRateRatio(unittest.TestCase):
         self.assertEqual(expected, result)
 
 
-class testMakeDataFile(unittest.TestCase):
-    def test(self):
-        pass
