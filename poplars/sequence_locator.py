@@ -604,19 +604,6 @@ def retrieve(virus, base, ref_regions, region, outfile=None, start_offset=1, end
         else:
             end = length + 1
 
-        # # Handles global and local start coordinates
-        # if start_offset <= region_start:
-        #     start = region_start
-        # else:
-        #     start = region_start + (start_offset - region_start)
-        #
-        # # Handles global and local end coordinates
-        # if end_offset == 'end' or end_offset > region_end:
-        #     end = region_end
-        # else:
-        #     end = region_end + (region_end - end_offset)
-
-        # Create a GenomeRegion object for the query
         if ref_region.region_name == region:
             query_region = GenomeRegion(region)
             query_region.set_coords([start, end], base)      # Set global coordinates

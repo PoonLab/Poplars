@@ -1139,3 +1139,7 @@ class TestHandleArgs(unittest.TestCase):
         self.siv_default_prot.close()
         self.siv_test_genome.close()
         self.siv_test_prot.close()
+
+
+if __name__ == '__main__':
+    unittest.main()
