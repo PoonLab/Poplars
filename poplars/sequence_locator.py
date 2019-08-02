@@ -29,16 +29,19 @@ class GenomeRegion:
                     genome start (gstart), query start (qstart), region start (rstart), and protein start (pstart)
     """
 
-    def __init__(self, region_name):
+    def __init__(self, region_name, global_ncoords=None,  local_ncoords=None,
+                 nt_seq=None, global_pcoords=None, local_pcoords=None, aa_seq=None):
         """
         Stores information about each genomic region
         :param region_name: The name of the genomic region
         """
         self.region_name = region_name
-        self.local_ncoords, self.global_ncoords = None, None
-        self.nt_seq = None
-        self.local_pcoords, self.global_pcoords = None, None
-        self.aa_seq = None
+        self.global_ncoords = global_ncoords
+        self.local_ncoords = local_ncoords
+        self.nt_seq = nt_seq
+        self.global_pcoords = global_pcoords
+        self.local_pcoords = local_pcoords
+        self.aa_seq = aa_seq
         self.rel_pos = {'CDS': [], 'gstart': [], 'qstart': [], 'rstart': [], 'pstart': []}
         self.codon_aln = ''
 
@@ -91,7 +94,7 @@ class GenomeRegion:
         """
         Gives the position of a sequence relative to the start of the coding sequence
         """
-        if self.region_name is not '5\'LTR':
+        if self.region_name != '5\'LTR':
             if virus == 'hiv':
                 cds_start = 790
             else:
@@ -129,7 +132,10 @@ class GenomeRegion:
         end_offset = self.local_ncoords[1] - region.local_ncoords[1]
         self.rel_pos['rstart'] = [start_offset, end_offset]
 
-    def set_pos_from_qstart(self, query):
+    def set_pos_from_qstart(self, query, base):
+        if self.local_ncoords is None or self.local_pcoords is None:
+            self.set_local_coords(self.get_global_coords(base), base)
+
         start_offset = query.local_ncoords[0] - self.local_ncoords[0]
         end_offset = query.local_ncoords[1] - self.local_ncoords[1]
         self.rel_pos['qstart'] = [start_offset, end_offset]
@@ -213,12 +219,13 @@ def set_regions(virus, nt_reference, nt_coords, aa_reference, aa_coords):
             nucl_coords = [int(nt_line[1]), int(nt_line[2])]
 
             seq_region = GenomeRegion(nt_line[0])
-            seq_region.set_seq_from_ref(nt_reference, 'nucl')
 
             # Set global and local nucleotide coordinates
             seq_region.set_global_coords(nucl_coords, 'nucl')
             local_coords = seq_region.global_to_local_index(nucl_coords, 'nucl')
             seq_region.set_local_coords(local_coords, 'nucl')
+
+            seq_region.set_seq_from_ref(nt_reference, 'nucl')
 
             # Set relative positions
             seq_region.set_pos_from_cds(virus)
@@ -240,12 +247,13 @@ def set_regions(virus, nt_reference, nt_coords, aa_reference, aa_coords):
         for i in range(len(prot_names)):
             for seq_region in genome_regions:
                 if prot_names[i] in seq_region.region_name:
-                    seq_region.set_seq_from_ref(aa_reference, 'prot')
 
                     # Set global and local protein coordinates
                     seq_region.set_global_coords(prot_coords[i], 'prot')
                     local_coords = seq_region.global_to_local_index(prot_coords[i], 'prot')
                     seq_region.set_local_coords(local_coords, 'prot')
+
+                    seq_region.set_seq_from_ref(aa_reference, 'prot')
 
                     seq_region.set_pos_from_pstart(virus)
 
@@ -460,7 +468,7 @@ def find_matches(virus, base, ref_regions, match_coordinates):
                     # Set relative positions
                     query_region.set_pos_from_cds(virus)
                     query_region.set_pos_from_gstart()
-                    query_region.set_pos_from_qstart(ref_region)
+                    query_region.set_pos_from_qstart(ref_region, base)
                     query_region.set_pos_from_rstart(ref_region)
                     query_region.set_pos_from_pstart(virus)
 
@@ -485,7 +493,7 @@ def set_protein_equivalents(query_reg, ref_regions):
     non_coding = ["5'LTR", "TAR", "3'LTR"]
     for ref_reg in ref_regions:
         if ref_reg.region_name == query_reg.region_name and ref_reg.region_name not in non_coding:
-            if ref_reg.codon_aln is not None and query_reg.aa_coords is not None:
+            if ref_reg.codon_aln is not None and query_reg.global_pcoords is not None:
                 prot_equiv = ref_reg.codon_aln[query_reg.global_ncoords[0]: query_reg.global_ncoords[1]]
                 prot_equiv = re.sub('[-]', '', prot_equiv)
                 query_reg.set_aa_seq(prot_equiv)
