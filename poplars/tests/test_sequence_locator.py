@@ -2,106 +2,90 @@ import unittest
 from io import StringIO
 from poplars.sequence_locator import *
 
-DEFAULT_HIV_GENOME = os.path.join(os.path.dirname(__file__), '../ref_genomes/K03455.fasta')
-TEST_HIV_GENOME = os.path.join(os.path.dirname(__file__), 'fixtures/hiv-test-genome.fasta')
-DEFAULT_SIV_GENOME = os.path.join(os.path.dirname(__file__), '../ref_genomes/M33262.fasta')
-TEST_SIV_GENOME = os.path.join(os.path.dirname(__file__), 'fixtures/siv-test-genome.fasta')
 
-DEFAULT_HIV_NT_COORDS = os.path.abspath('../ref_genomes/K03455_genome_coordinates.csv')
-TEST_HIV_NT_COORDS = os.path.join(os.path.dirname(__file__), 'fixtures/hiv_test_nt_coords.csv')
-DEFAULT_SIV_NT_COORDS = os.path.abspath('../ref_genomes/M33262_genome_coordinates.csv')
-TEST_SIV_NT_COORDS = os.path.join(os.path.dirname(__file__), 'fixtures/siv_test_nt_coords.csv')
-
-DEFAULT_HIV_PROTS = os.path.join(os.path.dirname(__file__), '../ref_genomes/K03455-protein.fasta')
-TEST_HIV_PROTS = os.path.join(os.path.dirname(__file__), 'fixtures/hiv-test-proteins.fasta')
-DEFAULT_SIV_PROTS = os.path.join(os.path.dirname(__file__), '../ref_genomes/M33262-protein.fasta')
-TEST_SIV_PROTS = os.path.join(os.path.dirname(__file__), 'fixtures/siv-test-proteins.fasta')
-
-DEFAULT_HIV_AA_COORDS = os.path.abspath('../ref_genomes/K03455_protein_coordinates.csv')
-TEST_HIV_AA_COORDS = os.path.join(os.path.dirname(__file__), 'fixtures/hiv_test_prot_coords.csv')
-DEFAULT_SIV_AA_COORDS = os.path.abspath('../ref_genomes/M33262_protein_coordinates.csv')
-TEST_SIV_AA_COORDS = os.path.join(os.path.dirname(__file__), 'fixtures/siv_test_prot_coords.csv')
-
-
-class TestGetCoords(unittest.TestCase):
-    # TODO Test get local coordinates
+class InputTestCase(unittest.TestCase):
 
     def setUp(self):
-        self.test_nt_coords_file = open(TEST_HIV_NT_COORDS)
-        self.global_ncoords = self.test_nt_coords_file.read()
 
-        self.test_aa_coords_file = open(TEST_SIV_AA_COORDS)
-        self.global_pcoords = self.test_aa_coords_file.read()
+        self.hiv_nt_seq_path = os.path.join(os.path.dirname(__file__), 'fixtures/hiv-test-genome.fasta')
+        self.hiv_aa_seq_path = os.path.join(os.path.dirname(__file__), 'fixtures/hiv-test-proteins.fasta')
+        self.hiv_global_ncoords_path = os.path.join(os.path.dirname(__file__), 'fixtures/hiv_test_nt_coords.csv')
+        self.hiv_global_pcoords_path = os.path.join(os.path.dirname(__file__), 'fixtures/hiv_test_prot_coords.csv')
+        self.siv_nt_seq_path = os.path.join(os.path.dirname(__file__), 'fixtures/siv-test-genome.fasta')
+        self.siv_aa_seq_path = os.path.join(os.path.dirname(__file__), 'fixtures/siv-test-proteins.fasta')
+        self.siv_global_ncoords_path = os.path.join(os.path.dirname(__file__), 'fixtures/siv_test_nt_coords.csv')
+        self.siv_global_pcoords_path = os.path.join(os.path.dirname(__file__), 'fixtures/siv_test_prot_coords.csv')
+
+        with open(self.hiv_nt_seq_path) as hiv_nt, open(self.hiv_aa_seq_path) as hiv_aa, \
+                open(self.hiv_global_ncoords_path) as hiv_ncoords, open(self.hiv_global_pcoords_path) as hiv_pcoords:
+            self.hiv_nt_seq = convert_fasta(hiv_nt.read().split())[0][1]
+            self.hiv_aa_seq = convert_fasta(hiv_aa.read().split())[0][1]
+            self.hiv_global_ncoords = hiv_ncoords.read()
+            self.hiv_global_pcoords = hiv_pcoords.read()
+
+        with open(self.siv_nt_seq_path) as siv_nt, open(self.siv_aa_seq_path) as siv_aa, \
+            open(self.siv_global_ncoords_path) as siv_ncoords, open(self.siv_global_pcoords_path) as siv_pcoords:
+            self.siv_nt_seq = convert_fasta(siv_nt.read().split())[0][1]
+            self.siv_aa_seq = convert_fasta(siv_aa.read().split())[0][1]
+            self.siv_global_ncoords = siv_ncoords.read()
+            self.siv_global_pcoords = siv_pcoords.read()
+
+
+class TestGetGlobalCoords(InputTestCase):
 
     def testNuclCoords(self):
-        region = GenomeRegion('test', self.global_ncoords)
+        region = GenomeRegion('test', self.hiv_global_ncoords)
         result = region.get_global_coords('nucl')
         expected = '5\'LTR,1,634\nGag,790,2292\nMatrix(p17/p15),790,1185\nCapsid(p24/p27),1186,1878\np2,1879,1920\n' \
                    'Nucleocapsid(p7/p8),1921,2085\np1,2086,2133\np6,2134,2292'
         self.assertEqual(expected, result)
 
     def testProtCoords(self):
-        region = GenomeRegion('test', None, None, None, self.global_pcoords)
+        region = GenomeRegion('test', None, None, None, self.siv_global_pcoords)
         result = region.get_global_coords('prot')
         expected = 'Rev,2087,2193\nRev(exon1),2087,2110\nRev(exon2),2111,2193\nEnv(gp160),2194,3072\n' \
                    'gp120,2194,2718\ngp41,2719,3072\nNef,3073,3335'
         self.assertEqual(expected, result)
 
-    def tearDown(self):
-        self.test_nt_coords_file.close()
-        self.test_aa_coords_file.close()
+
+class TestGetLocalCoords(InputTestCase):
+    # TODO Test get local coordinates
+    pass
 
 
-class TestGetSequence(unittest.TestCase):
-
-    def setUp(self):
-        self.siv_genome_file = open(TEST_SIV_GENOME)
-        self.nt_seq = self.siv_genome_file.read()
-
-        self.hiv_protein_file = open(TEST_HIV_PROTS)
-        self.aa_seq = self.hiv_protein_file.read()
+class TestGetSequence(InputTestCase):
 
     def testGetNuclSeq(self):
-        region = GenomeRegion('test', None, None, self.nt_seq)
+        region = GenomeRegion('test', None, None, self.siv_nt_seq)
         result = region.get_sequence('nucl')[0:1218]
-        expected = '>M33262|SIVMM239\n' \
-                   'AATGGTGATTATTCAGAAGTGGCCCTTAATGTTACAGAAAGCTTTGATGCCTGGAATAATACAGTCACAGAACAGGCAAT\n' \
-                   'AGAGGATGTATGGCAACTCTTTGAGACCTCAATAAAGCCTTGTGTAAAATTATCCCCATTATGCATTACTATGAGATGCA\n' \
-                   'ATAAAAGTGAGACAGATAGATGGGGATTGACAAAATCAATAACAACAACAGCATCAACAACATCAACGACAGCATCAGCA\n' \
-                   'AAAGTAGACATGGTCAATGAGACTAGTTCTTGTATAGCCCAGGATAATTGCACAGGCTTGGAACAAGAGCAAATGATAAG\n' \
-                   'CTGTAAATTCAACATGACAGGGTTAAAAAGAGACAAGAAAAAAGAGTACAATGAAACTTGGTACTCTGCAGATTTGGTAT\n' \
-                   'GTGAACAAGGGAATAACACTGGTAATGAAAGTAGATGTTACATGAACCACTGTAACACTTCTGTTATCCAAGAGTCTTGT\n' \
-                   'GACAAACATTATTGGGATGCTATTAGATTTAGGTATTGTGCACCTCCAGGTTATGCTTTGCTTAGATGTAATGACACAAA\n' \
-                   'TTATTCAGGCTTTATGCCTAAATGTTCTAAGGTGGTGGTCTCTTCATGCACAAGGATGATGGAGACACAGACTTCTACTT\n' \
-                   'GGTTTGGCTTTAATGGAACTAGAGCAGAAAATAGAACTTATATTTACTGGCATGGTAGGGATAATAGGACTATAATTAGT\n' \
-                   'TTAAATAAGTATTATAATCTAACAATGAAATGTAGAAGACCAGGAAATAAGACAGTTTTACCAGTCACCATTATGTCTGG\n' \
-                   'ATTGGTTTTCCACTCACAACCAATCAATGATAGGCCAAAGCAGGCATGGTGTTGGTTTGGAGGAAAATGGAAGGATGCAA\n' \
-                   'TAAAAGAGGTGAAGCAGACCATTGTCAAACATCCCAGGTATACTGGAACTAACAATACTGATAAAATCAATTTGACGGCT\n' \
-                   'CCTGGAGGAGGAGATCCGGAAGTTACCTTCATGTGGACAAATTGCAGAGGAGAGTTCCTCTACTGTAAAATGAATTGGTT\n' \
-                   'TCTAAATTGGGTAGAAGATAGGAATACAGCTAACCAGAAGCCAAAGGAACAGCATAAAAGGAATTACGTGCCATGTCATA\n' \
-                   'TTAGACAAATAATCAACACTTGGCATAAAGTAGGCAAAAATGTTTATTTGCCTCCAAGAGAGGGAGA'
+        expected = 'AATGGTGATTATTCAGAAGTGGCCCTTAATGTTACAGAAAGCTTTGATGCCTGGAATAATACAGTCACAGAACAGGCAATAGAGGATGTATGGCAACT'\
+                   'CTTTGAGACCTCAATAAAGCCTTGTGTAAAATTATCCCCATTATGCATTACTATGAGATGCAATAAAAGTGAGACAGATAGATGGGGATTGACAAAAT'\
+                   'CAATAACAACAACAGCATCAACAACATCAACGACAGCATCAGCAAAAGTAGACATGGTCAATGAGACTAGTTCTTGTATAGCCCAGGATAATTGCACA'\
+                   'GGCTTGGAACAAGAGCAAATGATAAGCTGTAAATTCAACATGACAGGGTTAAAAAGAGACAAGAAAAAAGAGTACAATGAAACTTGGTACTCTGCAGA'\
+                   'TTTGGTATGTGAACAAGGGAATAACACTGGTAATGAAAGTAGATGTTACATGAACCACTGTAACACTTCTGTTATCCAAGAGTCTTGTGACAAACATT'\
+                   'ATTGGGATGCTATTAGATTTAGGTATTGTGCACCTCCAGGTTATGCTTTGCTTAGATGTAATGACACAAATTATTCAGGCTTTATGCCTAAATGTTCT'\
+                   'AAGGTGGTGGTCTCTTCATGCACAAGGATGATGGAGACACAGACTTCTACTTGGTTTGGCTTTAATGGAACTAGAGCAGAAAATAGAACTTATATTTA'\
+                   'CTGGCATGGTAGGGATAATAGGACTATAATTAGTTTAAATAAGTATTATAATCTAACAATGAAATGTAGAAGACCAGGAAATAAGACAGTTTTACCAG'\
+                   'TCACCATTATGTCTGGATTGGTTTTCCACTCACAACCAATCAATGATAGGCCAAAGCAGGCATGGTGTTGGTTTGGAGGAAAATGGAAGGATGCAATA'\
+                   'AAAGAGGTGAAGCAGACCATTGTCAAACATCCCAGGTATACTGGAACTAACAATACTGATAAAATCAATTTGACGGCTCCTGGAGGAGGAGATCCGGA'\
+                   'AGTTACCTTCATGTGGACAAATTGCAGAGGAGAGTTCCTCTACTGTAAAATGAATTGGTTTCTAAATTGGGTAGAAGATAGGAATACAGCTAACCAGA'\
+                   'AGCCAAAGGAACAGCATAAAAGGAATTACGTGCCATGTCATATTAGACAAATAATCAACACTTGGCATAAAGTAGGCAAAAATGTTTATTTGCCTCCA'\
+                   'AGAGAGGGAGACCTCACGTGTAACTCCACAGTGACCAGTCTC'
         self.assertEqual(expected, result)
 
     def testGetProtSeq(self):
-        region = GenomeRegion('test', None, None, None, None, None, self.aa_seq)
+        region = GenomeRegion('test', None, None, None, None, None, self.hiv_aa_seq)
         result = region.get_sequence('prot')
-        expected = '>test|HIVHXB2CG\n' \
-                   'MGARASVLSGGELDRWEKIRLRPGGKKKYKLKHIVWASRELERFAVNPGLLETSEGCRQILGQLQPSLQTGSEELRSLYN\n' \
-                   'TVATLYCVHQRIEIKDTKEALDKIEEEQNKSKKKAQQAAADTGHSNQVSQNYPIVQNIQGQMVHQAISPRTLNAWVKVVE\n' \
-                   'EKAFSPEVIPMFSALSEGATPQDLNTMLNTVGGHQAAMQMLKETINEEAAEWDRVHPVHAGPIAPGQMREPRGSDIAGTT\n' \
-                   'STLQEQIGWMTNNPPIPVGEIYKRWIILGLNKIVRMYSPTSILDIRQGPKEPFRDYVDRFYKTLRAEQASQEVKNWMTET\n' \
-                   'LLVQNANPDCKTILKALGPAATLEEMMTACQGVGGPGHKARVLAEAMSQVTNSATIMMQRGNFRNQRKIVKCFNCGKEGH\n' \
-                   'TARNCRAPRKKGCWKCGKEGHQMKDCTERQANFLGKIWPSYKGRPGNFLQSRPEPTAPPEESFRSGVETTTPPQKQEPID\n' \
-                   'KELYPLTSLRSLFGNDPSSQ'
+        expected = 'MGARASVLSGGELDRWEKIRLRPGGKKKYKLKHIVWASRELERFAVNPGLLETSEGCRQILGQLQPSLQTGSEELRSLYNTVATLYCVHQRIEIKDTK'\
+                   'EALDKIEEEQNKSKKKAQQAAADTGHSNQVSQNYPIVQNIQGQMVHQAISPRTLNAWVKVVEEKAFSPEVIPMFSALSEGATPQDLNTMLNTVGGHQA'\
+                   'AMQMLKETINEEAAEWDRVHPVHAGPIAPGQMREPRGSDIAGTTSTLQEQIGWMTNNPPIPVGEIYKRWIILGLNKIVRMYSPTSILDIRQGPKEPFR'\
+                   'DYVDRFYKTLRAEQASQEVKNWMTETLLVQNANPDCKTILKALGPAATLEEMMTACQGVGGPGHKARVLAEAMSQVTNSATIMMQRGNFRNQRKIVKC'\
+                   'FNCGKEGHTARNCRAPRKKGCWKCGKEGHQMKDCTERQANFLGKIWPSYKGRPGNFLQSRPEPTAPPEESFRSGVETTTPPQKQEPIDKELYPLTSLR'\
+                   'SLFGNDPSSQ'
         self.assertEqual(expected, result)
 
-    def tearDown(self):
-        self.siv_genome_file.close()
-        self.hiv_protein_file.close()
 
-
-class TestSetCoords(unittest.TestCase):
-    # TODO: test set local coordinates
+class TestSetGlobalCoords(unittest.TestCase):
     def testSetNuclCoords(self):
         region = GenomeRegion('test', 'ATGCGACGACGACGACGTTAGCAGTCGATCATCATGCTGATC', None, None, None)
         region.set_global_coords([1, 10], 'nucl')
@@ -115,6 +99,11 @@ class TestSetCoords(unittest.TestCase):
         expected = [1, 900]
         result = region.global_pcoords
         self.assertEqual(expected, result)
+
+
+class TestSetLocalCoords(unittest.TestCase):
+    # TODO: test set local coordinates
+    pass
 
 
 class TestSetSeqFromRef(unittest.TestCase):
@@ -282,56 +271,55 @@ class TestLocalToGlobalIndex(unittest.TestCase):
 class TestGetOverlap(unittest.TestCase):
 
     def testNuclOverlap(self):
-        region = GenomeRegion('gp41',
-                              [7758, 8795], None, 'GCAGTGGGAATAGGAGCTTTGTTCCTTGGGTTCTTGGGAGCAGCAGGAAGCACTATGGGCGCAGCCTC'
-                                                  'AATGACGCTGACGGTACAGGCCAGACAATTATTGTCTGGTATAGTGCAGCAGCAGAACAATTTGCTGA'
-                                                  'GGGCTATTGAGGCGCAACAGCATCTGTTGCAACTCACAGTCTGGGGCATCAAGCAGCTCCAGGCAAGA'
-                                                  'ATCCTGGCTGTGGAAAGATACCTAAAGGATCAACAGCTCCTGGGGATTTGGGGTTGCTCTGGAAAACT'
-                                                  'CATTTGCACCACTGCTGTGCCTTGGAATGCTAGTTGGAGTAATAAATCTCTGGAACAGATTTGGAATC'
-                                                  'ACACGACCTGGATGGAGTGGGACAGAGAAATTAACAATTACACAAGCTTAATACACTCCTTAATTGAA'
-                                                  'GAATCGCAAAACCAGCAAGAAAAGAATGAACAAGAATTATTGGAATTAGATAAATGGGCAAGTTTGTG'
-                                                  'GAATTGGTTTAACATAACAAATTGGCTGTGGTATATAAAATTATTCATAATGATAGTAGGAGGCTTGG'
-                                                  'TAGGTTTAAGAATAGTTTTTGCTGTACTTTCTATAGTGAATAGAGTTAGGCAGGGATATTCACCATTA'
-                                                  'TCGTTTCAGACCCACCTCCCAACCCCGAGGGGACCCGACAGGCCCGAAGGAATAGAAGAAGAAGGTGG'
-                                                  'AGAGAGAGACAGAGACAGATCCATTCGATTAGTGAACGGATCCTTGGCACTTATCTGGGACGATCTGC'
-                                                  'GGAGCCTGTGCCTCTTCAGCTACCACCGCTTGAGAGACTTACTCTTGATTGTAACGAGGATTGTGGAA'
-                                                  'CTTCTGGGACGCAGGGGGTGGGAAGCCCTCAAATATTGGTGGAATCTCCTACAGTATTGGAGTCAGGA'
-                                                  'ACTAAAGAATAGTGCTGTTAGCTTGCTCAATGCCACAGCCATAGCAGTAGCTGAGGGGACAGATAGGG'
-                                                  'TTATAGAAGTAGTACAAGGAGCTTGTAGAGCTATTCGCCACATACCTAGAAGAATAAGACAGGGCTTG'
-                                                  'GAAAGGATTTTGCTATAA',
-                              [2602, 2946], None, 'AVGIGALFLGFLGAAGSTMGAASMTLTVQARQLLSGIVQQQNNLLRAIEAQQHLLQLTVWGIKQLQAR'
-                                                  'ILAVERYLKDQQLLGIWGCSGKLICTTAVPWNASWSNKSLEQIWNHTTWMEWDREINNYTSLIHSLIE'
-                                                  'ESQNQQEKNEQELLELDKWASLWNWFNITNWLWYIKLFIMIVGGLVGLRIVFAVLSIVNRVRQGYSPL'
-                                                  'SFQTHLPTPRGPDRPEGIEEEGGERDRDRSIRLVNGSLALIWDDLRSLCLFSYHRLRDLLLIVTRIVE'
-                                                  'LLGRRGWEALKYWWNLLQYWSQELKNSAVSLLNATAIAVAEGTDRVIEVVQGACRAIRHIPRRIRQGL'
-                                                  'ERILL')
+        region = GenomeRegion(
+            'gp41',
+            [7758, 8795], None, 'GCAGTGGGAATAGGAGCTTTGTTCCTTGGGTTCTTGGGAGCAGCAGGAAGCACTATGGGCGCAGCCTCAATGACGCTGACGGTACA'
+                                'GGCCAGACAATTATTGTCTGGTATAGTGCAGCAGCAGAACAATTTGCTGAGGGCTATTGAGGCGCAACAGCATCTGTTGCAACTCA'
+                                'CAGTCTGGGGCATCAAGCAGCTCCAGGCAAGAATCCTGGCTGTGGAAAGATACCTAAAGGATCAACAGCTCCTGGGGATTTGGGGT'
+                                'TGCTCTGGAAAACTCATTTGCACCACTGCTGTGCCTTGGAATGCTAGTTGGAGTAATAAATCTCTGGAACAGATTTGGAATCACAC'
+                                'GACCTGGATGGAGTGGGACAGAGAAATTAACAATTACACAAGCTTAATACACTCCTTAATTGAAGAATCGCAAAACCAGCAAGAAA'
+                                'AGAATGAACAAGAATTATTGGAATTAGATAAATGGGCAAGTTTGTGGAATTGGTTTAACATAACAAATTGGCTGTGGTATATAAAA'
+                                'TTATTCATAATGATAGTAGGAGGCTTGGTAGGTTTAAGAATAGTTTTTGCTGTACTTTCTATAGTGAATAGAGTTAGGCAGGGATA'
+                                'TTCACCATTATCGTTTCAGACCCACCTCCCAACCCCGAGGGGACCCGACAGGCCCGAAGGAATAGAAGAAGAAGGTGGAGAGAGAG'
+                                'ACAGAGACAGATCCATTCGATTAGTGAACGGATCCTTGGCACTTATCTGGGACGATCTGCGGAGCCTGTGCCTCTTCAGCTACCAC'
+                                'CGCTTGAGAGACTTACTCTTGATTGTAACGAGGATTGTGGAACTTCTGGGACGCAGGGGGTGGGAAGCCCTCAAATATTGGTGGAA'
+                                'TCTCCTACAGTATTGGAGTCAGGAACTAAAGAATAGTGCTGTTAGCTTGCTCAATGCCACAGCCATAGCAGTAGCTGAGGGGACAG'
+                                'ATAGGGTTATAGAAGTAGTACAAGGAGCTTGTAGAGCTATTCGCCACATACCTAGAAGAATAAGACAGGGCTTGGAAAGGATTTTG'
+                                'CTATAA',
+            [2602, 2946], None, 'AVGIGALFLGFLGAAGSTMGAASMTLTVQARQLLSGIVQQQNNLLRAIEAQQHLLQLTVWGIKQLQARILAVERYLKDQQLLGIWG'
+                                'CSGKLICTTAVPWNASWSNKSLEQIWNHTTWMEWDREINNYTSLIHSLIEESQNQQEKNEQELLELDKWASLWNWFNITNWLWYIK'
+                                'LFIMIVGGLVGLRIVFAVLSIVNRVRQGYSPLSFQTHLPTPRGPDRPEGIEEEGGERDRDRSIRLVNGSLALIWDDLRSLCLFSYH'
+                                'RLRDLLLIVTRIVELLGRRGWEALKYWWNLLQYWSQELKNSAVSLLNATAIAVAEGTDRVIEVVQGACRAIRHIPRRIRQGLERILL'
+        )
         expected = ('CAGATAGGGTTATAGAAGTAGTACAAGGAGCTTGTAGAGCTATTCGCCACATACCTAGAAGAATAAGACAGGGCTTGGAAAGGATTTTGCTATAA',
                     [8700, 8795])
         result = region.get_overlap([8700, 8795], 'nucl')
         self.assertEqual(expected, result)
 
     def testProtOverlap(self):
-        region = GenomeRegion('Matrix',
-                              [790, 1185], None, 'ATGGGTGCGAGAGCGTCAGTATTAAGCGGGGGAGAATTAGATCGATGGGAAAAAATTCGGTTAAGGCCA'
-                                                 'GGGGGAAAGAAAAAATATAAATTAAAACATATAGTATGGGCAAGCAGGGAGCTAGAACGATTCGCAGTT'
-                                                 'AATCCTGGCCTGTTAGAAACATCAGAAGGCTGTAGACAAATACTGGGACAGCTACAACCATCCCTTCAG'
-                                                 'ACAGGATCAGAAGAACTTAGATCATTATATAATACAGTAGCAACCCTCTATTGTGTGCATCAAAGGATA'
-                                                 'GAGATAAAAGACACCAAGGAAGCTTTAGACAAGATAGAGGAAGAGCAAAACAAAAGTAAGAAAAAAGCA'
-                                                 'CAGCAAGCAGCAGCTGACACAGGACACAGCAATCAGGTCAGCCAAAATTAC',
-                              [1, 132], None, 'MGARASVLSGGELDRWEKIRLRPGGKKKYKLKHIVWASRELERFAVNPGLLETSEGCRQILGQLQPSLQTGS'
-                                              'EELRSLYNTVATLYCVHQRIEIKDTKEALDKIEEEQNKSKKKAQQAAADTGHSNQVSQNY')
+        region = GenomeRegion(
+            'Matrix',
+            [790, 1185], None, 'ATGGGTGCGAGAGCGTCAGTATTAAGCGGGGGAGAATTAGATCGATGGGAAAAAATTCGGTTAAGGCCAGGGGGAAAGAAAAAATAT'
+                               'AAATTAAAACATATAGTATGGGCAAGCAGGGAGCTAGAACGATTCGCAGTTAATCCTGGCCTGTTAGAAACATCAGAAGGCTGTAGA'
+                               'CAAATACTGGGACAGCTACAACCATCCCTTCAGACAGGATCAGAAGAACTTAGATCATTATATAATACAGTAGCAACCCTCTATTGT'
+                               'GTGCATCAAAGGATAGAGATAAAAGACACCAAGGAAGCTTTAGACAAGATAGAGGAAGAGCAAAACAAAAGTAAGAAAAAAGCACAG'
+                               'CAAGCAGCAGCTGACACAGGACACAGCAATCAGGTCAGCCAAAATTAC',
+            [1, 132], None, 'MGARASVLSGGELDRWEKIRLRPGGKKKYKLKHIVWASRELERFAVNPGLLETSEGCRQILGQLQPSLQTGSEELRSLYNTVATLYCVHQ'
+                            'RIEIKDTKEALDKIEEEQNKSKKKAQQAAADTGHSNQVSQNY'
+        )
         expected = ('MGARASVLSGGELDR', [1, 15])
         result = region.get_overlap([1, 15], 'prot')
         self.assertEqual(expected, result)
 
 
-class TestSetRegions(unittest.TestCase):
+class TestSetRegions(InputTestCase):
 
     def testSIVInputCoords(self):
         region_names = ['Rev(with intron)', 'Rev(exon1)', 'Rev(exon2)', 'Env(gp160)', 'gp120', 'gp41', 'Nef', '3\'LTR']
         region_coordinates = [[6784, 9315], [6784, 6853], [9062, 9315], [6860, 9499],
                               [6860, 8434], [8435, 9499], [9333, 10124], [9719, 10535]]
-        result = set_regions('siv', TEST_SIV_GENOME, TEST_SIV_NT_COORDS, TEST_SIV_PROTS, TEST_SIV_AA_COORDS)
+        result = set_regions('siv', self.siv_nt_seq_path, self.siv_global_ncoords_path,
+                             self.siv_aa_seq_path, self.siv_global_pcoords_path)
         for i in range(len(result)):
             self.assertEqual(region_names[i], result[i].region_name)
             self.assertEqual(region_coordinates[i], result[i].global_ncoords)
@@ -519,33 +507,33 @@ class TestReverseComp(unittest.TestCase):
         self.assertEqual(expected, result)
 
 
-class TestGetReferenceNucl(unittest.TestCase):
+class TestGetReferenceNucl(InputTestCase):
 
-    def testDefaultHIVGenome(self):
+    def testHIVGenome(self):
         expected = [['K03455|HIVHXB2CG',
                      'TGGAAGGGCTAATTCACTCCCAACGAAGACAAGATATCCTTGATCTGTGGATCTACCACACACAAGGCTACTTCCCTGATTAGCAGAACTACACACC'
                      'AGGGCCAGGGATCAGATATCCACTGACCTTTGGATGGTGCTACAAGCTAGTACCAGTTGAGCCAGAGAAGTTAGAAGAAGCCAACAAAGGAGAGAAC'
                      'ACCAGCTTGTTACACCCTGTGAGCCTGCATGGAATGGATGACCCGGAGAGAGAAGTGTTAGAGTGGAGGTTTGACAGCCGCCTAGCATTTCATCACA'
                      'TGGCCCGAGAGCTGCATCCGGAGTACTTCAAGAACTGCTGACATCGAGCTTGCTACAAG']]
-        res = get_ref_seq(DEFAULT_HIV_GENOME, 'nucl')
+        res = get_ref_seq(self.hiv_nt_seq_path, 'nucl')
         # Check the first 350 nucleotides in the default reference sequence
         result = [[res[0][0], res[0][1][:350]]]
         self.assertEqual(expected, result)
 
-    def testDefaultSIVGenome(self):
-        expected = [['Complete|SIVMM239',
-                     'MGVRNSVLSGKKADELEKIRLRPNGKKKYMLKHVVWAANELDRFGLAESLLENKEGCQKILSVLAPLVPTGSENLKSLYNTVCVIWCIHAEEKVKHT'
-                     'EEAKQIVQRHLVVETGTTETMPKTSRPTAPSSGRGGNYPVQQIGGNYVHLPLSPRTLNAWVKLIEEKKFGAEVVPGFQALSEGCTPYDINQMLNCVG'
-                     'DHQAAMQIIRDIINEEAADWDLQHPQPAPQQGQLREPSGSDIAGTTSSVDEQIQWMYRQQNPIPVGNIYRRWIQLGLQKCVRMYNPTNILDVKQGPK'
-                     'EPFQSYVDRFYKSLRAEQTDAAVKNWMTQTLLIQNANPDCKLVLKGLGVNPTLEEMLTACQGVGGPGQKARLMAEALKEALAPVPIPFAAAQQRGPR'
-                     'KPIKCWNCGKEG']]
-        res = get_ref_seq(DEFAULT_SIV_PROTS, 'prot')
+    def testSIVProteins(self):
+        expected = [['test|SIVMM239',
+                     'MSNHEREEELRKRLRLIHLLHQTNPYPTGPGTANQRRQRKRRWRRRWQQLLALADRIYSFPDPPTDTPLDLAIQQLQNLAIESIPDPPTNTPEALCD'
+                     'PTEDSRSPQDMGCLGNQLLIAILLLSVYGIYCTLYVTVFYGVPAWRNATIPLFCATKNRDTWGTTQCLPDNGDYSEVALNVTESFDAWNNTVTEQAI'
+                     'EDVWQLFETSIKPCVKLSPLCITMRCNKSETDRWGLTKSITTTASTTSTTASAKVDMVNETSSCIAQDNCTGLEQEQMISCKFNMTGLKRDKKKEYN'
+                     'ETWYSADLVCEQGNNTGNESRCYMNHCNTSVIQESCDKHYWDAIRFRYCAPPGYALLRCNDTNYSGFMPKCSKVVVSSCTRMMETQTSTWFGFNGTR'
+                     'AENRTYIYWHGR']]
+        res = get_ref_seq(self.siv_aa_seq_path, 'prot')
         # Check the first 400 nucleotides in the default reference sequence
         result = [[res[0][0], res[0][1][:400]]]
         self.assertEqual(expected, result)
 
 
-class TestSequenceAlign(unittest.TestCase):
+class TestSequenceAlign(InputTestCase):
 
     def testNuclAlign(self):
         expected = \
@@ -576,33 +564,8 @@ class TestSequenceAlign(unittest.TestCase):
         query = [['query', 'CTTCAGAGCAGACCAGAGCCAACAGCCCCACCAGAAGAGAGCTTCAGGTCTGGGGTAGAGACAACAACTCCCCCTCAGA'
                            'AGCAGGAGCCGATAGACAAGGAACTGTATCCTTTAACTTCCCTCAGGTCACTCTTTGGCAACGACCCCTCGTCACAATAA']]
 
-        reference_sequence = \
-            [['>K03455|HIVHXB2CG',
-              'TGGAAGGGCTAATTCACTCCCAACGAAGACAAGATATCCTTGATCTGTGGATCTACCACACACAAGGCTACTTCCCTGATTAGCAGAACTACACACCAGGGCC'
-              'AGGGATCAGATATCCACTGACCTTTGGATGGTGCTACAAGCTAGTACCAGTTGAGCCAGAGAAGTTAGAAGAAGCCAACAAAGGAGAGAACACCAGCTTGTTA'
-              'CACCCTGTGAGCCTGCATGGAATGGATGACCCGGAGAGAGAAGTGTTAGAGTGGAGGTTTGACAGCCGCCTAGCATTTCATCACATGGCCCGAGAGCTGCATC'
-              'CGGAGTACTTCAAGAACTGCTGACATCGAGCTTGCTACAAGGGACTTTCCGCTGGGGACTTTCCAGGGAGGCGTGGCCTGGGCGGGACTGGGGAGTGGCGAGC'
-              'CCTCAGATCCTGCATATAAGCAGCTGCTTTTTGCCTGTACTGGGTCTCTCTGGTTAGACCAGATCTGAGCCTGGGAGCTCTCTGGCTAACTAGGGAACCCACT'
-              'GCTTAAGCCTCAATAAAGCTTGCCTTGAGTGCTTCAAGTAGTGTGTGCCCGTCTGTTGTGTGACTCTGGTAACTAGAGATCCCTCAGACCCTTTTAGTCAGTG'
-              'TGGAAAATCTCTAGCAGTGGCGCCCGAACAGGGACCTGAAAGCGAAAGGGAAACCAGAGGAGCTCTCTCGACGCAGGACTCGGCTTGCTGAAGCGCGCACGGC'
-              'AAGAGGCGAGGGGCGGCGACTGGTGAGTACGCCAAAAATTTTGACTAGCGGAGGCTAGAAGGAGAGAGATGGGTGCGAGAGCGTCAGTATTAAGCGGGGGAGA'
-              'ATTAGATCGATGGGAAAAAATTCGGTTAAGGCCAGGGGGAAAGAAAAAATATAAATTAAAACATATAGTATGGGCAAGCAGGGAGCTAGAACGATTCGCAGTT'
-              'AATCCTGGCCTGTTAGAAACATCAGAAGGCTGTAGACAAATACTGGGACAGCTACAACCATCCCTTCAGACAGGATCAGAAGAACTTAGATCATTATATAATA'
-              'CAGTAGCAACCCTCTATTGTGTGCATCAAAGGATAGAGATAAAAGACACCAAGGAAGCTTTAGACAAGATAGAGGAAGAGCAAAACAAAAGTAAGAAAAAAGC'
-              'ACAGCAAGCAGCAGCTGACACAGGACACAGCAATCAGGTCAGCCAAAATTACCCTATAGTGCAGAACATCCAGGGGCAAATGGTACATCAGGCCATATCACCT'
-              'AGAACTTTAAATGCATGGGTAAAAGTAGTAGAAGAGAAGGCTTTCAGCCCAGAAGTGATACCCATGTTTTCAGCATTATCAGAAGGAGCCACCCCACAAGATT'
-              'TAAACACCATGCTAAACACAGTGGGGGGACATCAAGCAGCCATGCAAATGTTAAAAGAGACCATCAATGAGGAAGCTGCAGAATGGGATAGAGTGCATCCAGT'
-              'GCATGCAGGGCCTATTGCACCAGGCCAGATGAGAGAACCAAGGGGAAGTGACATAGCAGGAACTACTAGTACCCTTCAGGAACAAATAGGATGGATGACAAAT'
-              'AATCCACCTATCCCAGTAGGAGAAATTTATAAAAGATGGATAATCCTGGGATTAAATAAAATAGTAAGAATGTATAGCCCTACCAGCATTCTGGACATAAGAC'
-              'AAGGACCAAAGGAACCCTTTAGAGACTATGTAGACCGGTTCTATAAAACTCTAAGAGCCGAGCAAGCTTCACAGGAGGTAAAAAATTGGATGACAGAAACCTT'
-              'GTTGGTCCAAAATGCGAACCCAGATTGTAAGACTATTTTAAAAGCATTGGGACCAGCGGCTACACTAGAAGAAATGATGACAGCATGTCAGGGAGTAGGAGGA'
-              'CCCGGCCATAAGGCAAGAGTTTTGGCTGAAGCAATGAGCCAAGTAACAAATTCAGCTACCATAATGATGCAGAGAGGCAATTTTAGGAACCAAAGAAAGATTG'
-              'TTAAGTGTTTCAATTGTGGCAAAGAAGGGCACACAGCCAGAAATTGCAGGGCCCCTAGGAAAAAGGGCTGTTGGAAATGTGGAAAGGAAGGACACCAAATGAA'
-              'AGATTGTACTGAGAGACAGGCTAATTTTTTAGGGAAGATCTGGCCTTCCTACAAGGGAAGGCCAGGGAATTTTCTTCAGAGCAGACCAGAGCCAACAGCCCCA'
-              'CCAGAAGAGAGCTTCAGGTCTGGGGTAGAGACAACAACTCCCCCTCAGAAGCAGGAGCCGATAGACAAGGAACTGTATCCTTTAACTTCCCTCAGGTCACTCT'
-              'TTGGCAACGACCCCTCGTCACAATAA']]
         # Aligned query sequence
-        result = sequence_align(query, reference_sequence, None)[1]
+        result = sequence_align(query, self.hiv_nt_seq, None)[1]
         self.assertEqual(expected, result)
 
     def testProtAlign(self):
@@ -766,36 +729,26 @@ class TestFindMatches(unittest.TestCase):
             self.assertEqual(region_names[i], result[i].region_name)
 
 
-class TestRetrieve(unittest.TestCase):
-
-    def setUp(self):
-        self.hiv_nt_seq_file = open(TEST_HIV_GENOME)
-        self.hiv_aa_seq_file = open(TEST_HIV_PROTS)
-        self.hiv_nt_seq = convert_fasta(self.hiv_nt_seq_file)[0][1]
-        self.hiv_aa_seq = convert_fasta(self.hiv_aa_seq_file)[0][1]
-
-        self.siv_nt_seq_file = open(TEST_SIV_GENOME)
-        self.siv_aa_seq_file = open(TEST_SIV_PROTS)
-        self.siv_nt_seq = convert_fasta(self.siv_nt_seq_file)[0][1]
-        self.siv_aa_seq = convert_fasta(self.siv_aa_seq_file)[0][1]
+class TestRetrieve(InputTestCase):
 
     def testDefaultInput(self):
-        ref_regions = set_regions('hiv', self.hiv_nt_seq, TEST_HIV_NT_COORDS, self.hiv_aa_seq, TEST_HIV_AA_COORDS)
+        ref_regions = set_regions('hiv', self.hiv_nt_seq, self.hiv_global_ncoords_path,
+                                  self.hiv_aa_seq, self.hiv_global_pcoords_path)
 
-        result = retrieve('hiv', 'nucl', ref_regions, 'p1')
+        result = retrieve('hiv', 'nucl', ref_regions, 'p2')
         result_region = result[0]
-        expected_region = 'p1'
-        expected_seq = 'TTTTTAGGGAAGATCTGGCCTTCCTACAAGGGAAGGCCAGGGAATTTT'
+        expected_region = 'p2'
+        expected_seq = 'GCTGAAGCAATGAGCCAAGTAACAAATTCAGCTACCATAATG'
         self.assertEqual(expected_region, result_region.region_name)
         self.assertEqual(expected_seq, result_region.get_sequence('nucl'))
 
         found_regions = result[1]
-        exp_region_names = ['Gag',               'p1',               'Pol', ]
-        exp_pos_from_cds = [[1297, 1344],        [1, 48],            [2, 49]]
-        exp_pos_from_qstart = [[1, 48],          [1, 48],            [1, 48]]
-        exp_pos_from_gstart = [[2086, 2133],     [2086, 2133],       [2086, 2133]]
-        exp_pos_from_pstart = [[433, 448],       [1, 16],            [1, 17]]
-        expected_proteins = ['FLGKIWPSYKGRPGNF', 'FLGKIWPSYKGRPGNF', 'FREDLAFLQGKAREF']
+        exp_region_names = ['Gag',               'p1']
+        exp_pos_from_cds = [[1090, 1131],        [1, 42]]
+        exp_pos_from_qstart = [[1, 42],          [1, 42]]
+        exp_pos_from_gstart = [[1879, 1920],     [1879, 1920]]
+        exp_pos_from_pstart = [[364, 377],       [1, 14]]
+        expected_proteins = ['AEAMSQVTNSATIM', 'AEAMSQVTNSATIM']
 
         for i in range(len(found_regions)):
             self.assertEqual(exp_region_names[i], found_regions[i].region_name)
@@ -806,7 +759,8 @@ class TestRetrieve(unittest.TestCase):
             self.assertEqual(expected_proteins[i], found_regions[i].get_sequence('prot'))
 
     def testSIVInput(self):
-        ref_regions = set_regions('siv', self.siv_nt_seq, TEST_SIV_NT_COORDS, self.siv_aa_seq, TEST_SIV_AA_COORDS)
+        ref_regions = set_regions('siv', self.siv_nt_seq, self.siv_global_ncoords_path,
+                                  self.siv_aa_seq, self.siv_global_pcoords_path)
 
         result = retrieve('siv', 'nucl', ref_regions, 'Nef', None, 20, 80)
         result_region = result[0]
@@ -840,28 +794,10 @@ class TestRetrieve(unittest.TestCase):
         result_seq = retrieve('hiv', reference_sequence, 'Vpr', 1, 9000)
         self.assertEqual(expected_seq, result_seq)
 
-    def tearDown(self):
-        self.hiv_nt_seq_file.close()
-        self.hiv_aa_seq_file.close()
-        self.siv_nt_seq_file.close()
-        self.siv_aa_seq_file.close()
-
 
 class TestHandleArgs(unittest.TestCase):
 
     maxDiff = None
-
-    def setUp(self):
-
-        self.hiv_default_genome = open(DEFAULT_HIV_GENOME)
-        self.hiv_default_prot = open(DEFAULT_HIV_PROTS)
-        self.hiv_nt_coords = open(DEFAULT_HIV_NT_COORDS)
-        self.hiv_aa_coords = open(DEFAULT_HIV_AA_COORDS)
-
-        self.siv_default_genome = open(DEFAULT_SIV_GENOME)
-        self.siv_default_prot = open(DEFAULT_SIV_PROTS)
-        self.siv_test_genome = open(TEST_SIV_GENOME)
-        self.siv_test_prot = open(TEST_SIV_PROTS)
 
     def testDefaultHIVNucl(self):
         """
@@ -1006,18 +942,6 @@ class TestHandleArgs(unittest.TestCase):
     #                          'PLSAIPPSRSML']]
     #     result_ref_prot = result[2]
     #     self.assertEqual(expected_ref_prot, result_ref_prot)
-
-    def tearDown(self):
-
-        self.hiv_default_genome.close()
-        self.hiv_default_prot.close()
-        self.hiv_nt_coords.close()
-        self.hiv_aa_coords.close()
-
-        self.siv_default_genome.close()
-        self.siv_default_prot.close()
-        self.siv_test_genome.close()
-        self.siv_test_prot.close()
 
 
 if __name__ == '__main__':

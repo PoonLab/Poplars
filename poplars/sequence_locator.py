@@ -170,8 +170,8 @@ class GenomeRegion:
         """
         Converts a pair of local indices (relative to the region of interest) to global indices
         """
-        start = local_pair[0] + self.get_global_coords(base)[0] - 1
-        end = self.get_global_coords(base)[0] + local_pair[1] - 1
+        start = local_pair[0] + self.get_local_coords(base)[0] - 1
+        end = self.get_local_coords(base)[0] + local_pair[1] - 1
         global_pair = [start, end]
         return global_pair
 
@@ -511,12 +511,12 @@ def set_nucleotide_equivalents(query_reg, ref_regions):
     nt_equiv = None
     for ref_reg in ref_regions:
         if ref_reg.region_name == query_reg.region_name and ref_reg.codon_aln is not None:
-            if query_reg.nt_coords is not None:
+            if query_reg.global_ncoords is not None:
                 query_reg.make_codon_aln()
                 regex = re.compile(query_reg.codon_aln)
                 coords = regex.search(ref_reg.codon_aln).span()
                 nt_equiv = ref_reg.nt_seq[coords[0]: coords[1]]
-                query_reg.set_nt_seq(nt_equiv)
+                query_reg.set_sequence('nucl', nt_equiv)
 
     return nt_equiv
 
@@ -602,7 +602,7 @@ def output(query_regions, outfile=None):
                               .format(reg.rel_pos['rstart'][0], reg.rel_pos['rstart'][1]))
 
 
-def retrieve(virus, base, ref_regions, region, outfile=None, local_start=1, local_end='end'):
+def retrieve(virus, base, ref_regions, region, outfile=None, qstart=1, qend='end'):
     """
     Retrieves a sequence given its coordinates
     :param virus: The organism (HIV or SIV)
@@ -610,36 +610,35 @@ def retrieve(virus, base, ref_regions, region, outfile=None, local_start=1, loca
     :param ref_regions: A list of GenomeRegion objects
     :param region: The genomic region
     :param outfile: The file stream of the output file
-    :param local_start: <option> The start coordinate of the query region (given as local coordinate)
-    :param local_end: <option> The end coordinate of the query region (given as local coordinate)
+    :param qstart: <option> The start coordinate of the query region (given as local coordinate)
+    :param qend: <option> The end coordinate of the query region (given as local coordinate)
     :return: The genomic region defined by the starting and ending coordinates
     """
 
     query_region = None
     for ref_region in ref_regions:
-        sequence_range = ref_region.get_local_coords(base)
-        region_start, region_end = sequence_range[0], sequence_range[1]
-        length = region_end - region_start
-
-        if local_end == 'end':
-            local_end = length
 
         if ref_region.region_name == region:
+            sequence_range = ref_region.get_local_coords(base)
+            region_start, region_end = sequence_range[0], sequence_range[1]
 
-            if local_start != region_start or local_end > region_end:
+            if qend == 'end':
+                qend = region_end - region_start
+
+            if qstart < region_start or qend > region_end:
                 print("Invalid {} coordinates: {} to {}.\nValid range: {} to {}"
-                      .format(region, local_start, local_end, region_start, region_end))
+                      .format(region, qstart, qend, region_start, region_end))
                 sys.exit(0)
 
             query_region = GenomeRegion(region)
 
             # Set local and global coordinates
-            query_region.set_local_coords([local_start, local_end], base)
-            global_coords = query_region.local_to_global_index([local_start, local_end], base)
+            query_region.set_local_coords([qstart, qend], base)
+            global_coords = query_region.local_to_global_index([qstart, qend], base)
             query_region.set_global_coords(global_coords, base)
 
             # Set sequences protein and nucleotide sequences
-            seq = ref_region.get_sequence(base)[local_start: local_end + 1]
+            seq = ref_region.get_sequence(base)[qstart: qend + 1]
             query_region.set_sequence(seq, base)
 
             # Set equivalent sequence
