@@ -1,7 +1,5 @@
 # TODO: consistent reference coordinates across outputs
 
-import sys
-import subprocess
 import random
 import argparse
 import os
@@ -50,7 +48,7 @@ def update_alignment(seq, reference):
     # eliminate insertions in query relative to references
     try:
         conseq = dict(fasta)['CON_OF_CONS']
-    except:
+    except KeyError:
         print("ERROR: reference alignment in poplars.riplike does not contain CON_OF_CONS entry")
         raise
 
@@ -135,9 +133,10 @@ def riplike(seq, reference, window=400, step=5, nrep=100):
             # use nonparametric bootstrap to determine significance
             count = 0.
             n = len(best_seq)
+            sample = random.choices(best_seq, k=n*nrep)
             for rep in range(nrep):
-                boot = [best_seq[round(random.random() * (n - 1))] for _ in range(n)]
-                if sum(boot) / len(boot) < second_p:
+                boot = sample[rep: rep + n]
+                if sum(boot) / n < second_p:
                     count += 1
             quant = count / nrep
 

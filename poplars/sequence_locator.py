@@ -166,16 +166,17 @@ class GenomeRegion:
         local_pair = [start_offset, end_offset]
         return local_pair
 
-    def local_to_global_index(self, local_pair, base):
+    def local_to_global_index(self, region, coord_pair, base):
         """
         Converts a pair of local indices (relative to the region of interest) to global indices
         """
-        start = local_pair[0] + self.get_local_coords(base)[0] - 1
-        end = self.get_local_coords(base)[0] + local_pair[1] - 1
-        global_pair = [start, end]
+
+        global_start = region.get_global_coords(base)[0] + coord_pair[0] - 1
+        global_end = region.get_local_coords(base)[0] + coord_pair[1] - 1
+        global_pair = [global_start, global_end]
         return global_pair
 
-    def get_overlap(self, coord_pair, base):
+    def get_overlap(self, region, coord_pair, base):
         """
         Gets the sequence regions that overlap with the region of interest
         :param coord_pair: the coordinates
@@ -189,9 +190,9 @@ class GenomeRegion:
         start = max(local_pair[0], 0)
         end = min(local_pair[1] + 1, len(seq))
         if base == 'nucl':
-            overlap = (seq[start: end], self.local_to_global_index([start, end], base))
+            overlap = (seq[start: end], self.local_to_global_index(region, [start, end], base))
         else:
-            overlap = (seq[start - 1: end - 1], self.local_to_global_index([start, end - 1], base))
+            overlap = (seq[start - 1: end - 1], self.local_to_global_index(region, [start, end - 1], base))
         return overlap
 
 
@@ -454,7 +455,7 @@ def find_matches(virus, base, ref_regions, match_coordinates):
 
         for ref_region in ref_regions:
             if ref_region.region_name != "Complete":
-                ov_seq, ov_coord = ref_region.get_overlap([start_aln, end_aln], base)
+                ov_seq, ov_coord = ref_region.get_overlap(ref_region, [start_aln, end_aln], base)
 
                 if ov_seq:
                     query_region = GenomeRegion(ref_region.region_name)
@@ -634,7 +635,7 @@ def retrieve(virus, base, ref_regions, region, outfile=None, qstart=1, qend='end
 
             # Set local and global coordinates
             query_region.set_local_coords([qstart, qend], base)
-            global_coords = query_region.local_to_global_index([qstart, qend], base)
+            global_coords = query_region.local_to_global_index(ref_region, [qstart, qend], base)
             query_region.set_global_coords(global_coords, base)
 
             # Set sequences protein and nucleotide sequences
