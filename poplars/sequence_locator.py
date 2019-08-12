@@ -16,47 +16,30 @@ import textwrap
 class GenomeRegion:
     """
     Represents information about a genomic region
-
-    :ivar region_name: The name of the genomic region
-    :ivar local_ncoords: A list containing the local start and end indices of the nucleotide region
-    :ivar global_ncoords: A list containing the global start and end indices of the nucleotide region
-    :ivar nt_seq:  The nucleotide sequence
-    :ivar local_pcoords: A list containing the local start and end indices of the protein region
-    :ivar global_pcoords: A list containing the global start and end indices of the protein region
-    :ivar aa_seq: The amino acid sequence
-    :ivar codon_aln: Amino acid sequence aligned with the nucleotide sequence
-    :ivar rel_pos: A dictionary containing the position of the region relative to the CDS start (CDS),
-                    genome start (gstart), query start (qstart), region start (rstart), and protein start (pstart)
     """
 
-    def __init__(self, region_name, global_ncoords=None,  local_ncoords=None,
-                 nt_seq=None, global_pcoords=None, local_pcoords=None, aa_seq=None):
+    def __init__(self, region_name, ncoords=None, nt_seq=None, pcoords=None, aa_seq=None):
         """
         Stores information about each genomic region
         :param region_name: The name of the genomic region
+        :param ncoords: A list containing the global start and end indices of the nucleotide region
+        :param nt_seq:  The nucleotide sequence
+        :param pcoords: A list containing the global start and end indices of the protein region
+        :param aa_seq: The amino acid sequence
         """
         self.region_name = region_name
-        self.global_ncoords = global_ncoords
-        self.local_ncoords = local_ncoords
+        self.ncoords = ncoords
         self.nt_seq = nt_seq
-        self.global_pcoords = global_pcoords
-        self.local_pcoords = local_pcoords
+        self.pcoords = pcoords
         self.aa_seq = aa_seq
         self.rel_pos = {'CDS': [], 'gstart': [], 'qstart': [], 'rstart': [], 'pstart': []}
         self.codon_aln = ''
 
-    def get_global_coords(self, base):
+    def get_coords(self, base):
         if base == 'nucl':
-            coords = self.global_ncoords
+            coords = self.ncoords
         else:
-            coords = self.global_pcoords
-        return coords
-
-    def get_local_coords(self, base):
-        if base == 'nucl':
-            coords = self.local_ncoords
-        else:
-            coords = self.local_pcoords
+            coords = self.pcoords
         return coords
 
     def get_sequence(self, base):
@@ -66,23 +49,17 @@ class GenomeRegion:
             sequence = self.aa_seq
         return sequence
 
-    def set_global_coords(self, coord_pair, base):
+    def set_coords(self, coord_pair, base):
         if base == 'nucl':
-            self.global_ncoords = coord_pair
+            self.ncoords = coord_pair
         else:
-            self.global_pcoords = coord_pair
-
-    def set_local_coords(self, coord_pair, base):
-        if base == 'nucl':
-            self.local_ncoords = coord_pair
-        else:
-            self.local_pcoords = coord_pair
+            self.pcoords = coord_pair
 
     def set_seq_from_ref(self, sequence, base):
         if base == 'nucl':
-            self.nt_seq = sequence[self.global_ncoords[0] - 1: self.global_ncoords[1]]
+            self.nt_seq = sequence[self.ncoords[0] - 1: self.ncoords[1]]
         else:
-            self.aa_seq = sequence[self.global_pcoords[0] - 1: self.global_pcoords[1]]
+            self.aa_seq = sequence[self.pcoords[0] - 1: self.pcoords[1]]
 
     def set_sequence(self, seq, base):
         if base == 'nucl':
@@ -99,11 +76,11 @@ class GenomeRegion:
                 cds_start = 790
             else:
                 cds_start = 1309
-            self.rel_pos['CDS'].append((self.global_ncoords[0] + 1 - cds_start))
-            self.rel_pos['CDS'].append((self.global_ncoords[1] + 1 - cds_start))
+            self.rel_pos['CDS'].append((self.ncoords[0] + 1 - cds_start))
+            self.rel_pos['CDS'].append((self.ncoords[1] + 1 - cds_start))
 
     def set_pos_from_gstart(self):
-        self.rel_pos['gstart'] = self.global_ncoords
+        self.rel_pos['gstart'] = self.ncoords
 
     def set_pos_from_pstart(self, virus):
         """
@@ -128,16 +105,16 @@ class GenomeRegion:
                 self.rel_pos['pstart'] = None
 
     def set_pos_from_rstart(self, region):
-        start_offset = self.local_ncoords[0] - region.local_ncoords[0]
-        end_offset = self.local_ncoords[1] - region.local_ncoords[1]
+        start_offset = self.ncoords[0] - region.ncoords[0]
+        end_offset = self.ncoords[1] - region.ncoords[1]
         self.rel_pos['rstart'] = [start_offset, end_offset]
 
     def set_pos_from_qstart(self, query, base):
-        if self.local_ncoords is None or self.local_pcoords is None:
-            self.set_local_coords(self.get_global_coords(base), base)
+        if self.ncoords is None or self.pcoords is None:
+            self.set_coords(self.get_coords(base), base)
 
-        start_offset = query.local_ncoords[0] - self.local_ncoords[0]
-        end_offset = query.local_ncoords[1] - self.local_ncoords[1]
+        start_offset = query.local_ncoords[0] - self.ncoords[0]
+        end_offset = query.local_ncoords[1] - self.ncoords[1]
         self.rel_pos['qstart'] = [start_offset, end_offset]
 
     def make_codon_aln(self):
@@ -160,25 +137,28 @@ class GenomeRegion:
         """
         Converts a pair of global indices to local indices, relative to the sequence region of interest
         """
-        start = self.get_global_coords(base)[0] - 1         # 0-based inclusive indexing
+        start = self.get_coords(base)[0] - 1  # 0-based inclusive indexing
         start_offset = coord_pair[0] - start
         end_offset = coord_pair[1] - start
         local_pair = [start_offset, end_offset]
         return local_pair
 
-    def local_to_global_index(self, region, coord_pair, base):
+    @staticmethod
+    def local_to_global_index(region, local_pair, base):
         """
         Converts a pair of local indices (relative to the region of interest) to global indices
         """
-
-        global_start = region.get_global_coords(base)[0] + coord_pair[0] - 1
-        global_end = region.get_local_coords(base)[0] + coord_pair[1] - 1
-        global_pair = [global_start, global_end]
-        return global_pair
+        r_coords = region.get_coords(base)
+        if r_coords is not None:
+            global_start = r_coords[0] + local_pair[0] - 1
+            global_end = r_coords[0] + local_pair[1] - 1
+            global_pair = [global_start, global_end]
+            return global_pair
 
     def get_overlap(self, region, coord_pair, base):
         """
         Gets the sequence regions that overlap with the region of interest
+        :param region: the region of interest
         :param coord_pair: the coordinates
         :param base: The base of the sequence
         :return: the sequence of the overlap, and the indices of the overlap
@@ -190,10 +170,12 @@ class GenomeRegion:
         start = max(local_pair[0], 0)
         end = min(local_pair[1] + 1, len(seq))
         if base == 'nucl':
-            overlap = (seq[start: end], self.local_to_global_index(region, [start, end], base))
+            ov_seq = seq[start: end]
+            ov_coords = self.local_to_global_index(region, [start, end], base)
         else:
-            overlap = (seq[start - 1: end - 1], self.local_to_global_index(region, [start, end - 1], base))
-        return overlap
+            ov_seq = seq[start - 1: end - 1]
+            ov_coords = self.local_to_global_index(region, [start, end - 1], base)
+        return ov_seq, ov_coords
 
 
 def set_regions(virus, nt_reference, nt_coords, aa_reference, aa_coords):
@@ -222,9 +204,9 @@ def set_regions(virus, nt_reference, nt_coords, aa_reference, aa_coords):
             seq_region = GenomeRegion(nt_line[0])
 
             # Set global and local nucleotide coordinates
-            seq_region.set_global_coords(nucl_coords, 'nucl')
+            seq_region.set_coords(nucl_coords, 'nucl')
             local_coords = seq_region.global_to_local_index(nucl_coords, 'nucl')
-            seq_region.set_local_coords(local_coords, 'nucl')
+            seq_region.set_coords(local_coords, 'nucl')
 
             seq_region.set_seq_from_ref(nt_reference, 'nucl')
 
@@ -248,11 +230,10 @@ def set_regions(virus, nt_reference, nt_coords, aa_reference, aa_coords):
         for i in range(len(prot_names)):
             for seq_region in genome_regions:
                 if prot_names[i] in seq_region.region_name:
-
                     # Set global and local protein coordinates
-                    seq_region.set_global_coords(prot_coords[i], 'prot')
+                    seq_region.set_coords(prot_coords[i], 'prot')
                     local_coords = seq_region.global_to_local_index(prot_coords[i], 'prot')
-                    seq_region.set_local_coords(local_coords, 'prot')
+                    seq_region.set_coords(local_coords, 'prot')
 
                     seq_region.set_seq_from_ref(aa_reference, 'prot')
 
@@ -342,10 +323,10 @@ def get_query(base, query_file, revcomp):
     :return: A list of lists containing the sequence identifiers and the query sequences
     """
     line = query_file.readline()
-    query_file.seek(0)              # Reset pointer to beginning
+    query_file.seek(0)  # Reset pointer to beginning
 
     # Parse query sequence
-    if line.startswith('>'):        # Fasta file
+    if line.startswith('>'):  # Fasta file
         query = convert_fasta(query_file)
 
     else:
@@ -433,7 +414,7 @@ def get_region_coordinates(alignment):
     :param alignment: A list containing the header of the query sequence, and the aligned query sequence
     :return: The positions where the query sequence aligns with the reference sequences(s) with no gaps
     """
-    pat = re.compile('[A-Z]{2,}')     # Match the aligned region (minimum alignment length is 2)
+    pat = re.compile('[A-Z]{2,}')  # Match the aligned region (minimum alignment length is 2)
     coordinates = [(match.start(), match.end()) for match in pat.finditer(alignment[1])]
     return coordinates
 
@@ -445,9 +426,9 @@ def find_matches(virus, base, ref_regions, match_coordinates):
     :param base: The base of the query sequence
     :param ref_regions: A list of GenomeRegion objects
     :param match_coordinates: A list of indices where the query sequence aligns with the reference sequence
-    :return matches: A dictionary of matches, where the key is the region name and the value is the coordinates
+    :return query_regions: A dictionary of matches, with keys as the region name and values as the GenomeRegion object
     """
-    query_regions = []
+    query_regions = {}
 
     for coord in match_coordinates:
         start_aln = coord[0]
@@ -462,9 +443,9 @@ def find_matches(virus, base, ref_regions, match_coordinates):
                     query_region.set_sequence(ov_seq, base)
 
                     # Set global and local coordinates
-                    query_region.set_global_coords(ov_coord, base)
+                    query_region.set_coords(ov_coord, base)
                     local_coord = query_region.global_to_local_index(ov_coord, base)
-                    query_region.set_local_coords(local_coord, base)
+                    query_region.set_coords(local_coord, base)
 
                     # Set relative positions
                     query_region.set_pos_from_cds(virus)
@@ -478,7 +459,7 @@ def find_matches(virus, base, ref_regions, match_coordinates):
                     else:
                         set_nucleotide_equivalents(query_region, ref_regions)
 
-                    query_regions.append(query_region)
+                    query_regions[query_region.region_name] = query_region
 
     return query_regions
 
@@ -634,9 +615,9 @@ def retrieve(virus, base, ref_regions, region, outfile=None, qstart=1, qend='end
             query_region = GenomeRegion(region)
 
             # Set local and global coordinates
-            query_region.set_local_coords([qstart, qend], base)
+            query_region.set_coords([qstart, qend], base)
             global_coords = query_region.local_to_global_index(ref_region, [qstart, qend], base)
-            query_region.set_global_coords(global_coords, base)
+            query_region.set_coords(global_coords, base)
 
             # Set sequences protein and nucleotide sequences
             seq = ref_region.get_sequence(base)[qstart: qend + 1]
@@ -651,11 +632,14 @@ def retrieve(virus, base, ref_regions, region, outfile=None, qstart=1, qend='end
                 query_region.set_sequence(equiv_seq, 'nucl')
 
         if query_region is not None:
-            # TODO: sort retrieved_regions to print query_region first
-            retrieved_regions = find_matches(virus, base, ref_regions, [query_region.get_global_coords(base)])
+            retrieved_regions = find_matches(virus, base, ref_regions, [query_region.get_coords(base)])
 
-            # TODO: remove duplicate query_region
-            output(retrieved_regions, outfile)
+            # Print retrieved region first
+            output(query_region, outfile)
+
+            for retrieved_region in retrieved_regions:
+                if retrieved_region != region:
+                    output(retrieved_region, outfile)
 
     return query_region, retrieved_regions
 
