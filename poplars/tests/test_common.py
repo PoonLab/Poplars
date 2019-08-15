@@ -2,6 +2,7 @@ import unittest
 from io import StringIO
 from poplars.common import convert_fasta
 
+
 class TestConvertFasta(unittest.TestCase):
     def testSimpleConversion(self):
         # create file stream as test fixture
@@ -26,5 +27,3 @@ class TestConvertFasta(unittest.TestCase):
             ['b', 'GCTAAAAAAAAA']
         ]
         self.assertEqual(expected, result)
-        
-
