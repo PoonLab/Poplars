@@ -8,27 +8,23 @@ from poplars.common import convert_fasta
 from poplars.mafft import align
 
 
-def hamming(fasta):
+def hamming(bin_fasta):
     """
     Convert list of lists into boolean outcomes (difference between query and reference)
-    :param fasta: object returned by align()
+    :param fasta: object returned by align() converted to bit strings
     :return: dictionary of boolean lists keyed by reference label
     """
-    aln = dict(fasta)
-    assert "query" in aln, "Argument <fasta> must contain 'query' entry"
-    query = aln.pop('query')
-    _ = aln.pop('CON_OF_CONS')
+    query = bin_fasta.pop('query')
 
-    # iterate over remaining sequences as references
+    # Iterate over remaining sequences as references
     results = {}
-    for h, s in aln.items():
+    for h, s in bin_fasta.items():
         result = []
-        for i, nt1 in enumerate(query):
-            nt2 = s[i]
-            if nt1 == '-' or nt2 == '-':
+        for nt1, nt2 in zip(query, s):
+            if (nt1 | nt2) & 0B1111:
                 result.append(None)
                 continue
-            result.append(int(nt1 != nt2))
+            result.append(bin(nt1 ^ nt2))
         results.update({h: result})
 
     return results
@@ -61,17 +57,28 @@ def update_alignment(seq, reference):
     return fasta2
 
 
-def encode(sequence):
+def encode(fasta):
     """
     Encodes each nucleotide in a sequence using 4-bits
-    :param sequence: the sequence
+    :param fasta: the result of the alignment
     :return: the sequence as a bitstring where each nucleotide is encoded using a 4-bits
     """
-    seq = []
-    binary_nt = {'A': 0B0001, 'T': 0B0010, 'C': 0B0011, 'G': 0B0100, ' ': 0B0000, '-': 0B1111}
-    for nt in sequence:
-        seq.append(binary_nt[nt])
-    return seq
+    bin_fasta = dict(fasta)
+    assert "query" in bin_fasta, "Argument <fasta> must contain 'query' entry"
+    _ = bin_fasta.pop('CON_OF_CONS')
+
+    binary_nt = {' ': 0B00000, 'A': 0B00001, 'T': 0B00010, 'C': 0B00011, 'G': 0B00100,
+                 'N': 0B00101, 'R': 0B00110, 'Y': 0B00111, 'K': 0B01000, 'M': 0B01001,
+                 'S': 0B01010, 'W': 0B01011, 'B': 0B01100, 'D': 0B01101, 'H': 0B01110,
+                 'V': 0B01111, 'X': 0B10000, '-': 0B1111}
+
+    for h, s in bin_fasta.items():
+        seq = []
+        for nt in s:
+            seq.append(binary_nt[nt])
+        bin_fasta[h] = seq
+
+    return bin_fasta
 
 
 def riplike(seq, reference, window=400, step=5, nrep=100):
@@ -89,7 +96,8 @@ def riplike(seq, reference, window=400, step=5, nrep=100):
     fasta = update_alignment(seq, reference)
     query = dict(fasta)['query']  # aligned query
     seqlen = len(query)
-    ham = hamming(fasta)
+    bin_fasta = encode(fasta)
+    ham = hamming(bin_fasta)
 
     for centre in range(window // 2, seqlen - (window // 2), step):
         best_p, second_p = 1., 1.  # maximum p-distance
@@ -193,5 +201,3 @@ def main():
 
 if __name__ == '__main__':
     main()
-
-

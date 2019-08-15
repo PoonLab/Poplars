@@ -33,7 +33,7 @@ class GenomeRegion:
         self.nt_seq = nt_seq
         self.pcoords = pcoords
         self.aa_seq = aa_seq
-        self.rel_pos = {'CDS': [], 'gstart': [], 'qstart': [], 'rstart': [], 'pstart': []}
+        self.rel_pos = {'CDS': [], 'gstart': [], 'qstart': [], 'pstart': []}
         self.codon_aln = ''
 
     def get_coords(self, base):
@@ -106,18 +106,20 @@ class GenomeRegion:
             else:
                 self.rel_pos['pstart'] = None
 
-    def set_pos_from_rstart(self, region):
-        start_offset = self.ncoords[0] - region.ncoords[0]
-        end_offset = self.ncoords[1] - region.ncoords[1]
-        self.rel_pos['rstart'] = [end_offset, start_offset]
-
     def set_pos_from_qstart(self, query, base):
-        if self.ncoords is None or self.pcoords is None:
-            self.set_coords(self.get_coords(base), base)
-
-        start_offset = self.ncoords[0] - query.ncoords[0]
-        end_offset = self.ncoords[1] - query.ncoords[1]
-        self.rel_pos['qstart'] = [end_offset, start_offset]
+        """
+        Gives the position of the sequence relative to the start of the region of interest
+        :param query: The GenomeRegion objects for the query
+        :param base: The base of the sequence (nucleotide or protein)
+        :return: The position relative to the start of the region of interest
+        """
+        r_coords = self.get_coords(base)
+        r_seq = self.get_sequence(base)
+        if r_coords is not None and r_seq is not None:
+            q_coords = query.get_coords(base)
+            start_offset = r_coords[0] - q_coords[0] + 1
+            end_offset = start_offset + len(r_seq)
+            self.rel_pos['qstart'] = [start_offset, end_offset]
 
     def make_codon_aln(self):
         """
@@ -495,7 +497,6 @@ def find_matches(virus, base, ref_regions, match_coordinates):
                         query_region.set_pos_from_cds(virus)
                         query_region.set_pos_from_gstart()
                         query_region.set_pos_from_qstart(ref_region, base)
-                        query_region.set_pos_from_rstart(ref_region)
                         query_region.set_pos_from_pstart(virus)
 
                         if base == 'nucl':
@@ -587,10 +588,6 @@ def output_retrieved_region(region, outfile=None):
             print("\t\tPosition relative to query start:\t{} --> {}"
                   .format(region.rel_pos['qstart'][0], region.rel_pos['qstart'][1]))
 
-        if region.rel_pos['rstart']:
-            print("\t\tPosition relative to region start:\t{} --> {}\n"
-                  .format(region.rel_pos['rstart'][0], region.rel_pos['rstart'][1]))
-
     else:
         outfile.write("\nRetrieved Region:\t{}".format(region.region_name))
         outfile.write("\tNucleotide Sequence:\n")
@@ -623,10 +620,6 @@ def output_retrieved_region(region, outfile=None):
         if region.rel_pos['qstart']:
             outfile.write("\t\tPosition relative to query start:\t{} --> {}"
                           .format(region.rel_pos['qstart'][0], region.rel_pos['qstart'][1]))
-
-        if region.rel_pos['rstart']:
-            outfile.write("\t\tPosition relative to region start:\t{} --> {}\n"
-                          .format(region.rel_pos['rstart'][0], region.rel_pos['rstart'][1]))
 
 
 def output_overlap(overlap_regions, outfile=None):
@@ -676,10 +669,6 @@ def output_overlap(overlap_regions, outfile=None):
                 print("\t\tPosition relative to query start:\t{} --> {}"
                       .format(region.rel_pos['qstart'][0], region.rel_pos['qstart'][1]))
 
-            if region.rel_pos['rstart']:
-                print("\t\tPosition relative to region start:\t{} --> {}\n"
-                      .format(region.rel_pos['rstart'][0], region.rel_pos['rstart'][1]))
-
     else:
         for key in overlap_regions:
             region = overlap_regions[key]
@@ -717,10 +706,6 @@ def output_overlap(overlap_regions, outfile=None):
             if region.rel_pos['qstart']:
                 outfile.write("\t\tPosition relative to query start:\t{} --> {}"
                               .format(region.rel_pos['qstart'][0], region.rel_pos['qstart'][1]))
-
-            if region.rel_pos['rstart']:
-                outfile.write("\t\tPosition relative to region start:\t{} --> {}\n"
-                              .format(region.rel_pos['rstart'][0], region.rel_pos['rstart'][1]))
 
 
 def retrieve(virus, base, ref_regions, region, qstart=1, qend='end'):
