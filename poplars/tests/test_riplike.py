@@ -50,12 +50,3 @@ class testRiplike(unittest.TestCase):
 
     def testRiplike(self):
         result = riplike(self.hiv_genome, self.reference)
-
-
-
-
-
-
-
-
-

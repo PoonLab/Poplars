@@ -6,6 +6,15 @@ def convert_fasta(handle):
     """
     result = []
     sequence, h = '', ''
+
+    # Verifies files have correct formatting
+    ln = handle.readline()
+    if ln.startswith('$'):
+        ln = handle.readline()
+    if not (ln.startswith('>') or ln.startswith('#')):
+        print('Invalid FASTA format')
+        raise NameError
+
     for line in handle:
         if line.startswith('$'):  # skip header line
             continue

@@ -8,31 +8,53 @@ from poplars.common import convert_fasta
 from poplars.mafft import align
 
 
-def hamming(fasta):
+def hamming(bit_aln):
     """
     Convert list of lists into boolean outcomes (difference between query and reference)
-    :param fasta: object returned by align()
+    :param bit_aln: aligned sequences converted to bit-strings
     :return: dictionary of boolean lists keyed by reference label
     """
-    aln = dict(fasta)
-    assert "query" in aln, "Argument <fasta> must contain 'query' entry"
-    query = aln.pop('query')
-    _ = aln.pop('CON_OF_CONS')
+    query = bit_aln.pop('query')
 
-    # iterate over remaining sequences as references
+    # Iterate over remaining sequences as references
     results = {}
-    for h, s in aln.items():
+    for h, s in bit_aln.items():
         result = []
-        for i, nt1 in enumerate(query):
+        for i in range(len(query)):
             nt2 = s[i]
-            if nt1 == '-' or nt2 == '-':
+            if (query[i] | nt2) & 0B1111:
                 result.append(None)
                 continue
-            result.append(int(nt1 != nt2))
+            result.append(bin(query[i] ^ nt2))
         results.update({h: result})
 
     return results
 
+
+# def hamming(fasta):
+#     """
+#     Convert list of lists into boolean outcomes (difference between query and reference)
+#     :param aln_seqs: aligned sequences converted to bit-strings
+#     :return: dictionary of boolean lists keyed by reference label
+#     """
+#     aln = dict(fasta)
+#     assert "query" in aln, "Argument <fasta> must contain 'query' entry"
+#     query = aln.pop('query')
+#     _ = aln.pop('CON_OF_CONS')
+#
+#     # iterate over remaining sequences as references
+#     results = {}
+#     for h, s in aln.items():
+#         result = []
+#         for i, nt1 in enumerate(query):
+#             nt2 = s[i]
+#             if nt1 == '-' or nt2 == '-':
+#                 result.append(None)
+#                 continue
+#             result.append(int(nt1 != nt2))
+#         results.update({h: result})
+#
+#     return results
 
 def update_alignment(seq, reference):
     """
@@ -61,17 +83,24 @@ def update_alignment(seq, reference):
     return fasta2
 
 
-def encode(sequence):
+def encode(fasta):
     """
     Encodes each nucleotide in a sequence using 4-bits
-    :param sequence: the sequence
+    :param fatsa: the result of the alignment
     :return: the sequence as a bitstring where each nucleotide is encoded using a 4-bits
     """
-    seq = []
+    bit_aln = dict(fasta)
+    assert "query" in bit_aln, "Argument <fasta> must contain 'query' entry"
+    _ = bit_aln.pop('CON_OF_CONS')
+
     binary_nt = {'A': 0B0001, 'T': 0B0010, 'C': 0B0011, 'G': 0B0100, ' ': 0B0000, '-': 0B1111}
-    for nt in sequence:
-        seq.append(binary_nt[nt])
-    return seq
+
+    for h, s in bit_aln.items():
+        seq = []
+        for nt in s:
+            seq.append(binary_nt[nt])
+        bit_aln[h] = seq
+    return bit_aln
 
 
 def riplike(seq, reference, window=400, step=5, nrep=100):
@@ -89,7 +118,8 @@ def riplike(seq, reference, window=400, step=5, nrep=100):
     fasta = update_alignment(seq, reference)
     query = dict(fasta)['query']  # aligned query
     seqlen = len(query)
-    ham = hamming(fasta)
+    bit_aln = encode(fasta)
+    ham = hamming(bit_aln)
 
     for centre in range(window // 2, seqlen - (window // 2), step):
         best_p, second_p = 1., 1.  # maximum p-distance
@@ -125,23 +155,46 @@ def riplike(seq, reference, window=400, step=5, nrep=100):
                 second_p = pd
                 second_ref = h
 
-        result = {'centre': centre, 'best_ref': best_ref, 'best_p': best_p,
-                  'second_ref': second_ref, 'second_p': None if second_ref is None else second_p}
+            result = {'centre': centre, 'best_ref': best_ref, 'best_p': best_p,
+                      'second_ref': second_ref, 'second_p': None if second_ref is None else second_p}
 
-        quant = None
-        if second_ref is not None and nrep > 0:
-            # use nonparametric bootstrap to determine significance
-            count = 0.
-            n = len(best_seq)
-            sample = random.choices(best_seq, k=n*nrep)
-            for rep in range(nrep):
-                boot = sample[rep: rep + n]
-                if sum(boot) / n < second_p:
-                    count += 1
-            quant = count / nrep
+            quant = None
+            if second_ref is not None and nrep > 0:
+                # use nonparametric bootstrap to determine significance
+                count = 0.
+                n = s.count(0B0001)
+                sample = random.choices(best_seq, k=n * nrep)
+                for rep in range(nrep):
+                    boot = sample[rep: rep + n]
+                    if sum(boot) / n < second_p:
+                        count += 1
+                quant = count / nrep
 
-        result.update({'quant': quant})
-        results.append(result)
+            result.update({'quant': quant})
+            results.append(result)
+
+        ### Move result in for loop to bootstrap for every list of booleans values in the dictionary
+        ### The value is the list of boolean values representing the number of differences
+        ### number of repetitions = number of 1's
+        # OR... Sample over only where there are 1's??? ... if this option, how to reconcile random.choices...
+
+        # result = {'centre': centre, 'best_ref': best_ref, 'best_p': best_p,
+        #           'second_ref': second_ref, 'second_p': None if second_ref is None else second_p}
+
+        # quant = None
+        # if second_ref is not None and nrep > 0:
+        #     # use nonparametric bootstrap to determine significance
+        #     count = 0.
+        #     n = s.count(0B0001)
+        #     sample = random.choices(best_seq, k=n*nrep)
+        #     for rep in range(nrep):
+        #         boot = sample[rep: rep + n]
+        #         if sum(boot) / n < second_p:
+        #             count += 1
+        #     quant = count / nrep
+        #
+        # result.update({'quant': quant})
+        # results.append(result)
 
     return results
 
