@@ -2,6 +2,7 @@ import unittest
 from io import StringIO
 from poplars.sequence_locator import *
 
+7039
 
 class InputTestCase(unittest.TestCase):
 
@@ -10,7 +11,8 @@ class InputTestCase(unittest.TestCase):
         self.hiv_aa_seq_path = os.path.join(os.path.dirname(__file__), 'fixtures/hiv-test-proteins.fasta')
         self.hiv_ncoords_path = os.path.join(os.path.dirname(__file__), 'fixtures/hiv_test_nt_coords.csv')
         self.hiv_pcoords_path = os.path.join(os.path.dirname(__file__), 'fixtures/hiv_test_prot_coords.csv')
-        self.siv_nt_seq_path = os.path.join(os.path.dirname(__file__), 'fixtures/siv-test-genome.fasta')
+        self.siv_nt_seq_path = os.path.join(
+            os.path.join(os.path.dirname(__file__), os.pardir), 'ref_genomes/M33262.fasta')
         self.siv_aa_seq_path = os.path.join(os.path.dirname(__file__), 'fixtures/siv-test-proteins.fasta')
         self.siv_ncoords_path = os.path.join(os.path.dirname(__file__), 'fixtures/siv_test_nt_coords.csv')
         self.siv_pcoords_path = os.path.join(os.path.dirname(__file__), 'fixtures/siv_test_prot_coords.csv')
@@ -304,10 +306,33 @@ class TestSetRegions(InputTestCase):
     def testSIVInputCoords(self):
         region_names = {
             'Rev(with intron)':
-                [[6784, 9315], 'ATGAGCAATCACGAAAGAGAAGAAGAACTCCGAAAAAGGCTAAGGCTAATACATCTTCTGCATCAAACAAACCCATATCCAACAGGA'
-                               'CCCGGCACTGCCAACCAGAGAAGGCAAAGAAAGAGACGGTGGAGAAGGCGGTGGCAACAGCTCCTGGCCTTGGCAGATAGAATATAT'
-                               'TCATTTCCTGATCCGCCAACTGATACGCCTCTTGACTTGGCTATTCAGCAACTGCAGAACCTTGCTATCGAGAGTATACCAGATCCT'
-                               'CCAACCAATACTCCAGAGGCTCTCTGCGACCCTACAGAGGATTCGAGAAGTCCTCAGGACTGA',
+                [[6784, 9315],
+                 'AATGGTGATTATTCAGAAGTGGCCCTTAATGTTACAGAAAGCTTTGATGCCTGGAATAATACAGTCACAGAACAGGCAATAGAGGATGTATGGCAACTCTT'
+                 'TGAGACCTCAATAAAGCCTTGTGTAAAATTATCCCCATTATGCATTACTATGAGATGCAATAAAAGTGAGACAGATAGATGGGGATTGACAAAATCAATAA'
+                 'CAACAACAGCATCAACAACATCAACGACAGCATCAGCAAAAGTAGACATGGTCAATGAGACTAGTTCTTGTATAGCCCAGGATAATTGCACAGGCTTGGAA'
+                 'CAAGAGCAAATGATAAGCTGTAAATTCAACATGACAGGGTTAAAAAGAGACAAGAAAAAAGAGTACAATGAAACTTGGTACTCTGCAGATTTGGTATGTGA'
+                 'ACAAGGGAATAACACTGGTAATGAAAGTAGATGTTACATGAACCACTGTAACACTTCTGTTATCCAAGAGTCTTGTGACAAACATTATTGGGATGCTATTA'
+                 'GATTTAGGTATTGTGCACCTCCAGGTTATGCTTTGCTTAGATGTAATGACACAAATTATTCAGGCTTTATGCCTAAATGTTCTAAGGTGGTGGTCTCTTCA'
+                 'TGCACAAGGATGATGGAGACACAGACTTCTACTTGGTTTGGCTTTAATGGAACTAGAGCAGAAAATAGAACTTATATTTACTGGCATGGTAGGGATAATAG'
+                 'GACTATAATTAGTTTAAATAAGTATTATAATCTAACAATGAAATGTAGAAGACCAGGAAATAAGACAGTTTTACCAGTCACCATTATGTCTGGATTGGTTT'
+                 'TCCACTCACAACCAATCAATGATAGGCCAAAGCAGGCATGGTGTTGGTTTGGAGGAAAATGGAAGGATGCAATAAAAGAGGTGAAGCAGACCATTGTCAAA'
+                 'CATCCCAGGTATACTGGAACTAACAATACTGATAAAATCAATTTGACGGCTCCTGGAGGAGGAGATCCGGAAGTTACCTTCATGTGGACAAATTGCAGAGG'
+                 'AGAGTTCCTCTACTGTAAAATGAATTGGTTTCTAAATTGGGTAGAAGATAGGAATACAGCTAACCAGAAGCCAAAGGAACAGCATAAAAGGAATTACGTGC'
+                 'CATGTCATATTAGACAAATAATCAACACTTGGCATAAAGTAGGCAAAAATGTTTATTTGCCTCCAAGAGAGGGAGACCTCACGTGTAACTCCACAGTGACC'
+                 'AGTCTCATAGCAAACATAGATTGGATTGATGGAAACCAAACTAATATCACCATGAGTGCAGAGGTGGCAGAACTGTATCGATTGGAATTGGGAGATTATAA'
+                 'ATTAGTAGAGATCACTCCAATTGGCTTGGCCCCCACAGATGTGAAGAGGTACACTACTGGTGGCACCTCAAGAAATAAAAGAGGGGTCTTTGTGCTAGGGT'
+                 'TCTTGGGTTTTCTCGCAACGGCAGGTTCTGCAATGGGCGCGGCGTCGTTGACGCTGACCGCTCAGTCCCGAACTTTATTGGCTGGGATAGTGCAGCAACAG'
+                 'CAACAGCTGTTGGACGTGGTCAAGAGACAACAAGAATTGTTGCGACTGACCGTCTGGGGAACAAAGAACCTCCAGACTAGGGTCACTGCCATCGAGAAGTA'
+                 'CTTAAAGGACCAGGCGCAGCTGAATGCTTGGGGATGTGCGTTTAGACAAGTCTGCCACACTACTGTACCATGGCCAAATGCAAGTCTAACACCAAAGTGGA'
+                 'ACAATGAGACTTGGCAAGAGTGGGAGCGAAAGGTTGACTTCTTGGAAGAAAATATAACAGCCCTCCTAGAGGAGGCACAAATTCAACAAGAGAAGAACATG'
+                 'TATGAATTACAAAAGTTGAATAGCTGGGATGTGTTTGGCAATTGGTTTGACCTTGCTTCTTGGATAAAGTATATACAATATGGAGTTTATATAGTTGTAGG'
+                 'AGTAATACTGTTAAGAATAGTGATCTATATAGTACAAATGCTAGCTAAGTTAAGGCAGGGGTATAGGCCAGTGTTCTCTTCCCCACCCTCTTATTTCCAGC'
+                 'AGACCCATATCCAACAGGACCCGGCACTGCCAACCAGAGAAGGCAAAGAAAGAGACGGTGGAGAAGGCGGTGGCAACAGCTCCTGGCCTTGGCAGATAGAA'
+                 'TATATTCATTTCCTGATCCGCCAACTGATACGCCTCTTGACTTGGCTATTCAGCAACTGCAGAACCTTGCTATCGAGAGTATACCAGATCCTCCAACCAAT'
+                 'ACTCCAGAGGCTCTCTGCGACCCTACAGAGGATTCGAGAAGTCCTCAGGACTGAACTGACCTACCTACAATATGGGTGGAGCTATTTCCATGAGGCGGTCC'
+                 'AGGCCGTCTGGAGATCTGCGACAGAGACTCTTGCGGGCGCGTGGGGAGACTTATGGGAGACTCTTAGGAGAGGTGGAAGATGGATACTCGCAATCCCCAGG'
+                 'AGGATTAGACAAGGGCTTGAGCTCACTCTCTTGTGAGGGACAGAAATACAATCAGGGACAGTATATGAATACTCCATGGAGAAACCCAGCTGAAGAGAG'
+                 'AGAAAAATT',
                  [2087, 2193], 'MSNHEREEELRKRLRLIHLLHQTNPYPTGPGTANQRRQRKRRWRRRWQQLLALADRIYSFPDPPTDTPLDLAIQQLQNLAIESIPDP'
                                'PTNTPEALCDPTEDSRSPQD'],
             'Rev(exon1)':
@@ -317,28 +342,30 @@ class TestSetRegions(InputTestCase):
                 [[9062, 9315], 'ACCCATATCCAACAGGACCCGGCACTGCCAACCAGAGAAGGCAAAGAAAGAGACGGTGGAGAAGGCGGTGGCAACAGCTCCTGGCCT'
                                'TGGCAGATAGAATATATTCATTTCCTGATCCGCCAACTGATACGCCTCTTGACTTGGCTATTCAGCAACTGCAGAACCTTGCTATCG'
                                'AGAGTATACCAGATCCTCCAACCAATACTCCAGAGGCTCTCTGCGACCCTACAGAGGATTCGAGAAGTCCTCAGGACTGA',
-                 [2111, 2193], 'PYPTGPGTANQRRQRKRRWRRRWQQLLALADRIYSFPDPPTDTPLDLAIQQLQNLAIESIPDPPTNTPEALCDPTEDSRSPQD'],
-            '3\'LTR':
-                [[9719, 10535], 'TGGAAGGGATTTATTACAGTGCAAGAAGACATAGAATCTTAGACATATACTTAGAAAAGGAAGAAGGCATCATACCAGATTGGCAG'
-                                'GATTACACCTCAGGACCAGGAATTAGATACCCAAAGACATTTGGCTGGCTATGGAAATTAGTCCCTGTAAATGTATCAGATGAGGC'
-                                'ACAGGAGGATGAGGAGCATTATTTAATGCATCCAGCTCAAACTTCCCAGTGGGATGACCCTTGGGGAGAGGTTCTAGCATGGAAGT'
-                                'TTGATCCAACTCTGGCCTACACTTATGAGGCATATGTTAGATACCCAGAAGAGTTTGGAAGCAAGTCAGGCCTGTCAGAGGAAGAG'
-                                'GTTAGAAGAAGGCTAACCGCAAGAGGCCTTCTTAACATGGCTGACAAGAAGGAAACTCGCTGAAACAGCAGGGACTTTCCACAAGG'
-                                'GGATGTTACGGGGAGGTACTGGGGAGGAGCCGGTCGGGAACGCCCACTTTCTTGATGTATAAATATCACTGCATTTCGCTCTGTAT'
-                                'TCAGTCGCTCTGCGGAGAGGCTGGCAGATTGAGCCCTGGGAGGTTCTCTCCAGCACTAGCAGGTAGAGCCTGGGTGTTCCCTGCTA'
-                                'GACTCTCACCAGCACTTGGCCGGTGCTGGGCAGAGTGACTCCACGCTTGCTTGCTTAAAGCCCTCTTCAATAAAGCTGCCATTTTA'
-                                'GAAGTAAGCTAGTGTGTGTTCCCATCTCTCCTAGCCGCCGCCTGGTCAACTCGGTACTCAATAATAAGAAGACCCTGGTCTGTTAG'
-                                'GACCCTTTCTGCTTTGGGAAACCGAAGCAGGAAAATCCCTAGC', None, None]}
+                 [2111, 2193], 'PYPTGPGTANQRRQRKRRWRRRWQQLLALADRIYSFPDPPTDTPLDLAIQQLQNLAIESIPDPPTNTPEALCDPTEDSRSPQD']}
 
-        result = set_regions('siv', 'nucl', self.siv_ncoords_path, self.siv_nt_seq_path,
-                             self.siv_pcoords_path, self.siv_aa_seq_path)
+        configs = handle_args('siv', 'nucl', self.siv_nt_seq_path, self.siv_ncoords_path,
+                              self.siv_aa_seq_path, self.siv_pcoords_path)
 
-        for i, reg in enumerate(result):
-            self.assertEqual(list(region_names.keys())[i], reg.region_name)
-            self.assertEqual(region_names[reg.region_name][0], reg.ncoords)
-            self.assertEqual(region_names[reg.region_name][1], reg.nt_seq)
-            self.assertEqual(region_names[reg.region_name][2], reg.pcoords)
-            self.assertEqual(region_names[reg.region_name][3], reg.aa_seq)
+        ref_nt_seq = configs[0][0][1]
+        ref_aa_seq = configs[1][0][1]
+        nt_coords = configs[2]
+        aa_coords = configs[3]
+
+        with open(nt_coords) as ncoords, open(aa_coords) as pcoords:
+            result = set_regions('siv', 'nucl', ncoords, ref_nt_seq, pcoords, ref_aa_seq)
+
+            for i, reg in enumerate(result):
+                self.assertEqual(list(region_names.keys())[i], reg.region_name)
+                self.assertEqual(region_names[reg.region_name][0], reg.ncoords)
+                # self.assertEqual(region_names[reg.region_name][1], reg.nt_seq)
+                print(ref_nt_seq[6784:6853])
+                print()
+                print(region_names[reg.region_name][1])
+                print(reg.nt_seq)
+                print()
+                self.assertEqual(region_names[reg.region_name][2], reg.pcoords)
+                # self.assertEqual(region_names[reg.region_name][3], reg.aa_seq)
 
     def testHIVInputCoords(self):
         region_names = {
@@ -881,8 +908,6 @@ class TestHandleArgs(InputTestCase):
         """
         Tests the scenario when the user selects HIV and nucleotide alignment
         """
-        # configs = [ref_nt_seq, ref_aa_seq, nt_coords, aa_coords, reference_sequence]
-
         result = handle_args('hiv', 'nucl', None, None, None, None)
 
         expected_ref_nt_seq = [
@@ -932,18 +957,18 @@ class TestHandleArgs(InputTestCase):
         self.assertEqual(expected_ref_nt_seq, result_ref_nt_seq)
 
         expected_ref_aa_seq = [
-            ['Capsid|SIVMM239', 'PVQQIGGNYVHLPLSPRTLNAWVKLIEEKKFGAEVVPGFQALSEGCTPYDINQMLNCVGDHQAAMQIIRDIINEEAADWDLQHPQP'
-                                'APQQGQLREPSGSDIAGTTSSVDEQIQWMYRQQNPIPVGNIYRRWIQLGLQKCVRMYNPTNILDVKQGPKEPFQSYVDRFYKSLRA'
-                                'EQTDAAVKNWMTQTLLIQNANPDCKLVLKGLGVNPTLEEMLTACQGVGGPGQKARLM'],
-            ['p2|SIVMM239', 'AEALKEALAPVPIPFAA'],
-            ['Nucleocapsid|SIVMM239', 'AQQRGPRKPIKCWNCGKEGHSARQCRAPRRQGCWKCGKMDHVMAKCPDRQAG']]
-        result_ref_aa_seq = result[2][2:5]
+            ['Capsid(p24/p27)|SIVMM239',     'PVQQIGGNYVHLPLSPRTLNAWVKLIEEKKFGAEVVPGFQALSEGCTPYDINQMLNCVGDHQAAMQIIRDIIN'
+                                             'EEAADWDLQHPQPAPQQGQLREPSGSDIAGTTSSVDEQIQWMYRQQNPIPVGNIYRRWIQLGLQKCVRMYNPT'
+                                             'NILDVKQGPKEPFQSYVDRFYKSLRAEQTDAAVKNWMTQTLLIQNANPDCKLVLKGLGVNPTLEEMLTACQGV'
+                                             'GGPGQKARLM'],
+            ['p2|SIVMM239',                  'AEALKEALAPVPIPFAA'],
+            ['Nucleocapsid(p7/p8)|SIVMM239', 'AQQRGPRKPIKCWNCGKEGHSARQCRAPRRQGCWKCGKMDHVMAKCPDRQAG']]
+        result_ref_aa_seq = result[1][2:5]
         self.assertEqual(expected_ref_aa_seq, result_ref_aa_seq)
 
     def testInputNuclProtHIV(self):
         """
-        Tests the scenario when the user selects HIV, specifies the reference sequences,
-        and selects nucleotide alignment
+        Tests the scenario when the user selects HIV, specifies the reference protein and nucleotide sequences
         """
 
         result = handle_args('hiv', 'nucl', self.hiv_nt_seq_path, self.hiv_ncoords_path,
@@ -955,27 +980,33 @@ class TestHandleArgs(InputTestCase):
              'GGATCAGATATCCACTGACCTTTGGATGGTGCTACAAGCTAGTACCAGTTGAGCCAGAGAAGTTAGAAGAAGCCAACAAAGGAGAGAACACCAGCTTGTTACACC'
              'CTGTGAGCCTGCATGGAATGGATGACCCGGAGAGAGAAGTGTTAGAGTGGAGGTTTGACAGCCGCCTAGCATTTCATCACATGGCCCGAGAGCTGCATCCGGAGT'
              'ACTTCAAGAACTGCTGACATCGAGCTTGCTACAAG']]
-        result_ref_nt = result[0][0][1]
+
+        # Check the first 350 nucleotides
+        seq = result[0][0][1][:350]
+        header = result[0][0][0]
+        result_ref_nt = [[header, seq]]
         self.assertEqual(expected_ref_nt, result_ref_nt)
 
         expected_ref_prot = [
-            ['Gag|HIVHXB2CG', 'MGARASVLSGGELDRWEKIRLRPGGKKKYKLKHIVWASRELERFAVNPGLLETSEGCRQILGQLQPSLQTGSEELRSLYNTVATLYCV'
-                              'HQRIEIKDTKEALDKIEEEQNKSKKKAQQAAADTGHSNQVSQNYPIVQNIQGQMVHQAISPRTLNAWVKVVEEKAFSPEVIPMFSALS'
-                              'EGATPQDLNTMLNTVGGHQAAMQMLKETINEEAAEWDRVHPVHAGPIAPGQMREPRGSDIAGTTSTLQEQIGWMTNNPPIPVGEIYKR'
-                              'WIILGLNKIVRMYSPTSILDIRQGPKEPFRDYVDRFYKTLRAEQASQEVKNWMTETLLVQNANPDCKTILKALGPAATLEEMMTACQG'
-                              'VGGPGHKARVLAEAMSQVTNSATIMMQRGNFRNQRKIVKCFNCGKEGHTARNCRAPRKKGCWKCGKEGHQMKDCTERQANFLGKIWPS'
-                              'YKGRPGNFLQSRPEPTAPPEESFRSGVETTTPPQKQEPIDKELYPLTSLRSLFGNDPSSQ'],
-            ['Matrix|HIVHXB2CG', 'MGARASVLSGGELDRWEKIRLRPGGKKKYKLKHIVWASRELERFAVNPGLLETSEGCRQILGQLQPSLQTGSEELRSLYNTVATL'
-                                 'YCVHQRIEIKDTKEALDKIEEEQNKSKKKAQQAAADTGHSNQVSQNY'],
-            ['Capsid|HIVHXB2CG', 'PIVQNIQGQMVHQAISPRTLNAWVKVVEEKAFSPEVIPMFSALSEGATPQDLNTMLNTVGGHQAAMQMLKETINEEAAEWDRVHP'
-                                 'VHAGPIAPGQMREPRGSDIAGTTSTLQEQIGWMTNNPPIPVGEIYKRWIILGLNKIVRMYSPTSILDIRQGPKEPFRDYVDRFYK'
-                                 'TLRAEQASQEVKNWMTETLLVQNANPDCKTILKALGPAATLEEMMTACQGVGGPGHKARVL']]
-        result_ref_prot = result[1]
+            ['Gag|HIVHXB2CG',             'MGARASVLSGGELDRWEKIRLRPGGKKKYKLKHIVWASRELERFAVNPGLLETSEGCRQILGQLQPSLQTGSEELR'
+                                          'SLYNTVATLYCVHQRIEIKDTKEALDKIEEEQNKSKKKAQQAAADTGHSNQVSQNYPIVQNIQGQMVHQAISPRTL'
+                                          'NAWVKVVEEKAFSPEVIPMFSALSEGATPQDLNTMLNTVGGHQAAMQMLKETINEEAAEWDRVHPVHAGPIAPGQM'
+                                          'REPRGSDIAGTTSTLQEQIGWMTNNPPIPVGEIYKRWIILGLNKIVRMYSPTSILDIRQGPKEPFRDYVDRFYKTL'
+                                          'RAEQASQEVKNWMTETLLVQNANPDCKTILKALGPAATLEEMMTACQGVGGPGHKARVLAEAMSQVTNSATIMMQR'
+                                          'GNFRNQRKIVKCFNCGKEGHTARNCRAPRKKGCWKCGKEGHQMKDCTERQANFLGKIWPSYKGRPGNFLQSRPEPT'
+                                          'APPEESFRSGVETTTPPQKQEPIDKELYPLTSLRSLFGNDPSSQ'],
+            ['Matrix(p17/p15)|HIVHXB2CG', 'MGARASVLSGGELDRWEKIRLRPGGKKKYKLKHIVWASRELERFAVNPGLLETSEGCRQILGQLQPSLQTGSEELR'
+                                          'SLYNTVATLYCVHQRIEIKDTKEALDKIEEEQNKSKKKAQQAAADTGHSNQVSQNY'],
+            ['Capsid(p24/p27)|HIVHXB2CG', 'PIVQNIQGQMVHQAISPRTLNAWVKVVEEKAFSPEVIPMFSALSEGATPQDLNTMLNTVGGHQAAMQMLKETINEE'
+                                          'AAEWDRVHPVHAGPIAPGQMREPRGSDIAGTTSTLQEQIGWMTNNPPIPVGEIYKRWIILGLNKIVRMYSPTSILD'
+                                          'IRQGPKEPFRDYVDRFYKTLRAEQASQEVKNWMTETLLVQNANPDCKTILKALGPAATLEEMMTACQGVGGPGHKA'
+                                          'RVL']]
+        result_ref_prot = result[1][:3]
         self.assertEqual(expected_ref_prot, result_ref_prot)
 
     def testInputAllSIV(self):
         """
-        Tests the scenario when the user selects SIV, specifies the reference sequences, and selects protein alignment
+        Tests the scenario when the user specifies only the protein sequences
         """
         result = handle_args('siv', 'prot', None, None, self.siv_aa_seq_path, self.siv_pcoords_path)
 
@@ -984,24 +1015,17 @@ class TestHandleArgs(InputTestCase):
                                 'GCCTTGTCTCATCATGAACTTTGGCATTTCATCTACAGCTAAGTTTATATCATAAATAGTTCTTTACAGGCAGCACCAACTTATAC'
                                 'CCTTATAGCATACTTTACTGTGTGAAAATTGCATCTTTCATTAAGCTTACTGTAAATTTACTGGCTGTCTTCCTTGCAGGTTTCTG'
                                 'GAAGGGATTTATTACAGTGCAAGAAGACATAGAATCTTAGACATATACTTAGAAAAGGAAGAAGGCATCATACCAGATTGGCAGGA'
-                                'TTACACCTCAGGACCAGGAATTAGATACCCAAAGACATTTGGCTGGCTATGGAAAT']]
-        result_ref_nt = result[0]
+                                'TTACAC']]
+        seq = result[0][0][1][:350]
+        header = result[0][0][0]
+        result_ref_nt = [[header, seq]]
         self.assertEqual(expected_ref_nt, result_ref_nt)
 
-        expected_ref_prot = [
-            ['RNase|SIVMM239', 'YTDGSCNKQSKEGKAGYITDRGKDKVKVLEQTTNQQAELEAFLMALTDSGPKANIIVDSQYVMGIITGCPTESESRLVNQIIEEMIK'
-                               'KSEIYVAWVPAHKGIGGNQEIDHLVSQGIRQVL'],
-            ['Integrase|SIVMM239', 'FLEKIEPAQEEHDKYHSNVKELVFKFGLPRIVARQIVDTCDKCHQKGEAIHGQANSDLGTWQMDCTHLEGKIIIVAVHVASGF'
-                                   'IEAEVIPQETGRQTALFLLKLAGRWPITHLHTDNGANFASQEVKMVAWWAGIEHTFGVPYNPQSQGVVEAMNHHLKNQIDRIR'
-                                   'EQANSVETIVLMAVHCMNFKRRGGIGDMTPAERLINMITTEQEIQFQQSKNSKFKNFRVYYREGRDQLWKGPGELLWKGEGAV'
-                                   'ILKVGTDIKVVPRRKAKIIKDYGGGKEVDSSSHMEDTGEAREVA'],
-            ['Vif|SIVMM239', 'MEEEKRWIAVPTWRIPERLERWHSLIKYLKYKTKDLQKVCYVPHFKVGWAWWTCSRVIFPLQEGSHLEVQGYWHLTPEKGWLSTYAVRI'
-                             'TWYSKNFWTDVTPNYADILLHSTYFPCFTAGEVRRAIRGEQLLSCCRFPRAHKYQVPSLQYLALKVVSDVRSQGENPTWKQWRRDNRRG'
-                             'LRMAKQNSRGDKQRGGKPPTKGANFPGLAKVLGILA'],
-            ['Vpx|SIVMM239', 'MSDPRERIPPGNSGEETIGEAFEWLNRTVEEINREAVNHLPRELIFQVWQRSWEYWHDEQGMSPSYVKYRYLCLIQKALFMHCKKGCRC'
-                             'LGEGHGAGGWRPGPPPPPPPGLA'],
-            ['Vpr|SIVMM239', 'MEERPPENEGPQREPWDEWVVEVLEELKEEALKHFDPRLLTALGNHIYNRHGDTLEGAGELIRILQRALFMHFRGGCIHSRIGQPGGGN'
-                             'PLSAIPPSRSML']]
+        expected_ref_prot = [['Rev|SIVMM239',         'MSNHEREEELRKRLRLIHLLHQTNPYPTGPGTANQRRQRKRRWRRRWQQLLALADRIYSFPDPP'
+                                                      'TDTPLDLAIQQLQNLAIESIPDPPTNTPEALCDPTEDSRSPQD'],
+                             ['Rev(exon 1)|SIVMM239', 'MSNHEREEELRKRLRLIHLLHQT'],
+                             ['Rev(exon 2)|SIVMM239', 'PYPTGPGTANQRRQRKRRWRRRWQQLLALADRIYSFPDPPTDTPLDLAIQQLQNLAIESIPDPP'
+                                                      'TNTPEALCDPTEDSRSPQD']]
         result_ref_prot = result[1]
         self.assertEqual(expected_ref_prot, result_ref_prot)
 
