@@ -128,12 +128,12 @@ class GenomeRegion:
         if self.nt_seq is not None and self.aa_seq is not None:
             codon_aln = []
             codons = [''.join(t) for t in zip(*[iter(self.nt_seq)] * 3)]
-            for i in range(len(codons)):
+            for aa, codon in zip(self.aa_seq, codons):
                 # Check if stop codon
-                if codons[i] == 'TAA' or codons[i] == 'TGA' or codons[i] == 'TAG':
+                if codon == 'TAA' or codon == 'TGA' or codon == 'TAG':
                     codon_aln.append('-*-')
                 else:
-                    codon_aln.append('-{}-'.format(self.aa_seq[i]))
+                    codon_aln.append('-{}-'.format(aa))
             self.codon_aln = ''.join(codon_aln)
         return self.codon_aln
 
@@ -194,10 +194,10 @@ def set_regions(virus, base, nt_coords, nt_seq, aa_coords, aa_seq):
     :param base: The base of the sequence
     :param nt_coords: Path to the csv file containing the global coordinates of the nucleotide region.
             The file stream has one genomic entry per line and has the following format: region_name,start,end
-    :param nt_seq: The file stream containing the reference nucleotide sequence in read mode
+    :param nt_seq: The nucleotide sequence
     :param aa_coords: Path to the csv file containing the global coordinates of the protein region.
             The file stream has one genomic entry per line and has the following format: region_name,start,end
-    :param aa_seqe: The file stream containing the reference nucleotide sequence in read mode
+    :param aa_seq: A list of lists containing the amino acid sequences
     :return: A list of GenomeRegions
     """
 
@@ -225,26 +225,24 @@ def set_regions(virus, base, nt_coords, nt_seq, aa_coords, aa_seq):
             genome_regions.append(seq_region)
 
         # Parse protein coordinates file
-        prot_names = []
         prot_coords = []
         for aa_line in aa_coords:
             aa_line = aa_line.strip()
             aa_line = aa_line.split(',')
             prot_coords.append([int(aa_line[1]), int(aa_line[2])])
-            prot_names.append(aa_line[0])
 
-        for i in range(len(prot_names)):
+        for i, coords in enumerate(prot_coords):
             for seq_region in genome_regions:
-                if prot_names[i] in seq_region.region_name:
+                if aa_seq[i][0].startswith(seq_region.region_name):
                     # Set global and local protein coordinates
-                    seq_region.set_coords(prot_coords[i], 'prot')
-                    seq_region.set_seq_from_ref(aa_seq, 'prot')
-
+                    seq_region.set_coords(coords, 'prot')
+                    seq_region.set_sequence(aa_seq[i][1], 'prot')
                     seq_region.set_pos_from_pstart(virus)
+                    seq_region.make_codon_aln()
 
     else:
         # Parse protein region coordinates file
-        for aa_line in aa_coords:
+        for i, aa_line in enumerate(aa_coords):
             aa_line = aa_line.strip()
             aa_line = aa_line.split(',')
             prot_coords = [int(aa_line[1]), int(aa_line[2])]
@@ -253,7 +251,7 @@ def set_regions(virus, base, nt_coords, nt_seq, aa_coords, aa_seq):
 
             # Set global and local nucleotide coordinates
             seq_region.set_coords(prot_coords, 'prot')
-            seq_region.set_seq_from_ref(aa_seq, 'prot')
+            seq_region.set_sequence(aa_seq[i][1], 'prot')
 
             # Set relative positions
             seq_region.set_pos_from_cds(virus)
@@ -268,17 +266,17 @@ def set_regions(virus, base, nt_coords, nt_seq, aa_coords, aa_seq):
         for nt_line in nt_coords:
             nt_line = nt_line.strip()
             nt_line = nt_line.split(',')
-            nucl_coords.append([int(nt_line[1]), int(nt_line[2])])
             nucl_names.append(nt_line[0])
+            nucl_coords.append([int(nt_line[1]), int(nt_line[2])])
 
-        for i in range(len(nucl_names)):
+        for i, name in enumerate(nucl_names):
             for seq_region in genome_regions:
-                if nucl_names[i] in seq_region.region_name:
+                if name.startswith(seq_region.region_name):
                     # Set global and local protein coordinates
                     seq_region.set_coords(nucl_coords[i], 'nucl')
                     seq_region.set_seq_from_ref(nt_seq, 'nucl')
-
                     seq_region.set_pos_from_pstart(virus)
+                    seq_region.make_codon_aln()
 
     return genome_regions
 
@@ -557,7 +555,7 @@ def output_retrieved_region(region, outfile=None):
         print("\tNucleotide Sequence:")
         seq_lines = [region.nt_seq[i:i + 60] for i in range(0, len(region.nt_seq), 60)]
         for line in seq_lines:
-            print('\t\t{}\n'.format(line))
+            print('\t\t{}'.format(line))
 
         if region.aa_seq:
             print("\tProtein Sequence:")
@@ -739,8 +737,8 @@ def retrieve(virus, base, ref_regions, region, qstart=1, qend='end'):
             query_region = GenomeRegion(region)
 
             # Set local and global coordinates
-            query_region.set_coords([qstart, qend], base)
-            global_coords = query_region.local_to_global_index(ref_region, [qstart, qend], base)
+            # query_region.set_coords([qstart, qend], base)
+            global_coords = GenomeRegion.local_to_global_index(ref_region, [qstart, qend], base)
             query_region.set_coords(global_coords, base)
 
             # Set sequences protein and nucleotide sequences
@@ -878,7 +876,7 @@ def main():
     # Ensure proper configuration files are set
     configs = handle_args(args.virus, args.base, args.ref_nt, args.nt_coords, args.ref_aa, args.aa_coords)
     ref_nt_seq = configs[0][0][1]
-    ref_aa_seq = configs[1][0][1]
+    ref_aa_seq = configs[1]
     nt_coords = configs[2]
     aa_coords = configs[3]
     reference_sequence = configs[4]

@@ -12,10 +12,8 @@ RNase,1096,1215
 Integrase,1216,1503
 Vif,1504,1695
 Vpr,1696,1791
-Tat,1792,1892
 Tat(exon1),1792,1862
 Tat(exon2),1863,1892
-Rev(with intron),1893,2008
 Rev(exon1),1893,1918
 Rev(exon2),1919,2008
 Vpu,2009,2090
