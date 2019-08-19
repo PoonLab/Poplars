@@ -16,7 +16,7 @@ class TestConvertFasta(unittest.TestCase):
         handle = StringIO("a\nACGT\n>b\nGCTA\n")
         
         with self.assertRaises(NameError):
-            result = convert_fasta(handle)
+            convert_fasta(handle)
             
     def testMultilineConversion(self):
         handle = StringIO(">a\nACGT\nGGGG\nATGATCGTAA\n>b\nGCTA\n\nAAAAAAAA\n")

@@ -8,12 +8,17 @@ def convert_fasta(handle):
     sequence, h = '', ''
 
     # Verifies files have correct formatting
-    ln = handle.readline()
-    if ln.startswith('$'):
-        ln = handle.readline()
-    if not (ln.startswith('>') or ln.startswith('#')):
-        print('Invalid FASTA format')
-        raise NameError
+    for i, line in enumerate(handle):
+        if line.startswith('$'):
+            continue
+        elif line.startswith('>') or line.startswith('#'):
+            break
+        else:
+            print("No header")
+            raise NameError
+
+    if hasattr(handle, 'seek'):
+        handle.seek(0)
 
     for line in handle:
         if line.startswith('$'):  # skip header line
