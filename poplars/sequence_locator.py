@@ -225,15 +225,17 @@ def set_regions(virus, base, nt_coords, nt_seq, aa_coords, aa_seq):
             genome_regions.append(seq_region)
 
         # Parse protein coordinates file
+        prot_names = []
         prot_coords = []
         for aa_line in aa_coords:
             aa_line = aa_line.strip()
             aa_line = aa_line.split(',')
+            prot_names.append(aa_line[0])
             prot_coords.append([int(aa_line[1]), int(aa_line[2])])
 
         for i, coords in enumerate(prot_coords):
             for seq_region in genome_regions:
-                if aa_seq[i][0].startswith(seq_region.region_name):
+                if prot_names[i].startswith(seq_region.region_name):
                     # Set global and local protein coordinates
                     seq_region.set_coords(coords, 'prot')
                     seq_region.set_sequence(aa_seq[i][1], 'prot')
@@ -716,6 +718,7 @@ def retrieve(virus, base, ref_regions, region, qstart=1, qend='end'):
     """
 
     query_region = None
+    overlap_regions = {}
     for ref_region in ref_regions:
 
         if ref_region.region_name == region:
@@ -757,7 +760,6 @@ def retrieve(virus, base, ref_regions, region, qstart=1, qend='end'):
             retrieved_regions = find_matches(virus, base, ref_regions, [query_region.get_coords(base)])
 
             # Remove duplicated retrieved region
-            overlap_regions = {}
             for key in retrieved_regions:
                 if retrieved_regions[key].region_name != region:
                     overlap_regions[key] = retrieved_regions[key]

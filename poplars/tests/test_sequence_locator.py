@@ -797,8 +797,27 @@ class TestFindMatches(unittest.TestCase):
 
         coordinates = [(2133, 2292)]
         result = find_matches('hiv', 'nucl', ref_regions, coordinates)
-        region_names = ['Gag', 'p6']
-        self.assertListEqual(region_names, list(result.keys()))
+
+        exp_region_names = ['Gag',           'p6']
+        exp_pos_from_cds = [[1344, 1504],    [1, 159]]
+        exp_pos_from_qstart = [[1, 160],     [2, 160]]
+        exp_pos_from_gstart = [[2133, 2292], [2134, 2292]]
+        exp_pos_from_pstart = [[449, 501],   [1, 53]]
+        exp_aa_seq = ['XLQSRPEPTAPPEESFRSGVETTTPPQKQEPIDKELYPLTSLRSLFGNDPSSQ',
+                      'LQSRPEPTAPPEESFRSGVETTTPPQKQEPIDKELYPLTSLRSLFGNDPSSQ']
+        exp_nt_seq = ['TCTTCAGAGCAGACCAGAGCCAACAGCCCCACCAGAAGAGAGCTTCAGGTCTGGGGTAGAGACAACAACTCCCCCTCAGAAGCAGGAGCCGATAGA'
+                      'CAAGGAACTGTATCCTTTAACTTCCCTCAGGTCACTCTTTGGCAACGACCCCTCGTCACAATAA',
+                      'TCTTCAGAGCAGACCAGAGCCAACAGCCCCACCAGAAGAGAGCTTCAGGTCTGGGGTAGAGACAACAACTCCCCCTCAGAAGCAGGAGCCGATAGA'
+                      'CAAGGAACTGTATCCTTTAACTTCCCTCAGGTCACTCTTTGGCAACGACCCCTCGTCACAATAA']
+
+        self.assertListEqual(exp_region_names, list(result.keys()))
+        for i, (key, value) in enumerate(result.items()):
+            self.assertEqual(exp_pos_from_cds[i], value.rel_pos['CDS'])
+            self.assertEqual(exp_pos_from_qstart[i], value.rel_pos['qstart'])
+            self.assertEqual(exp_pos_from_gstart[i], value.rel_pos['gstart'])
+            self.assertEqual(exp_pos_from_pstart[i], value.rel_pos['pstart'])
+            self.assertEqual(exp_aa_seq[i], value.get_sequence('prot'))
+            self.assertEqual(exp_nt_seq[i], value.get_sequence('nucl'))
 
 
 class TestRetrieve(InputTestCase):
@@ -813,7 +832,7 @@ class TestRetrieve(InputTestCase):
         aa_coords = configs[3]
 
         with open(nt_coords) as ncoords, open(aa_coords) as pcoords:
-            ref_regions = set_regions('hiv', 'nucl', ncoords, self.hiv_nt_seq, pcoords, self.hiv_aa_seq)
+            ref_regions = set_regions('hiv', 'nucl', ncoords, ref_nt_seq, pcoords, ref_aa_seq)
 
         result = retrieve('hiv', 'nucl', ref_regions, 'p2')
         query_region = result[0]
@@ -830,17 +849,26 @@ class TestRetrieve(InputTestCase):
         exp_pos_from_pstart = [[364, 377], [1, 14]]
         expected_proteins = ['AEAMSQVTNSATIM', 'AEAMSQVTNSATIM']
 
-        for i, region in enumerate(overlap_regions):
-            self.assertEqual(exp_region_names[i], overlap_regions[i].region_name)
-            # self.assertEqual(exp_pos_from_cds[i], overlap_regions[i].pos_from_cds)
-            # self.assertEqual(exp_pos_from_qstart[i], overlap_regions[i].pos_from_qstart)
-            # self.assertEqual(exp_pos_from_gstart[i], overlap_regions[i].pos_from_gstart)
-            # self.assertEqual(exp_pos_from_pstart[i], overlap_regions[i].pos_from_pstart)
-            # self.assertEqual(expected_proteins[i], overlap_regions[i].get_sequence('prot'))
+        for i, (k, v) in enumerate(overlap_regions.items()):
+            self.assertListEqual(list(overlap_regions.keys()), exp_region_names)
+            self.assertEqual(exp_pos_from_cds[i], v.rel_pos['CDS'])
+            self.assertEqual(exp_pos_from_qstart[i], v.rel_pos['qstart'])
+            self.assertEqual(exp_pos_from_gstart[i], v.rel_pos['gstart'])
+            self.assertEqual(exp_pos_from_pstart[i], v.rel_pos['pstart'])
+            self.assertEqual(expected_proteins[i], v.get_sequence('prot'))
 
     def testSIVInput(self):
-        ref_regions = set_regions('siv', 'nucl', self.siv_nt_seq, self.siv_ncoords_path,
-                                  self.siv_aa_seq, self.siv_pcoords_path)
+
+        configs = handle_args('siv', 'nucl', self.siv_nt_seq_path, self.siv_ncoords_path,
+                              self.siv_aa_seq_path, self.siv_pcoords_path)
+
+        ref_nt_seq = configs[0][0][1]
+        ref_aa_seq = configs[1]
+        nt_coords = configs[2]
+        aa_coords = configs[3]
+
+        with open(nt_coords) as ncoords, open(aa_coords) as pcoords:
+            ref_regions = set_regions('siv', 'nucl', ncoords, ref_nt_seq, pcoords, ref_aa_seq)
 
         result = retrieve('siv', 'nucl', ref_regions, 'Nef', 20, 80)
         result_region = result[0]
@@ -849,7 +877,7 @@ class TestRetrieve(InputTestCase):
         self.assertEqual(expected_region, result_region.region_name)
         self.assertEqual(expected_seq, result_region.get_sequence('nucl'))
 
-        found_regions = result[1]
+        overlap_regions = result[1]
         exp_region_names = ['Env(gp160)', 'gp41', 'Nef']
         exp_pos_from_cds = [[2493, 2553], [918, 978], [20, 80]]
         exp_pos_from_qstart = [[1, 61], [1, 61], [1, 61]]
@@ -857,13 +885,13 @@ class TestRetrieve(InputTestCase):
         exp_pos_from_pstart = [[832, 851], [307, 326], [7, 27]]
         expected_proteins = ['VWRSATETLAGAWGD', 'VWRSATETLAGAWGD', 'SGDLRQRLLRARGE']
 
-        for i in range(len(found_regions)):
-            self.assertEqual(exp_region_names[i], found_regions[i].region_name)
-            self.assertEqual(exp_pos_from_cds[i], found_regions[i].pos_from_cds)
-            self.assertEqual(exp_pos_from_qstart[i], found_regions[i].pos_from_qstart)
-            self.assertEqual(exp_pos_from_gstart[i], found_regions[i].pos_from_gstart)
-            self.assertEqual(exp_pos_from_pstart[i], found_regions[i].pos_from_pstart)
-            self.assertEqual(expected_proteins[i], found_regions[i].get_sequence('prot'))
+        for i, (k, v) in enumerate(overlap_regions.items()):
+            self.assertListEqual(list(overlap_regions.keys()), exp_region_names)
+            self.assertEqual(exp_pos_from_cds[i], v.rel_pos['CDS'])
+            self.assertEqual(exp_pos_from_qstart[i], v.rel_pos['qstart'])
+            self.assertEqual(exp_pos_from_gstart[i], v.rel_pos['gstart'])
+            self.assertEqual(exp_pos_from_pstart[i], v.rel_pos['pstart'])
+            self.assertEqual(expected_proteins[i], v.get_sequence('prot'))
 
 
 class TestHandleArgs(InputTestCase):
