@@ -4,7 +4,6 @@ as described in Keele et al. http://www.pnas.org/cgi/content/short/0802203105
 Supplementary Materials.
 """
 
-# TODO: Check that input sequences are the same length
 
 import argparse
 from poplars.common import convert_fasta
@@ -74,7 +73,6 @@ def make_results(seq, gees):
     """
 
     # FIXME: Regexes do not catch all potential mutation/ control sites
-    #
     mut = re.compile('[AGCT](?=[AG][AGT])')  # Matches potential mutation sites (GRD)
     ctrl = re.compile('[AGCT](?=[CT].|[AG]C)')  # Matches control sites (YN|RC)
 
@@ -143,6 +141,11 @@ def hypermut(infile, skip=None):
     if skip:
         print("skipping first {} records".format(skip))
         fasta = fasta[int(skip):]
+
+    # Check that sequences are aligned
+    length = len(fasta[0][1])
+    for h, s in fasta:
+        assert length == len(s), "Sequences are not aligned."
 
     refseq = fasta[0][1]  # First sequence is the reference sequence
     gees = [i for i, nt in enumerate(refseq) if nt.upper() == 'G']  # Locate GRD motifs in reference sequence
