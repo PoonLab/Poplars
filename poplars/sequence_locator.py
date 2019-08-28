@@ -68,57 +68,40 @@ class GenomeRegion:
         else:
             self.aa_seq = seq
 
-    def set_pos_from_cds(self, virus):
+    def set_pos_from_cds(self, region_coords):
         """
         Gives the position of a sequence relative to the start of the coding sequence
         """
         if self.ncoords is not None:
             if self.region_name != '5\'LTR':
-                if virus == 'hiv':
-                    cds_start = 790
-                else:
-                    cds_start = 1309
-                self.rel_pos['CDS'].append((self.ncoords[0] + 1 - cds_start))
-                self.rel_pos['CDS'].append((self.ncoords[1] + 1 - cds_start))
+                self.rel_pos['CDS'].append((self.ncoords[0] + 1 - region_coords[0]))
+                self.rel_pos['CDS'].append((self.ncoords[1] + 1 - region_coords[0]) + 1)
 
     def set_pos_from_gstart(self):
         self.rel_pos['gstart'] = self.ncoords
 
-    def set_pos_from_pstart(self, virus):
+    def set_pos_from_pstart(self):
         """
         Gives the position of the sequence relative to the start of the protein sequence
         """
-        if self.aa_seq is not None:
-            if not self.rel_pos['CDS']:
-                self.set_pos_from_cds(virus)
-
-            # If the region is within the CDS
-            if self.rel_pos['CDS']:
-                cds_pos = self.rel_pos['CDS']
-
-                # If the whole protein sequence is encompassed in the CDS range
-                if len(self.aa_seq) == (((cds_pos[1] - cds_pos[0]) // 3) + 1):
-                    self.rel_pos['pstart'] = [1, (((cds_pos[1] - cds_pos[0]) // 3) + 1)]
-                else:
-                    self.rel_pos['pstart'] = [(cds_pos[0] // 3) + 1, cds_pos[1] // 3]
-
-            # If the region is outside the CDS
-            else:
+        if self.pcoords is not None:
+            if 'LTR' in self.region_name:
                 self.rel_pos['pstart'] = None
+            else:
+                self.rel_pos['pstart'] = self.pcoords
 
-    def set_pos_from_qstart(self, query, base):
+    def set_pos_from_qstart(self, q_coords, base):
         """
         Gives the position of the sequence relative to the start of the region of interest
-        :param query: The GenomeRegion objects for the query
+        :param q_coords: The coodinates of the query region
         :param base: The base of the sequence (nucleotide or protein)
         :return: The position relative to the start of the region of interest
         """
         r_coords = self.get_coords(base)
         r_seq = self.get_sequence(base)
         if r_coords is not None and r_seq is not None:
-            q_coords = query.get_coords(base)
             start_offset = r_coords[0] - q_coords[0] + 1
-            end_offset = start_offset + len(r_seq)
+            end_offset = start_offset + len(r_seq) - 1
             self.rel_pos['qstart'] = [start_offset, end_offset]
 
     def make_codon_aln(self):
@@ -174,11 +157,11 @@ class GenomeRegion:
 
         if coords[1] > coord_pair[0]:
             # Check if local coordinates are in the range of the sequence
-            start = max(local_pair[0], 0)
+            start = max(local_pair[0], 1)
             end = min(local_pair[1] + 1, len(seq))
             if base == 'nucl':
                 overlap.append(seq[start - 1: end + 1])
-                overlap.append(self.local_to_global_index(region, [start, end + 1], base))
+                overlap.append(self.local_to_global_index(region, [start, end], base))
             else:
                 overlap.append(seq[start - 1: end - 1])
                 overlap.append(self.local_to_global_index(region, [start, end - 1], base))
@@ -186,11 +169,10 @@ class GenomeRegion:
         return overlap
 
 
-def set_regions(virus, base, nt_coords, nt_seq, aa_coords, aa_seq):
+def set_regions(base, nt_coords, nt_seq, aa_coords, aa_seq):
     """
     Reads in the start and end coordinates of the genomic regions and associates the region with its coordinates.
     If no coordinate files are specified, set default nucleotide and protein coordinate files.
-    :param virus: The organism (HIV or SIV)
     :param base: The base of the sequence
     :param nt_coords: Path to the csv file containing the global coordinates of the nucleotide region.
             The file stream has one genomic entry per line and has the following format: region_name,start,end
@@ -218,9 +200,9 @@ def set_regions(virus, base, nt_coords, nt_seq, aa_coords, aa_seq):
             seq_region.set_seq_from_ref(nt_seq, 'nucl')
 
             # Set relative positions
-            seq_region.set_pos_from_cds(virus)
+            seq_region.set_pos_from_cds(nucl_coords)
             seq_region.set_pos_from_gstart()
-            seq_region.set_pos_from_pstart(virus)
+            seq_region.set_pos_from_pstart()
 
             genome_regions.append(seq_region)
 
@@ -239,7 +221,7 @@ def set_regions(virus, base, nt_coords, nt_seq, aa_coords, aa_seq):
                     # Set global and local protein coordinates
                     seq_region.set_coords(coords, 'prot')
                     seq_region.set_sequence(aa_seq[i][1], 'prot')
-                    seq_region.set_pos_from_pstart(virus)
+                    seq_region.set_pos_from_pstart()
                     seq_region.make_codon_aln()
 
     else:
@@ -256,9 +238,9 @@ def set_regions(virus, base, nt_coords, nt_seq, aa_coords, aa_seq):
             seq_region.set_sequence(aa_seq[i][1], 'prot')
 
             # Set relative positions
-            seq_region.set_pos_from_cds(virus)
+            seq_region.set_pos_from_cds(prot_coords)
             seq_region.set_pos_from_gstart()
-            seq_region.set_pos_from_pstart(virus)
+            seq_region.set_pos_from_pstart()
 
             genome_regions.append(seq_region)
 
@@ -277,7 +259,7 @@ def set_regions(virus, base, nt_coords, nt_seq, aa_coords, aa_seq):
                     # Set global and local protein coordinates
                     seq_region.set_coords(nucl_coords[i], 'nucl')
                     seq_region.set_seq_from_ref(nt_seq, 'nucl')
-                    seq_region.set_pos_from_pstart(virus)
+                    seq_region.set_pos_from_pstart()
                     seq_region.make_codon_aln()
 
     return genome_regions
@@ -461,10 +443,9 @@ def get_region_coordinates(alignment):
     return coordinates
 
 
-def find_matches(virus, base, ref_regions, match_coordinates):
+def find_matches(base, ref_regions, match_coordinates):
     """
     Finds the genomic regions where the query sequence aligns with the reference sequence
-    :param virus: The organism (HIV or SIV)
     :param base: The base of the query sequence
     :param ref_regions: A list of GenomeRegion objects
     :param match_coordinates: A list of indices where the query sequence aligns with the reference sequence
@@ -487,14 +468,19 @@ def find_matches(virus, base, ref_regions, match_coordinates):
                         query_region = GenomeRegion(ref_region.region_name)
                         query_region.set_sequence(ov_seq, base)
 
-                        # Set global and local coordinates
+                        # Set protein and nucelotide coordinates
                         query_region.set_coords(ov_coord, base)
 
+                        if base == 'nucl':
+                            query_regions.set_coords(prot_coords, 'prot')
+                        else:
+                            query_regions.set_coords(nucl_coords, 'nucl')
+
                         # Set relative positions
-                        query_region.set_pos_from_cds(virus)
+                        query_region.set_pos_from_cds(ref_region.get_coords(base))
                         query_region.set_pos_from_gstart()
-                        query_region.set_pos_from_qstart(ref_region, base)
-                        query_region.set_pos_from_pstart(virus)
+                        query_region.set_pos_from_qstart(coord, base)
+                        query_region.set_pos_from_pstart()
 
                         if base == 'nucl':
                             set_protein_equivalents(query_region, ref_regions)
@@ -705,10 +691,9 @@ def output_overlap(overlap_regions, outfile=None):
                               .format(region.rel_pos['qstart'][0], region.rel_pos['qstart'][1]))
 
 
-def retrieve(virus, base, ref_regions, region, qstart=1, qend='end'):
+def retrieve(base, ref_regions, region, qstart=1, qend='end'):
     """
     Retrieves a sequence given its coordinates
-    :param virus: The organism (HIV or SIV)
     :param base: The base of the sequence (nucleotide or protein)
     :param ref_regions: A list of GenomeRegion objects
     :param region: The genomic region
@@ -757,7 +742,7 @@ def retrieve(virus, base, ref_regions, region, qstart=1, qend='end'):
                 query_region.set_sequence(equiv_seq, 'nucl')
 
         if query_region is not None:
-            retrieved_regions = find_matches(virus, base, ref_regions, [query_region.get_coords(base)])
+            retrieved_regions = find_matches(base, ref_regions, [query_region.get_coords(base)])
 
             # Remove duplicated retrieved region
             for key in retrieved_regions:
@@ -886,7 +871,7 @@ def main():
     with open(nt_coords) as nt_coords_handle, open(aa_coords) as aa_coords_handle:
 
         # Create genomic region objects based on configuration files
-        ref_regions = set_regions(args.virus, args.base, nt_coords_handle, ref_nt_seq, aa_coords_handle, ref_aa_seq)
+        ref_regions = set_regions(args.base, nt_coords_handle, ref_nt_seq, aa_coords_handle, ref_aa_seq)
 
         if args.subcommand == "align":
             query = get_query(args.base, args.query, args.revcomp)
@@ -894,7 +879,7 @@ def main():
 
             # Find indices where the query sequence aligns with the reference sequence
             match_coords = get_region_coordinates(alignment[-1])  # Query sequence will be the last item in the list
-            query_regions = find_matches(args.virus, args.base, ref_regions, match_coords)
+            query_regions = find_matches(args.base, ref_regions, match_coords)
 
             output_overlap(query_regions, args.outfile)
 
@@ -904,7 +889,7 @@ def main():
             if not valid_in:
                 sys.exit(0)
             else:
-                result = retrieve(args.virus, args.base, ref_regions, args.region, args.start, args.end)
+                result = retrieve(args.base, ref_regions, args.region, args.start, args.end)
                 query_region = result[0]
                 overlap_regions = result[1]
 
