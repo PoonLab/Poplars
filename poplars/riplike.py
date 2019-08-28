@@ -67,10 +67,10 @@ def encode(fasta):
     assert "query" in bin_fasta, "Argument <fasta> must contain 'query' entry"
     _ = bin_fasta.pop('CON_OF_CONS')
 
-    binary_nt = {' ': 0B00000, 'A': 0B00001, 'T': 0B00010, 'C': 0B00011, 'G': 0B00100,
-                 'N': 0B00101, 'R': 0B00110, 'Y': 0B00111, 'K': 0B01000, 'M': 0B01001,
-                 'S': 0B01010, 'W': 0B01011, 'B': 0B01100, 'D': 0B01101, 'H': 0B01110,
-                 'V': 0B01111, 'X': 0B10000, '-': 0B1111}
+    binary_nt = {'A': 0B1000, 'T': 0B0100, 'G': 0B0010, 'C': 0B0001,
+                 'R': 0B1010, 'Y': 0B0101, 'S': 0B0011, 'W': 0B1100,
+                 'K': 0B0110, 'M': 0B1001, 'B': 0B0111, 'D': 0B1110,
+                 'H': 0B1101, 'V': 0B1011, 'N': 0B1111, '-': 0B0000}
 
     for h, s in bin_fasta.items():
         seq = []
