@@ -75,7 +75,7 @@ class GenomeRegion:
         if self.ncoords is not None:
             if self.region_name != '5\'LTR':
                 self.rel_pos['CDS'].append((self.ncoords[0] + 1 - region_coords[0]))
-                self.rel_pos['CDS'].append((self.ncoords[1] + 1 - region_coords[0]) + 1)
+                self.rel_pos['CDS'].append((self.ncoords[1] + 1 - region_coords[0]))
 
     def set_pos_from_gstart(self):
         self.rel_pos['gstart'] = self.ncoords
@@ -161,7 +161,7 @@ class GenomeRegion:
             end = min(local_pair[1] + 1, len(seq))
             if base == 'nucl':
                 overlap.append(seq[start - 1: end + 1])
-                overlap.append(self.local_to_global_index(region, [start, end], base))
+                overlap.append(self.local_to_global_index(region, [start, end + 1], base))
             else:
                 overlap.append(seq[start - 1: end - 1])
                 overlap.append(self.local_to_global_index(region, [start, end - 1], base))
@@ -455,7 +455,7 @@ def find_matches(base, ref_regions, match_coordinates):
 
     for coord in match_coordinates:
         start_aln = coord[0]
-        end_aln = coord[1] - 1  # -1 to account for match.end() in regex
+        end_aln = coord[1]
 
         for ref_region in ref_regions:
             if ref_region.region_name != "Complete":
@@ -504,9 +504,9 @@ def set_protein_equivalents(query_reg, ref_regions):
     for ref_reg in ref_regions:
         if ref_reg.region_name == query_reg.region_name and ref_reg.region_name not in non_coding:
             if ref_reg.codon_aln is not None and query_reg.pcoords is not None:
-                prot_equiv = ref_reg.codon_aln[query_reg.ncoords[0]: query_reg.ncoords[1]]
+                prot_equiv = ref_reg.codon_aln[query_reg.pcoords[0]: query_reg.pcoords[1]]
                 prot_equiv = re.sub('[-]', '', prot_equiv)
-                query_reg.set_aa_seq(prot_equiv)
+                query_reg.set_sequence('prot', prot_equiv)
 
     return prot_equiv
 
@@ -561,7 +561,7 @@ def output_retrieved_region(region, outfile=None):
 
         if region.rel_pos['gstart']:
             print("\t\tNucleotide position relative to genome start:\t{} --> {}"
-                  .format(region.rel_pos['gstart'][0] + 1, region.rel_pos['gstart'][1] + 1))
+                  .format(region.rel_pos['gstart'][0], region.rel_pos['gstart'][1]))
 
         if region.rel_pos['pstart']:
             print("\t\tAmino acid position relative to protein start:\t{} --> {}"
@@ -642,7 +642,7 @@ def output_overlap(overlap_regions, outfile=None):
 
             if region.rel_pos['gstart']:
                 print("\t\tNucleotide position relative to genome start:\t{} --> {}"
-                      .format(region.rel_pos['gstart'][0] + 1, region.rel_pos['gstart'][1] + 1))
+                      .format(region.rel_pos['gstart'][0], region.rel_pos['gstart'][1]))
 
             if region.rel_pos['pstart']:
                 print("\t\tAmino acid position relative to protein start:\t{} --> {}"
@@ -725,7 +725,6 @@ def retrieve(base, ref_regions, region, qstart=1, qend='end'):
             query_region = GenomeRegion(region)
 
             # Set local and global coordinates
-            # query_region.set_coords([qstart, qend], base)
             global_coords = GenomeRegion.local_to_global_index(ref_region, [qstart, qend], base)
             query_region.set_coords(global_coords, base)
 

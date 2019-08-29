@@ -205,13 +205,13 @@ class TestSetPosFromAAStart(unittest.TestCase):
 class TestMakeCodonAln(unittest.TestCase):
 
     def testSimpleUse(self):
-        region = GenomeRegion('p6', [2134, 2298], 'CTTCAGAGCAGACCAGAGCCAACAGCCCCACCAGAAGAGAGCTTCAGGTCTGGGGTAGAGACAACAAC'
+        region = GenomeRegion('p6', [2134, 2292], 'CTTCAGAGCAGACCAGAGCCAACAGCCCCACCAGAAGAGAGCTTCAGGTCTGGGGTAGAGACAACAAC'
                                                   'TCCCCCTCAGAAGCAGGAGCCGATAGACAAGGAACTGTATCCTTTAACTTCCCTCAGGTCACTCTTTG'
                                                   'GCAACGACCCCTCGTCACAATAA',
-                              [449, 500], 'LQSRPEPTAPPEESFRSGVETTTPPQKQEPIDKELYPLTSLRSLFGNDPSSQ')
+                                    [449, 500],   'LQSRPEPTAPPEESFRSGVETTTPPQKQEPIDKELYPLTSLRSLFGNDPSSQ*')
         region.make_codon_aln()
         expected = '-L--Q--S--R--P--E--P--T--A--P--P--E--E--S--F--R--S--G--V--E--T--T--T--P--P--Q-' \
-                   '-K--Q--E--P--I--D--K--E--L--Y--P--L--T--S--L--R--S--L--F--G--N--D--P--S--S--Q-'
+                   '-K--Q--E--P--I--D--K--E--L--Y--P--L--T--S--L--R--S--L--F--G--N--D--P--S--S--Q--*-'
         result = region.codon_aln
         self.assertEqual(expected, result)
 
@@ -1058,6 +1058,63 @@ class TestHandleArgs(InputTestCase):
                                                      'TNTPEALCDPTEDSRSPQD']]
         result_ref_prot = result[1]
         self.assertEqual(expected_ref_prot, result_ref_prot)
+
+
+class TestSetNucleotideEquivalent(InputTestCase):
+
+    def testSimpleNuclEquiv(self):
+        configs = handle_args('hiv', 'prot', self.hiv_nt_seq_path, self.hiv_ncoords_path,
+                              self.hiv_aa_seq_path, self.hiv_pcoords_path)
+
+        ref_nt_seq = configs[0][0][1]
+        ref_aa_seq = configs[1]
+        nt_coords = configs[2]
+        aa_coords = configs[3]
+
+        with open(nt_coords) as ncoords, open(aa_coords) as pcoords:
+            ref_regions = set_regions('prot', ncoords, ref_nt_seq, pcoords, ref_aa_seq)
+        for region in ref_regions:
+            region.make_codon_aln()
+
+        query_region = GenomeRegion('Gag', [2133, 2292], 'GCTGAAGCAATGAGCCAAGTAACAAATTCAGCTACCATAATG',
+                                    [364, 377], 'AEAMSQVTNSATIM')
+
+        expected = 'GCTGAAGCAATGAGCCAAGTAACAAATTCAGCTACCATAATG'
+        result = set_nucleotide_equivalents(query_region, ref_regions)
+        self.assertEqual(expected, result)
+
+    def testWithGaps(self):
+        ref_regions = [GenomeRegion('test1', [1, 31], 'GGGGGCCCGGGTTTAAACCCGGGTTTAAATTTC', [1, 11], 'GGPGLNPGLNF')]
+        for region in ref_regions:
+            region.make_codon_aln()
+        q_region = GenomeRegion('test1', [12, 27],  'TTAAACCCGGGTTTA', [1, 5], 'LNPGL')
+        expected = 'TTAAACCCGGGTTTA'
+        result = set_nucleotide_equivalents(q_region, ref_regions)
+        self.assertEqual(expected, result)
+
+
+class TestSetProteinEquivalent(InputTestCase):
+
+    def testHIV(self):
+        configs = handle_args('hiv', 'nucl', self.hiv_nt_seq_path, self.hiv_ncoords_path,
+                              self.hiv_aa_seq_path, self.hiv_pcoords_path)
+
+        ref_nt_seq = configs[0][0][1]
+        ref_aa_seq = configs[1]
+        nt_coords = configs[2]
+        aa_coords = configs[3]
+
+        with open(nt_coords) as ncoords, open(aa_coords) as pcoords:
+            ref_regions = set_regions('nucl', ncoords, ref_nt_seq, pcoords, ref_aa_seq)
+
+        for reg in ref_regions:
+            reg.make_codon_aln()
+
+        query_region = GenomeRegion('Gag', [2133, 2292], 'GCTGAAGCAATGAGCCAAGTAACAAATTCAGCTACCATAATG',
+                                    [364, 377], 'AEAMSQVTNSATIM')
+        expected = 'AEAMSQVTNSATIM'
+        result = set_protein_equivalents(query_region, ref_regions)
+        self.assertEqual(expected, result)
 
 
 if __name__ == '__main__':
