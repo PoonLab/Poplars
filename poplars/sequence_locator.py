@@ -468,24 +468,19 @@ def find_matches(base, ref_regions, match_coordinates):
                         query_region = GenomeRegion(ref_region.region_name)
                         query_region.set_sequence(ov_seq, base)
 
-                        # Set protein and nucelotide coordinates
+                        # Set protein and nucleotide coordinates
                         query_region.set_coords(ov_coord, base)
 
                         if base == 'nucl':
-                            query_regions.set_coords(prot_coords, 'prot')
+                            set_protein_equivalents(query_region, ref_regions)
                         else:
-                            query_regions.set_coords(nucl_coords, 'nucl')
+                            set_nucleotide_equivalents(query_region, ref_regions)
 
                         # Set relative positions
                         query_region.set_pos_from_cds(ref_region.get_coords(base))
                         query_region.set_pos_from_gstart()
                         query_region.set_pos_from_qstart(coord, base)
                         query_region.set_pos_from_pstart()
-
-                        if base == 'nucl':
-                            set_protein_equivalents(query_region, ref_regions)
-                        else:
-                            set_nucleotide_equivalents(query_region, ref_regions)
 
                         query_regions[query_region.region_name] = query_region
 
@@ -499,16 +494,19 @@ def set_protein_equivalents(query_reg, ref_regions):
     :param ref_regions: a list of GenomeRegion objects
     :return prot_equiv: the protein equivalent of the nucleotide sequence
     """
-    prot_equiv = None
+    prot_seq = ''
+    prot_coords = []
     non_coding = ["5'LTR", "TAR", "3'LTR"]
     for ref_reg in ref_regions:
         if ref_reg.region_name == query_reg.region_name and ref_reg.region_name not in non_coding:
             if ref_reg.codon_aln is not None and query_reg.pcoords is not None:
-                prot_equiv = ref_reg.codon_aln[query_reg.pcoords[0]: query_reg.pcoords[1]]
-                prot_equiv = re.sub('[-]', '', prot_equiv)
-                query_reg.set_sequence('prot', prot_equiv)
+                prot_coords = query_reg.get_overlap(query_reg.region, query_reg.get_coords('prot'), 'prot')
+                prot_seq = ref_reg.codon_aln[query_reg.pcoords[0]: query_reg.pcoords[1]]
+                prot_seq = re.sub('[-]', '', prot_seq)
+                query_reg.set_sequence('prot', prot_seq)
+                query_reg.set_coords(prot_coords, 'prot')
 
-    return prot_equiv
+    return prot_seq, prot_coords
 
 
 def set_nucleotide_equivalents(query_reg, ref_regions):
@@ -518,17 +516,20 @@ def set_nucleotide_equivalents(query_reg, ref_regions):
     :param ref_regions: a list of GenomeRegion objects
     :return nt_equiv: the nucleotide equivalent of the protein sequence
     """
-    nt_equiv = None
+    nt_seq = ''
+    nt_coords = []
     for ref_reg in ref_regions:
         if ref_reg.region_name == query_reg.region_name and ref_reg.codon_aln is not None:
             if query_reg.ncoords is not None:
                 query_reg.make_codon_aln()
                 regex = re.compile(query_reg.codon_aln)
                 coords = regex.search(ref_reg.codon_aln).span()
-                nt_equiv = ref_reg.nt_seq[coords[0]: coords[1]]
-                query_reg.set_sequence('nucl', nt_equiv)
+                nt_coords = query_reg.get_overlap(query_reg.region_name, query_reg.get_coords('nucl'), 'nucl')
+                nt_seq = ref_reg.nt_seq[coords[0]: coords[1]]
+                query_reg.set_sequence('nucl', nt_seq)
+                query_reg.set_coords(nt_coords, 'nucl')
 
-    return nt_equiv
+    return nt_seq, nt_coords
 
 
 def output_retrieved_region(region, outfile=None):
