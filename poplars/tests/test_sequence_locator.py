@@ -160,6 +160,20 @@ class TestSetPosFromCDS(unittest.TestCase):
         result = region.rel_pos['CDS']
         self.assertEqual(expected, result)
 
+    def testGagfromP1Start(self):
+        region = GenomeRegion('Gag', [2086, 2133])
+        region.set_pos_from_cds([2086, 2133])
+        expected = [1297, 1344]
+        result = region.rel_pos['CDS']
+        self.assertEqual(expected, result)
+
+    def testPolFromP1Start(self):
+        region = GenomeRegion('Pol', [2086, 2133])
+        region.set_pos_from_cds([2086, 2133])
+        expected = [2, 49]
+        result = region.rel_pos['CDS']
+        self.assertEqual(expected, result)
+
 
 class TestSetPosFromAAStart(unittest.TestCase):
 
@@ -257,6 +271,17 @@ class TestLocalToGlobalIndex(unittest.TestCase):
         expected = [1096, 1215]
         result = region.local_to_global_index(region, [1, 120], 'prot')
         self.assertEqual(expected, result)
+
+
+class TestProtCoordsFromNuclCoords(unittest.TestCase):
+
+    def testSimpleUse(self):
+        region = GenomeRegion('Gag', [2086, 2133], 'TTTTTAGGGAAGATCTGGCCTTCCTACAAGGGAAGGCCAGGGAATTTT', None, None)
+        region.set_pos_from_cds([2086, 2133])
+        print(region.rel_pos['CDS'])
+        region.set_pcoords_from_ncoords()
+        expected = [433, 448]
+        self.assertEqual(expected, region.pcoords)
 
 
 class TestGetOverlap(unittest.TestCase):
@@ -806,7 +831,7 @@ class TestFindMatches(unittest.TestCase):
         result = find_matches('nucl', ref_regions, coordinates)
 
         exp_region_names = ['Gag',           'p6']
-        exp_pos_from_cds = [[1344, 1504],    [1, 159]]
+        exp_pos_from_cds = [[1344, 1503],    [1, 159]]
         exp_pos_from_qstart = [[1, 160],     [2, 160]]
         exp_pos_from_gstart = [[2133, 2292], [2134, 2292]]
         exp_pos_from_pstart = [[449, 501],   [1, 53]]

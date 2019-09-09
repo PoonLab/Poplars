@@ -73,9 +73,15 @@ class GenomeRegion:
         Gives the position of a sequence relative to the start of the coding sequence
         """
         if self.ncoords is not None:
+            local_ncoords = self.global_to_local_index(self.get_coords('nucl'), 'nucl')
+            print('local ncoords {}'.format(local_ncoords))
+
             if self.region_name != '5\'LTR':
-                self.rel_pos['CDS'].append((self.ncoords[0] + 1 - region_coords[0]))
-                self.rel_pos['CDS'].append((self.ncoords[1] + 1 - region_coords[0]))
+                len_region = region_coords[1] - region_coords[0]
+                cds_start = region_coords[0] - local_ncoords[0] + 1
+                cds_end = cds_start + len_region
+                self.rel_pos['CDS'].append(cds_start)
+                self.rel_pos['CDS'].append(cds_end)
 
     def set_pos_from_gstart(self):
         self.rel_pos['gstart'] = self.ncoords
@@ -142,6 +148,25 @@ class GenomeRegion:
             global_pair = [global_start, global_end]
             return global_pair
 
+    def set_pcoords_from_ncoords(self):
+        """
+        Sets protein coordinates relative to the protein start, given the nucleotide coordinates
+        """
+        if self.rel_pos['CDS'] is not None:
+            prot_start = self.rel_pos['CDS'][0] // 3 + 1
+            prot_end = self.rel_pos['CDS'][1] // 3
+            self.pcoords = [prot_start, prot_end]
+
+    def set_ncoords_from_pcoords(self):
+        """
+        Sets nucleotide coordinates given the protein coordinates relative to the protein start
+        :return ncoords: the nucleotide coordinates
+        """
+        if self.pcoords is not None:
+            nucl_start = self.pcoords[0] - 1 * 3
+            nucl_end = self.pcoords[1] * 3
+            return [nucl_start, nucl_end]
+
     def get_overlap(self, region, coord_pair, base):
         """
         Gets the sequence regions that overlap with the region of interest
@@ -161,7 +186,7 @@ class GenomeRegion:
             end = min(local_pair[1] + 1, len(seq))
             if base == 'nucl':
                 overlap.append(seq[start - 1: end + 1])
-                overlap.append(self.local_to_global_index(region, [start, end + 1], base))
+                overlap.append(self.local_to_global_index(region, [start, end], base))
             else:
                 overlap.append(seq[start - 1: end - 1])
                 overlap.append(self.local_to_global_index(region, [start, end - 1], base))
@@ -472,8 +497,14 @@ def find_matches(base, ref_regions, match_coordinates):
                         query_region.set_coords(ov_coord, base)
 
                         if base == 'nucl':
+                            prot_start = ov_coord[0] // 3
+                            prot_end = ov_coord[1] // 3
+                            query_region.set_coords([prot_start, prot_end], 'prot')
                             set_protein_equivalents(query_region, ref_regions)
                         else:
+                            nucl_start = ov_coord[0] * 3
+                            nucl_end = ov_coord[1] * 3
+                            query_region.set_coords([nucl_start, nucl_end], 'nucl')
                             set_nucleotide_equivalents(query_region, ref_regions)
 
                         # Set relative positions
