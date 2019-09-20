@@ -4,12 +4,11 @@ as described in Keele et al. http://www.pnas.org/cgi/content/short/0802203105
 Supplementary Materials.
 """
 
-
 import argparse
-from poplars.common import convert_fasta
 import re
 
 import scipy.stats as stats
+from common import *
 
 
 class MutationInfo:
@@ -57,8 +56,11 @@ def parse_args():
         description='Classify HIV-1 sequences as being hypermutated '
                     'based on dinucleotide frequencies relative to the consensus.'
     )
-    parser.add_argument('fasta', help="<input> path to FASTA file")
-    parser.add_argument('--skip', help="<option> number of records to skip")
+    parser.add_argument('fasta', help='<input> path to FASTA file. If no reference sequence is specified, '
+                                      'the program will designate the first sequence as the reference sequence.')
+    parser.add_argument('--consensus', action="store_true", default=False,
+                        help='<option> the majority-rule consensus sequence is designated as the reference sequence.')
+    parser.add_argument('--skip', type=int, help="<option> number of records to skip")
     parser.add_argument('--out', help="<option> write output to the specified file")
 
     return parser.parse_args()
@@ -72,7 +74,6 @@ def make_results(seq, gees):
     :return ctable: a contingency table for the query sequence
     """
 
-    # FIXME: Regexes do not catch all potential mutation/ control sites
     mut = re.compile('[AGCT](?=[AG][AGT])')  # Matches potential mutation sites (GRD)
     ctrl = re.compile('[AGCT](?=[CT].|[AG]C)')  # Matches control sites (YN|RC)
 
@@ -127,10 +128,12 @@ def make_results(seq, gees):
     return result
 
 
-def hypermut(infile, skip=None):
+def hypermut(infile, cons, skip=None):
     """
     Determines if a sequence is hypermutated compared to the reference sequence
     :param infile: the input FASTA file
+    :param cons: <bool> True if the consensus sequence is designated as the reference sequence
+                        False if the first sequence is designated as the reference sequence
     :param skip: the number of records to skip
     :return results: a list of MutationInfo Objects
     """
@@ -138,21 +141,29 @@ def hypermut(infile, skip=None):
     with open(infile) as handle:
         fasta = convert_fasta(handle)
 
+    if cons:
+        print("Generating consensus sequence.")
+        refseq = consensus(fasta)
+        query_seqs = fasta
+    else:
+        refseq = fasta[0][1]  # First sequence is the reference sequence
+        query_seqs = fasta[1:]
+
     if skip:
-        print("skipping first {} records".format(skip))
+        print("Skipping first {} records".format(skip))
         fasta = fasta[int(skip):]
+        query_seqs = fasta
 
     # Check that sequences are aligned
     length = len(fasta[0][1])
     for h, s in fasta:
         assert length == len(s), "Sequences are not aligned."
 
-    refseq = fasta[0][1]  # First sequence is the reference sequence
     gees = [i for i, nt in enumerate(refseq) if nt.upper() == 'G']  # Locate GRD motifs in reference sequence
     results = []
 
     # Iterate through sequences and identify substitutions from consensus
-    for j, seq in enumerate(fasta[1:]):
+    for j, seq in enumerate(query_seqs):
         result = make_results(seq, gees)
         results.append(result)
 
@@ -224,7 +235,7 @@ def make_data_file(file_name, mutation_info_list):
 
 def main():
     args = parse_args()
-    results = hypermut(args.fasta, args.skip)
+    results = hypermut(args.fasta, args.consensus, args.skip)
     if args.out:
         make_data_file(args.out, results)
     pretty_print(results)
