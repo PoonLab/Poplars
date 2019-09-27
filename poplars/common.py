@@ -118,16 +118,4 @@ def consensus(fasta, alphabet='ACGT', resolve=False):
 
     newseq = "".join(consen)
 
-    # Resolve missing data.
-    # Proper indels start and end in-frame.
-    indel_ptn = re.compile("(.{3})*?(?P<indel>(\?{3})+)")
-    indels = []
-    for match in indel_ptn.finditer(newseq):
-        indels.extend(range(*match.span("indel")))
-
-    for column in range(len(consen)):
-        if consen[column] == "?" and column not in indels:
-            consen[column] = consensus(column, resolve=True)
-
-    return "".join(consen)
-
+    return newseq
