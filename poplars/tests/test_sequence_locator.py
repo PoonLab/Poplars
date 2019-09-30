@@ -555,62 +555,43 @@ class TestGetQuery(unittest.TestCase):
 
     def testNucleotideQuery(self):
         expected = [["query", "ATGCGCG"]]
-        handle = StringIO(">query\natgcgcg\n")
-        result = get_query("nucl", handle, False)
+        result = get_query("nucl", "ATGCGCG", False)
         self.assertEqual(expected, result)
 
     def testProteinQuery(self):
-        expected = [["query", "MPPLMMADLADLGG"]]
-        handle = StringIO(">query\nMPPLMMADLADLGG\n")
-        result = get_query("prot", handle, False)
+        expected = [["query1", "MPPLMMADLADLGG"]]
+        query = ">query1\nMPPLMMADLADLGG"
+        result = get_query("prot", query, False)
         self.assertEqual(expected, result)
 
     def testLongNucleotideSequence(self):
         expected = [["query", "ATGCGCGAATTAGCGA"]]
-        handle = StringIO(">query\natgcgcg\naattagcga\n")
-        result = get_query("nucl", handle, False)
+        query = "atgcgcg\naattagcga"
+        result = get_query("nucl", query, False)
         self.assertEqual(expected, result)
 
     def testRevCompNucl(self):
-        handle = StringIO(">query\nTCGCTAATTCGCGCATN*")
-        expected = [["query", "*NATGCGCGAATTAGCGA"]]
-        result = get_query("nucl", handle, True)
+        query = ">seq1\nTCGCTAATTCGCGCATN*"
+        expected = [["seq1", "*NATGCGCGAATTAGCGA"]]
+        result = get_query("nucl", query, True)
         self.assertEqual(expected, result)
 
     def testInvalidNucleotideQuery(self):
-        handle = StringIO(">query\natgcgcg&\n")
+        query = ">query\natgcgcg&\n"
         with self.assertRaises(SystemExit) as e:
-            get_query("nucl", handle, 'n')
+            get_query("nucl", query, 'n')
         self.assertEqual(e.exception.code, 0)
 
     def testInvalidProteinQuery(self):
-        handle = StringIO(">query\nMPPLMMAD>LADLGG\n")
+        query = ">query\nMPPLMMAD>LADLGG"
         with self.assertRaises(SystemExit) as e:
-            get_query("prot", handle, 'n')
+            get_query("prot", query, 'n')
         self.assertEqual(e.exception.code, 0)
 
     def testRevCompProt(self):
-        handle = StringIO(">query\nMPPLMMADLADLGG\n")
-        expected = [["query", "MPPLMMADLADLGG"]]
+        handle = ">seq2\nMPPLMMADLADLGG\n"
+        expected = [["seq2", "MPPLMMADLADLGG"]]
         result = get_query('prot', handle, True)
-        self.assertEqual(expected, result)
-
-    def testPlainText(self):
-        handle = StringIO("atgatcg\n")
-        expected = [["Sequence1", "ATGATCG"]]
-        result = get_query("nucl", handle, False)
-        self.assertEqual(expected, result)
-
-    def testMultipleQueries(self):
-        handle = StringIO("atgct--agc\natgca---ga\n")
-        expected = [["Sequence1", "ATGCT--AGC"], ["Sequence2", "ATGCA---GA"]]
-        result = get_query("nucl", handle, False)
-        self.assertEqual(expected, result)
-
-    def testMultipleFasta(self):
-        handle = StringIO(">q1\natgct--agc\n>q2\natgca---ga\n")
-        expected = [["q1", "ATGCT--AGC"], ["q2", "ATGCA---GA"]]
-        result = get_query("nucl", handle, False)
         self.assertEqual(expected, result)
 
 

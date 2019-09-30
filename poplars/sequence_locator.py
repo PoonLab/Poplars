@@ -11,7 +11,6 @@ import re
 from poplars.mafft import *
 from poplars.common import convert_fasta
 import textwrap
-import json
 
 
 class GenomeRegion:
@@ -298,7 +297,7 @@ def valid_sequence(base, sequence):
     :raises ValueError: If the sequence is empty or if it contains invalid characters
     :return: <True> If the input sequence uses the correct alphabet, <False> otherwise
     """
-    dna_alphabet = 'atgc-*xn'
+    dna_alphabet = 'ATGC-*XN'
     aa_alphabet = 'ARDNCEQGHILKMFPSTWYV-*X'
 
     if not sequence:
@@ -310,14 +309,10 @@ def valid_sequence(base, sequence):
             print("Invalid sequence: sequence length is 0\n")
             return False
         elif base == 'nucl':
-            # Nucleotide sequences are converted to lowercase
-            s = s.lower()
             if not all(pos in dna_alphabet for pos in s):
                 print("Invalid nucleotide sequence:\n{}\n{}\n".format(h, s))
                 return False
         else:
-            # Amino acid sequences are converted to uppercase
-            s = s.upper()
             if not all(pos in aa_alphabet for pos in s):
                 print("Invalid amino acid sequence:\n{}\n{}\n".format(h, s))
                 return False
@@ -362,44 +357,61 @@ def valid_inputs(virus, start_coord, end_coord, region):
     return True
 
 
-def get_query(base, query_file, revcomp):
+def get_query(base, query, revcomp):
     """
     Gets the query sequence and checks that it is valid
     :param base: The base (nucleotide or protein)
-    :param query_file: The file stream containing the query sequence in read mode
-    :param revcomp: Option to align the reverse complement of the nucleotide sequence ('y' or 'n')
+    :param query: The query sequence as a string or the file path to the query sequence
+    :param revcomp: Option to align the reverse complement of the nucleotide sequence
     :return: A list of lists containing the sequence identifiers and the query sequences
     """
 
-    line = query_file.readline()
-    query_file.seek(0)  # Reset pointer to beginning
+    # If the query is a string
+    if not os.path.exists(query):
+        query_lines = query.split('\n')
+        [line.strip('\n') for line in query_lines]
 
-    # Parse query sequence
-    if line.startswith('>'):  # Fasta file
-        query = convert_fasta(query_file)
+        # Convert string into a list of lists
+        if query_lines[0].startswith('>'):
+            header = query_lines[0].strip('>')
+            seq = ''.join(query_lines[1:])
+        else:
+            header = "query"
+            seq = ''.join(query_lines)
+        query_seq = [[header, seq.upper()]]
 
+    # If the query is a file path
     else:
-        query = []
-        count = 1
-        for line in query_file:
-            line = line.strip('\n')
-            if len(line) > 0:
-                query.extend([["Sequence{}".format(count), "{}".format(line.upper())]])
-                count += 1
+        with open(query, 'r') as query_handle:
+            line = query_handle.readline()
+            query_handle.seek(0)  # Reset pointer to beginning
 
-    if not valid_sequence(base, query):
+            # Parse query sequence
+            if line.startswith('>'):  # Fasta file
+                query_seq = convert_fasta(query_handle)
+
+            else:
+                query_seq = []
+                count = 1
+                for line in query_handle:
+                    line = line.strip('\n')
+                    if len(line) > 0:
+                        query_seq.extend([["Sequence{}".format(count), "{}".format(line.upper())]])
+                        count += 1
+
+    if not valid_sequence(base, query_seq):
         sys.exit(0)
 
-    else:
-        if revcomp:
-            if base == 'prot':
-                print("Invalid option: reverse complement is not available for proteins.")
-            else:
-                rc_query = reverse_comp(query[0][1])
-                header = query[0][0]
-                query = [[header, rc_query]]
+    # At this point, the sequence is valid
+    if revcomp:
+        if base == 'prot':
+            print("Invalid option: reverse complement is not available for proteins.")
+        else:
+            rc_query = reverse_comp(query_seq[0][1])
+            header = query_seq[0][0]
+            query_seq = [[header, rc_query]]
 
-        return query
+    return query_seq
 
 
 def reverse_comp(query_sequence):
@@ -864,9 +876,8 @@ def parse_args():
     parser_align = subparsers.add_parser('align', formatter_class=argparse.ArgumentDefaultsHelpFormatter,
                                          description='Align a nucleotide or protein sequence '
                                                      'relative to the HIV or SIV reference genome')
-    parser_align.add_argument('query', type=argparse.FileType('r'),
-                              help='Path to the file containing the query sequence.')
-    parser_align.add_argument('-revcomp', type=bool, default=False, choices=[True, False],
+    parser_align.add_argument('query', help='The query sequence. This can be the a string or a file path.')
+    parser_align.add_argument('--revcomp', action="store_true", default=False,
                               help='Align the reverse complement of the query sequence with the reference sequence')
     parser_align.add_argument('-outfile', type=argparse.FileType('w'),
                               help='Path to the file where results will be written. '
