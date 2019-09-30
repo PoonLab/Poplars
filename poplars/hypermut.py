@@ -50,6 +50,16 @@ class MutationInfo:
         self.mut_sites = mut_sites
         self.ctrl_sites = ctrl_sites
 
+    def is_hypermutated(self):
+        """
+        Returns if a sequence is hypermutated
+        :return: True if the sequence is hypermutated, False otherwise
+        """
+        self.hypermutated = False
+        if self.p_value is not None and self.p_value <= 0.05:
+            self.hypermutated = True
+        return self.hypermutated
+
 
 def parse_args():
     parser = argparse.ArgumentParser(
@@ -142,15 +152,14 @@ def hypermut(infile, cons, skip=None):
         fasta = convert_fasta(handle)
 
     if cons:
-        print("Generating consensus sequence.")
-        refseq = consensus(fasta)
+        refseq = get_consensus(fasta)
         query_seqs = fasta
     else:
         refseq = fasta[0][1]  # First sequence is the reference sequence
         query_seqs = fasta[1:]
 
     if skip:
-        print("Skipping first {} records".format(skip))
+        print("Skipping first {} records...\n".format(skip))
         fasta = fasta[int(skip):]
         query_seqs = fasta
 
@@ -168,6 +177,12 @@ def hypermut(infile, cons, skip=None):
         results.append(result)
 
     return results
+
+
+def get_consensus(fasta):
+    print("Generating consensus sequence...\n")
+    refseq = consensus(fasta)
+    return refseq
 
 
 def rate_ratio(ctable):
@@ -195,42 +210,74 @@ def pretty_print(results):
     Print results
     :param results: a list of MutationInfo objects
     """
-    print("\033[1m{0:<11} {1:<7} {2:<22} {3:<15} {4:<21} {5:<22} {6:<25} {7:<20}".format
+
+    print("{0}\t\t{1}\t\t{2}\t\t{3}\t\t{4}\t\t{5}\t\t{6}\t\t{7}\t\t{8}".format
           ("Sequence", "Muts", "Potential Mut Sites", "Control Muts", "Potential Controls",
-           "Rate Ratio", "Fisher's Exact P-value", "Odds Ratio\033[0m"))
+           "Rate Ratio", "Fisher's Exact P-value", "Odds Ratio", "Hypermutated"))
+    print('-' * 169)
 
     # Print values of rows under corresponding headings
     for result in results:
-        print("{0:<11} {1:<7} {2:<22} {3:<15} {4:<21} {5:<22} {6:<25} {7:<20}"
-              .format(result.seq_name, result.num_muts, result.pot_muts,
-                      result.ctrl_muts, result.potential_ctrls,
-                      result.rate_ratio, result.p_value, result.odds_ratio))
+        is_hypermutated = result.is_hypermutated()
+        print("{0}\t\t{1}\t\t\t{2}\t\t\t\t\t{3}\t\t\t\t\t{4}\t\t\t\t\t{5}\t\t\t{6}\t\t\t\t\t{7}\t\t{8}"
+              .format(result.seq_name[:8], result.num_muts, result.pot_muts, result.ctrl_muts,
+                      result.potential_ctrls, round(result.rate_ratio, 2), round(result.p_value, 6),
+                      round(result.odds_ratio, 6), str(is_hypermutated)))
 
     # Print summary of hypermutated sequences
-    print("\n\033[1m\033[4mSummary:\033[0m")
+    print("\nSummary:")
     for result in results:
         if result.p_value <= 0.05:
             print("{} appears to be hypermutated (OR={})".format(result.seq_name, result.odds_ratio))
+        else:
+            print("No sequences appear to be hypermutated.")
+            break
 
 
-def make_data_file(file_name, mutation_info_list):
+def make_data_file(file_name, results):
     """
     Writes detailed output of hypermut to a text file
     :param file_name: name of the output file
-    :param mutation_info_list: list of MutationInfo objects
+    :param results: list of MutationInfo objects
     """
 
     with open(file_name, "w+") as output:
-        for mutation_info in mutation_info_list:
-            output.write("\nSequence Name: {}".format(mutation_info.seq_name))
-            output.write("\nPos\tMut\n")
-            for key in mutation_info.mut_sites:
-                output.write("{}\t{}\n".format(key, mutation_info.mut_sites[key]))
 
-            output.write("\nSequence Name: {} control".format(mutation_info.seq_name))
+        output.write("Results:\n")
+        output.write("{0},{1},{2},{3},{4},{5},{6},{7},{8}\n".format
+                     ("Sequence", "Muts", "Potential Mut Sites", "Control Muts", "Potential Controls",
+                      "Rate Ratio", "Fisher's Exact P-value", "Odds Ratio", "Hypermutated"))
+
+        # Print values of rows under corresponding headings
+        for result in results:
+            is_hypermutated = result.is_hypermutated()
+            output.write("{0},{1},{2},{3},{4},{5},{6},{7},{8}\n"
+                         .format(result.seq_name[:8], result.num_muts, result.pot_muts, result.ctrl_muts,
+                                 result.potential_ctrls, round(result.rate_ratio, 2),
+                                 round(result.p_value, 6), round(result.odds_ratio, 6),
+                                 str(is_hypermutated)))
+
+        # Print summary of hypermutated sequences
+        output.write("\nSummary:\n")
+        for result in results:
+            if result.p_value <= 0.05:
+                output.write("{} appears to be hypermutated (OR={})\n".format(result.seq_name, result.odds_ratio))
+            else:
+                output.write("No sequences appear to be hypermutated.\n")
+                break
+
+        # Print detailed output
+        output.write("\nLocations of matches:\n")
+        for result in results:
+            output.write("\nSequence Name: {}".format(result.seq_name[:8]))
             output.write("\nPos\tMut\n")
-            for key in mutation_info.ctrl_sites:
-                output.write("{}\t{}\n".format(key, mutation_info.ctrl_sites[key]))
+            for key in result.mut_sites:
+                output.write("{}\t{}\n".format(key, result.mut_sites[key]))
+
+            output.write("\nSequence Name: {} control".format(result.seq_name))
+            output.write("\nPos\tMut\n")
+            for key in result.ctrl_sites:
+                output.write("{}\t{}\n".format(key, result.ctrl_sites[key]))
 
 
 def main():
