@@ -1,5 +1,10 @@
 import random
-import re
+
+mixture_dict = {'W': 'AT', 'R': 'AG', 'K': 'GT', 'Y': 'CT', 'S': 'CG',
+                'M': 'AC', 'V': 'AGC', 'H': 'ATC', 'D': 'ATG',
+                'B': 'TGC', 'N': 'ATGC', '-': 'ATGC'}
+
+ambig_dict = dict(("".join(sorted(v)), k) for k, v in mixture_dict.items())
 
 
 def convert_fasta(handle):
@@ -39,13 +44,6 @@ def convert_fasta(handle):
     return result
 
 
-mixture_dict = {'W': 'AT', 'R': 'AG', 'K': 'GT', 'Y': 'CT', 'S': 'CG',
-                'M': 'AC', 'V': 'AGC', 'H': 'ATC', 'D': 'ATG',
-                'B': 'TGC', 'N': 'ATGC', '-': 'ATGC'}
-
-ambig_dict = dict(("".join(sorted(v)), k) for k, v in mixture_dict.items())
-
-
 def transpose_fasta(fasta):
     # some checks to make sure the right kind of object is being sent
     if type(fasta) is not list:
@@ -69,7 +67,7 @@ def plurality_consensus(column, alphabet='ACGT', resolve=False):
     freqs = {}
     for char in alphabet:
         freqs.update({char: 0})
-    # freqs = {"A": 0, "T": 0, "C": 0, "G": 0, "-": 0}
+
     for char in column:
         if char in alphabet:
             freqs[char] += 1
