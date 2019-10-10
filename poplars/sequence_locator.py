@@ -32,7 +32,7 @@ class GenomeRegion:
         self.nt_seq = nt_seq
         self.pcoords = pcoords
         self.aa_seq = aa_seq
-        self.cds, self.gstart, self.qstart, self.pstart = None, None, None, None
+        self.cds_offset, self.gstart, self.qstart, self.pstart = [], [], [], []
         self.codon_aln = ''
 
     def get_coords(self, base):
@@ -67,19 +67,30 @@ class GenomeRegion:
         else:
             self.aa_seq = sequence[self.pcoords[0] - 1: self.pcoords[1]]
 
-    def set_pos_from_cds(self, region_coords):
+    def set_pos_from_cds(self, ref_reg_name):
         """
-        Gives the position of a sequence relative to the start of the coding sequence
+        Gives the position of a the query sequence relative to the start of the coding sequence
         """
-        if self.ncoords is not None:
-            local_ncoords = self.global_to_local_index(self.get_coords('nucl'))
-            print('local ncoords {}'.format(local_ncoords))
 
-            if self.region_name != '5\'LTR':
-                len_region = region_coords[1] - region_coords[0]
-                cds_start = region_coords[0] - local_ncoords[0] + 1
-                cds_end = cds_start + len_region
-                self.cds = [cds_start, cds_end]
+        ref_region = GENOME_REGIONS[ref_reg_name]
+        if self.ncoords and ref_region.ncoords:
+
+            query_start = self.ncoords[0]
+            query_end = self.ncoords[1]
+            ref_start = ref_region.ncoords[0]
+            ref_end = ref_region.ncoords[1]
+
+            if query_start == ref_start:
+                start = 1
+            else:
+                start = query_start - ref_start
+
+            if query_end == ref_end:
+                end = query_end - query_start
+            else:
+                end = query_end - start
+
+            self.cds_offset = [start, end]
 
     def set_pos_from_gstart(self):
         self.gstart = self.ncoords
@@ -150,9 +161,9 @@ class GenomeRegion:
         """
         Sets protein coordinates relative to the protein start, given the nucleotide coordinates
         """
-        if self.cds is not None:
-            prot_start = self.cds[0] // 3 + 1
-            prot_end = self.cds['CDS'][1] // 3
+        if self.cds_offset is not None:
+            prot_start = self.cds_offset[0] // 3 + 1
+            prot_end = self.cds_offset[1] // 3
             self.pcoords = [prot_start, prot_end]
 
     def set_ncoords_from_pcoords(self):

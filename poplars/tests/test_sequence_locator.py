@@ -1,5 +1,4 @@
 import unittest
-from io import StringIO
 from poplars.sequence_locator import *
 
 
@@ -20,15 +19,15 @@ class InputTestCase(unittest.TestCase):
                 open(self.hiv_ncoords_path) as hiv_ncoords, open(self.hiv_pcoords_path) as hiv_pcoords:
             self.hiv_nt_seq = convert_fasta(hiv_nt.read().split())[0][1]
             self.hiv_aa_seq = convert_fasta(hiv_aa.read().split())[0][1]
-            self.hiv_ncoords = hiv_ncoords.read()
-            self.hiv_pcoords = hiv_pcoords.read()
+            self.hiv_ncoords = hiv_ncoords
+            self.hiv_pcoords = hiv_pcoords
 
         with open(self.siv_nt_seq_path) as siv_nt, open(self.siv_aa_seq_path) as siv_aa, \
                 open(self.siv_ncoords_path) as siv_ncoords, open(self.siv_pcoords_path) as siv_pcoords:
             self.siv_nt_seq = convert_fasta(siv_nt.read().split())[0][1]
             self.siv_aa_seq = convert_fasta(siv_aa.read().split())[0][1]
-            self.siv_ncoords = siv_ncoords.read()
-            self.siv_pcoords = siv_pcoords.read()
+            self.siv_ncoords = siv_ncoords
+            self.siv_pcoords = siv_pcoords
 
 
 class TestGetCoords(InputTestCase):
@@ -136,42 +135,44 @@ class TestSetPosFromCDS(unittest.TestCase):
         region.set_coords([1, 634], 'nucl')
         region.set_pos_from_cds([1, 634])
         expected = []
-        result = region.rel_pos['CDS']
+        result = region.cds_offset
         self.assertEqual(expected, result)
 
     def testFromSIVLTR5Start(self):
         region = GenomeRegion('5\'LTR')
         region.set_pos_from_cds([1, 1110])
         expected = []
-        result = region.rel_pos['CDS']
+        result = region.cds_offset
         self.assertEqual(expected, result)
 
     def testFromHIVStart(self):
-        region = GenomeRegion('Gag', [790, 2292])
-        region.set_pos_from_cds([790, 2292])
+        ref_region = GenomeRegion('Gag', [790, 2292])
+        query_region = GenomeRegion('Gag', [790, 2292])
+        query_region.set_pos_from_cds(ref_region)
         expected = [1, 1503]
-        result = region.rel_pos['CDS']
+        result = query_region.cds_offset
         self.assertEqual(expected, result)
 
     def testFromSIVStart(self):
-        region = GenomeRegion('Integrase', [4785, 5666])
-        region.set_pos_from_cds([4785, 5666])
+        ref_region = GenomeRegion('Integrase', [4785, 5666])
+        query_region = GenomeRegion('Integrase', [4785, 5666])
+        query_region.set_pos_from_cds(ref_region)
         expected = [1, 882]
-        result = region.rel_pos['CDS']
+        result = query_region.cds_offset
         self.assertEqual(expected, result)
 
     def testGagfromP1Start(self):
         region = GenomeRegion('Gag', [2086, 2133])
         region.set_pos_from_cds([2086, 2133])
         expected = [1297, 1344]
-        result = region.rel_pos['CDS']
+        result = region.cds_offset
         self.assertEqual(expected, result)
 
     def testPolFromP1Start(self):
         region = GenomeRegion('Pol', [2086, 2133])
         region.set_pos_from_cds([2086, 2133])
         expected = [2, 49]
-        result = region.rel_pos['CDS']
+        result = region.cds_offset
         self.assertEqual(expected, result)
 
 
@@ -194,14 +195,14 @@ class TestSetPosFromAAStart(unittest.TestCase):
                                         'PKEPFRDYVDRFYKTLRAEQASQEVKNWMTETLLVQNANPDCKTILKALGPAATLEEMMTACQGVGGPGHKARVL')
         region.set_pos_from_pstart()
         expected = [1, 231]
-        result = region.rel_pos['pstart']
+        result = region.pstart
         self.assertEqual(expected, result)
 
     def testLTR5FromAAStart(self):
         region = GenomeRegion('5\'LTR')
         region.set_pos_from_pstart()
         expected = []
-        result = region.rel_pos['pstart']
+        result = region.pstart
         self.assertEqual(expected, result)
 
     def testGagFromAAStart(self):
@@ -212,7 +213,7 @@ class TestSetPosFromAAStart(unittest.TestCase):
                               [450, 500],   'QSRPEPTAPPEESFRSGVETTTPPQKQEPIDKELYPLTSLRSLFGNDPSSQ')
         region.set_pos_from_pstart()
         expected = [450, 500]
-        result = region.rel_pos['pstart']
+        result = region.pstart
         self.assertEqual(expected, result)
 
 
@@ -278,7 +279,6 @@ class TestProtCoordsFromNuclCoords(unittest.TestCase):
     def testSimpleUse(self):
         region = GenomeRegion('Gag', [2086, 2133], 'TTTTTAGGGAAGATCTGGCCTTCCTACAAGGGAAGGCCAGGGAATTTT', None, None)
         region.set_pos_from_cds([2086, 2133])
-        print(region.rel_pos['CDS'])
         region.set_pcoords_from_ncoords()
         expected = [433, 448]
         self.assertEqual(expected, region.pcoords)
@@ -349,7 +349,7 @@ class TestSetRegions(InputTestCase):
         aa_coords = configs[3]
 
         with open(nt_coords) as ncoords, open(aa_coords) as pcoords:
-            result = set_regions('nucl', ncoords, ref_nt_seq, pcoords, ref_aa_seq)
+            result = make_regions(ncoords, ref_nt_seq, pcoords, ref_aa_seq)
 
             for i, reg in enumerate(result):
                 self.assertEqual(list(region_names.keys())[i], reg.region_name)
@@ -430,7 +430,7 @@ class TestSetRegions(InputTestCase):
         aa_coords = configs[3]
 
         with open(nt_coords) as ncoords, open(aa_coords) as pcoords:
-            result = set_regions('prot', ncoords, ref_nt_seq, pcoords, ref_aa_seq)
+            result = make_regions(ncoords, ref_nt_seq, pcoords, ref_aa_seq)
 
             for i, reg in enumerate(result):
                 self.assertEqual(list(region_names.keys())[i], reg.region_name)
@@ -713,7 +713,7 @@ class TestGetRegionCoordinates(unittest.TestCase):
                'CCAGAAGAGAGCTTCAGGTCTGGGGTAGAGACAACAACTCCCCCTCAGAAGCAGGAGCCGATAGACAAGGAACTGTATCCTTTAACTTCCCTCAGGTCACTCT'
                'TTGGCAACGACCCCTCGTCACAATAA']
         expected = [(2133, 2292)]
-        result = get_region_coordinates(aln)
+        result = query_region_coordinates(aln)
         self.assertEqual(expected, result)
 
     def testProtAlignment(self):
@@ -724,7 +724,7 @@ class TestGetRegionCoordinates(unittest.TestCase):
                '-------------------------------------------------------------------------------------------------------'
                '----------------------------------------------------------------------------------------']
         expected = [(0, 132)]
-        result = get_region_coordinates(aln)
+        result = query_region_coordinates(aln)
         self.assertEqual(expected, result)
 
 
@@ -854,7 +854,7 @@ class TestRetrieve(InputTestCase):
         aa_coords = configs[3]
 
         with open(nt_coords) as ncoords, open(aa_coords) as pcoords:
-            ref_regions = set_regions('nucl', ncoords, ref_nt_seq, pcoords, ref_aa_seq)
+            ref_regions = make_regions(ncoords, ref_nt_seq, pcoords, ref_aa_seq)
 
         result = retrieve('hiv', 'nucl', ref_regions, 'p2')
         query_region = result[0]
@@ -898,9 +898,9 @@ class TestRetrieve(InputTestCase):
         aa_coords = configs[3]
 
         with open(nt_coords) as ncoords, open(aa_coords) as pcoords:
-            ref_regions = set_regions('nucl', ncoords, ref_nt_seq, pcoords, ref_aa_seq)
+            ref_regions = make_regions(ncoords, ref_nt_seq, pcoords, ref_aa_seq)
 
-        result = retrieve('nucl', ref_regions, 'Nef', 20, 80)
+        result = retrieve('nucl', 'Nef', 20, 80)
         result_region = result[0]
         expected_region = 'Nef'
         expected_seq = 'TGAGGCGGTCCAGGCCGTCTGGAGATCTGCGACAGAGACTCTTGCGGGCGCGTGGGGAGAC'
@@ -1078,7 +1078,7 @@ class TestSetNucleotideEquivalent(InputTestCase):
         aa_coords = configs[3]
 
         with open(nt_coords) as ncoords, open(aa_coords) as pcoords:
-            ref_regions = set_regions('prot', ncoords, ref_nt_seq, pcoords, ref_aa_seq)
+            ref_regions = make_regions(ncoords, ref_nt_seq, pcoords, ref_aa_seq)
         for region in ref_regions:
             region.make_codon_aln()
 
@@ -1086,7 +1086,7 @@ class TestSetNucleotideEquivalent(InputTestCase):
                                     [364, 377], 'AEAMSQVTNSATIM')
 
         expected = 'GCTGAAGCAATGAGCCAAGTAACAAATTCAGCTACCATAATG'
-        result = set_nucleotide_equivalents(query_region, ref_regions)
+        result = set_nucleotide_equivalents(query_region)
         self.assertEqual(expected, result)
 
     def testWithGaps(self):
@@ -1095,7 +1095,7 @@ class TestSetNucleotideEquivalent(InputTestCase):
             region.make_codon_aln()
         q_region = GenomeRegion('test1', [12, 27],  'TTAAACCCGGGTTTA', [1, 5], 'LNPGL')
         expected = 'TTAAACCCGGGTTTA'
-        result = set_nucleotide_equivalents(q_region, ref_regions)
+        result = set_nucleotide_equivalents(q_region)
         self.assertEqual(expected, result)
 
 
@@ -1111,7 +1111,7 @@ class TestSetProteinEquivalent(InputTestCase):
         aa_coords = configs[3]
 
         with open(nt_coords) as ncoords, open(aa_coords) as pcoords:
-            ref_regions = set_regions('nucl', ncoords, ref_nt_seq, pcoords, ref_aa_seq)
+            ref_regions = make_regions(ncoords, ref_nt_seq, pcoords, ref_aa_seq)
 
         for reg in ref_regions:
             reg.make_codon_aln()
@@ -1119,7 +1119,7 @@ class TestSetProteinEquivalent(InputTestCase):
         query_region = GenomeRegion('Gag', [2133, 2292], 'GCTGAAGCAATGAGCCAAGTAACAAATTCAGCTACCATAATG',
                                     [364, 377], 'AEAMSQVTNSATIM')
         expected = 'AEAMSQVTNSATIM'
-        result = set_protein_equivalents(query_region, ref_regions)
+        result = set_protein_equivalents(query_region)
         self.assertEqual(expected, result)
 
 
