@@ -13,41 +13,35 @@ from poplars.common import convert_fasta
 import textwrap
 
 
-class GenomeRegion:
+class Region:
     """
-    Represents information about a genomic region
+    Stores information about a genome region
     """
-
-    def __init__(self, region_name, ncoords=None, nt_seq=None, pcoords=None, aa_seq=None):
+    def __init__(self, region_name, genome, ncoords=None, pcoords=None):
         """
-        Stores information about each genomic region
         :param region_name: The name of the genomic region
+        :param genome: A reference to a genome object
         :param ncoords: A list containing the global start and end indices of the nucleotide region
-        :param nt_seq:  The nucleotide sequence
         :param pcoords: A list containing the global start and end indices of the protein region
-        :param aa_seq: The amino acid sequence
         """
         self.region_name = region_name
+        self.genome = genome
         self.ncoords = ncoords
-        self.nt_seq = nt_seq
         self.pcoords = pcoords
-        self.aa_seq = aa_seq
-        self.cds_offset, self.gstart, self.qstart, self.pstart = [], [], [], []
-        self.codon_aln = ''
+        self.nt_seq = self.set_nt_seq_from_genome()
+        self.aa_seq = None
 
     def get_coords(self, base):
         if base == 'nucl':
-            coords = self.ncoords
+            return self.ncoords
         else:
-            coords = self.pcoords
-        return coords
+            return self.pcoords
 
     def get_sequence(self, base):
         if base == 'nucl':
-            sequence = self.nt_seq
+            return self.nt_seq
         else:
-            sequence = self.aa_seq
-        return sequence
+            return self.aa_seq
 
     def set_coords(self, coord_pair, base):
         if base == 'nucl':
@@ -55,69 +49,23 @@ class GenomeRegion:
         else:
             self.pcoords = coord_pair
 
-    def set_sequence(self, seq, base):
+    def set_nt_seq_from_genome(self):
+        return self.genome.nt_seq[self.ncoords[0] - 1: self.ncoords[1]]
+
+    def set_sequence(self, base, seq):
         if base == 'nucl':
             self.nt_seq = seq
         else:
             self.aa_seq = seq
 
-    def set_seq_from_ref(self, sequence, base):
-        if base == 'nucl':
-            self.nt_seq = sequence[self.ncoords[0] - 1: self.ncoords[1]]
-        else:
-            self.aa_seq = sequence[self.pcoords[0] - 1: self.pcoords[1]]
 
-    def set_pos_from_cds(self, ref_reg_name):
-        """
-        Gives the position of a the query sequence relative to the start of the coding sequence
-        """
-
-        ref_region = GENOME_REGIONS[ref_reg_name]
-        if self.ncoords and ref_region.ncoords:
-
-            query_start = self.ncoords[0]
-            query_end = self.ncoords[1]
-            ref_start = ref_region.ncoords[0]
-            ref_end = ref_region.ncoords[1]
-
-            if query_start == ref_start:
-                start = 1
-            else:
-                start = query_start - ref_start
-
-            if query_end == ref_end:
-                end = query_end - query_start
-            else:
-                end = query_end - start
-
-            self.cds_offset = [start, end]
-
-    def set_pos_from_gstart(self):
-        self.gstart = self.ncoords
-
-    def set_pos_from_qstart(self, q_coords, base):
-        """
-        Gives the position of the sequence relative to the start of the region of interest
-        :param q_coords: The coodinates of the query region
-        :param base: The base of the sequence (nucleotide or protein)
-        :return: The position relative to the start of the region of interest
-        """
-        r_coords = self.get_coords(base)
-        r_seq = self.get_sequence(base)
-        if r_coords is not None and r_seq is not None:
-            start_offset = r_coords[0] - q_coords[0] + 1
-            end_offset = start_offset + len(r_seq) - 1
-            self.qstart = [start_offset, end_offset]
-
-    def set_pos_from_pstart(self):
-        """
-        Gives the position of the sequence relative to the start of the protein sequence
-        """
-        if self.pcoords is not None:
-            if 'LTR' in self.region_name:
-                self.pstart = None
-            else:
-                self.pstart = self.pcoords
+class RefRegion(Region):
+    """
+    Stores information about each region in the reference genome
+    """
+    def __init__(self, region_name, genome, ncoords=None, pcoords=None):
+        super().__init__(region_name, genome, ncoords, pcoords)
+        self.codon_aln = ''
 
     def make_codon_aln(self):
         """
@@ -135,27 +83,159 @@ class GenomeRegion:
             self.codon_aln = ''.join(codon_aln)
         return self.codon_aln
 
-    @staticmethod
-    def global_to_local_index(coord_pair):
+    def find_overlap(self, base, q_coords):
         """
-        Converts a pair of global indices to local indices, relative to the sequence region of interest
+        Gets the sequence regions that overlap with the region of interest
+        :param base: the base of the sequence (nucleotide or protein)
+        :param q_coords: the coordinates of the query region (global coordinates)
+        :return overlap: A QueryRegion object that represents the where the query overlaps with the reference region
         """
-        start = coord_pair[0]  # 0-based inclusive indexing
-        start_offset = coord_pair[0] - start
-        end_offset = coord_pair[1] - start
-        local_pair = [start_offset, end_offset]
-        return local_pair
+        start, end = 0, 0
+        ref_coords = self.get_coords(base)  # Coordinates are global coordinates
 
-    @staticmethod
-    def local_to_global_index(r_coords, local_pair):
+        # If the ref_coords are in the range of the query region and the q_coords are in the range of the ref region
+        if not ((ref_coords[0] < ref_coords[1] < q_coords[0]) or (q_coords[0] < q_coords[1] < ref_coords[0])):
+
+            # If the end of the query region exceeds the end of the reference region
+            if q_coords[1] > ref_coords[1]:
+                end = ref_coords[1]
+            else:
+                end = q_coords[1]
+
+            # If the query region starts before the reference region starts
+            if q_coords[0] < ref_coords[0]:
+                start = ref_coords[0]
+            else:
+                start = q_coords[0]
+
+        overlap = QueryRegion(self.region_name, self, base, self.genome)
+
+        # Set the nucleotide and protein regions
+        if base == 'nucl':
+            prot_overlap = self.set_protein_equivalents(overlap)
+            overlap.set_coords(q_coords, 'nucl')
+            overlap.set_sequence('nucl', self.get_sequence('nucl')[start: end])
+            overlap.set_coords(prot_overlap[1], 'prot')
+            overlap.set_sequence(prot_overlap[0], 'prot')
+        else:
+            nucl_overlap = self.set_nucleotide_equivalents(overlap)
+            overlap.set_coords(q_coords, 'prot')
+            overlap.set_sequence('prot', self.get_sequence('prot')[start: end])
+            overlap.set_coords(nucl_overlap[1], 'nucl')
+            overlap.set_sequence(nucl_overlap[0], 'nucl')
+
+        return overlap  # return overlap object not dict
+
+    def set_protein_equivalents(self, overlap):
         """
-        Converts a pair of local indices (relative to the region of interest) to global indices
+        Finds the protein equivalent of the nucleotide sequence
+        :param overlap: the region that aligns with the reference region
+        :return aa_seq, aa_coords: the sequence and coordinates of the overlapping protein sequence
         """
-        if r_coords is not None:
-            global_start = r_coords[0] + local_pair[0] - 1
-            global_end = r_coords[0] + local_pair[1] - 1
-            global_pair = [global_start, global_end]
-            return global_pair
+        non_coding = ["5'LTR", "TAR", "3'LTR"]
+        aa_seq, aa_coords = '', []
+        if self.region_name not in non_coding:
+
+            # Slice aligned nucleotide sequence using coordinates of the query region
+            if self.codon_aln is not None:
+                aligned_prot = self.codon_aln[overlap.ncoords[0]: overlap.ncoords[1]]
+                aa_seq = re.sub('[-]', '', aligned_prot)  # Get corresponding protein sequence
+                aa_coords = [1, len(aa_seq)]
+
+        return aa_seq, aa_coords
+
+    def set_nucleotide_equivalents(self, overlap):
+        """
+        Finds the nucleotide equivalent of the protein sequence
+        :param overlap: the region that aligns with the reference region
+        :return nt_seq, nt_coords: the sequence and coordinates of the overlapping nucleotide sequence
+        """
+        nt_seq, nt_coords = '', []
+        if self.ncoords is not None:
+            overlap.make_codon_aln()
+            regex = re.compile(overlap.codon_aln)
+            coords = regex.search(self.codon_aln).span()
+            nt_coords = overlap.get_coords('nucl')
+            nt_seq = self.nt_seq[coords[0]: coords[1]]
+
+        return nt_seq, nt_coords
+
+
+class QueryRegion(Region):
+    """
+    Represents information about the query sequence region
+    """
+    def __init__(self, region_name, ref_region, base, genome, ncoords=None, pcoords=None):
+        super().__init__(region_name, genome, ncoords, pcoords)
+
+        self.ref_region = ref_region
+        self.codon_aln = ''
+        self.set_pos_from_cds()
+        self.set_pos_from_gstart()
+        self.set_pos_from_qstart(base)
+        self.set_pos_from_rstart(base)
+        self.set_pos_from_pstart()
+
+    def set_pos_from_cds(self):
+        """
+        Gives the position of a the query sequence relative to the start of the coding sequence
+        """
+        if self.ncoords and self.ref_region.ncoords:
+            query_start = self.ncoords[0]
+            query_end = self.ncoords[1]
+            ref_start = self.ref_region.ncoords[0]
+            ref_end = self.ref_region.ncoords[1]
+
+            if query_start == ref_start:
+                start = 1
+            else:
+                start = query_start - ref_start
+
+            if query_end == ref_end:
+                end = query_end - query_start
+            else:
+                end = query_end - start
+
+            self.cds_offset = [start, end]
+
+    def set_pos_from_gstart(self):
+        self.gstart = self.ncoords
+
+    def set_pos_from_qstart(self, base):
+        """
+        Gives the position of the sequence relative to the start of the region of interest
+        :param base: The base of the sequence (nucleotide or protein)
+        :return: The position of the reference region relative to the query region
+        """
+        q_coords = self.get_coords(base)
+        q_seq = self.ref_region.get_sequence(base)
+        if q_coords is not None and q_seq is not None:
+            start_offset = q_coords[0] - self.ref_region.get_coords(base)[0] + 1
+            end_offset = start_offset + len(q_seq) - 1
+            self.qstart = [start_offset, end_offset]
+
+    def set_pos_from_rstart(self, base):
+        """
+        Gives the position of the sequence relative to the start of the region of interest
+        :param base: The base of the sequence (nucleotide or protein)
+        :return: The position of the reference region relative to the query region
+        """
+        q_coords = self.get_coords(base)
+        q_seq = self.ref_region.get_sequence(base)
+        if q_coords is not None and q_seq is not None:
+            start_offset = self.ref_region.get_coords(base)[0] + 1 - q_coords[0]
+            end_offset = len(q_seq) - 1 - start_offset
+            self.rstart = [start_offset, end_offset]
+
+    def set_pos_from_pstart(self):
+        """
+        Gives the position of the sequence relative to the start of the protein sequence
+        """
+        if self.pcoords is not None:
+            if 'LTR' in self.region_name:
+                self.pstart = None
+            else:
+                self.pstart = self.pcoords
 
     def set_pcoords_from_ncoords(self):
         """
@@ -177,53 +257,139 @@ class GenomeRegion:
             return [nucl_start, nucl_end]
 
 
-def make_regions(nt_coords, nt_seq, aa_coords, aa_seq):
+class Genome:
     """
-    Reads in the start and end coordinates of the genomic regions and associates the region with its coordinates.
-    If no coordinate files are specified, set default nucleotide and protein coordinate files.
-    :param nt_coords: Path to the csv file containing the global coordinates of the nucleotide region.
-            The file stream has one genomic entry per line and has the following format: region_name,start,end
-    :param nt_seq: The nucleotide sequence
-    :param aa_coords: Path to the csv file containing the global coordinates of the protein region.
-            The file stream has one genomic entry per line and has the following format: region_name,start,end
-    :param aa_seq: A list of lists containing the protein sequences
-    :return genome_regions: A dictionary with keys as the region names and the values are GenomeRegion objects
+    Stores information about the reference genome
     """
+    def __init__(self, nt_coords, nt_seq, aa_coords, aa_seq, reference_sequence):
+        self.nt_seq = nt_seq
+        # self.aa_seq = aa_seq  # List of lists
+        self.ref_genome_regions = self.make_ref_regions(nt_coords, aa_coords, aa_seq)
+        self.reference_sequence = reference_sequence
 
-    genome_regions = {}
-    # Parse nucleotide region coordinates file
-    for nt_line in nt_coords:
-        nt_line = nt_line.strip()
-        nt_line = nt_line.split(',')
-        nucl_coords = [int(nt_line[1]), int(nt_line[2])]
-        seq_region = GenomeRegion(nt_line[0])
+    def make_ref_regions(self, nt_coords, aa_coords, aa_seq):
+        """
+        Reads in the start and end coordinates of the genomic regions and associates the region with its coordinates.
+        If no coordinate files are specified, set default nucleotide and protein coordinate files.
+        :param nt_coords: File stream containing coordinates for nucleotide regions. Format: region_name,start,end
+        :param aa_coords: File stream containing coordinates for protein regions. Format: region_name,start,end
+        :param aa_seq: A list of lists containing the protein sequences
+        """
+        ref_regions = {}
+        # Parse nucleotide region coordinates file
+        for nt_line in nt_coords:
+            nt_line = nt_line.strip()
+            nt_line = nt_line.split(',')
+            nucl_coords = [int(nt_line[1]), int(nt_line[2])]
+            seq_region = RefRegion(nt_line[0], self, nucl_coords)
+            ref_regions[nt_line[0]] = seq_region
 
-        # Set nucleotide coordinates and sequences
-        seq_region.set_coords(nucl_coords, 'nucl')
-        seq_region.set_seq_from_ref(nt_seq, 'nucl')
-        genome_regions[nt_line[0]] = seq_region
+        # Parse protein coordinates file
+        prot_names, prot_coords = [], []
+        for aa_line in aa_coords:
+            aa_line = aa_line.strip()
+            aa_line = aa_line.split(',')
+            prot_names.append(aa_line[0])
+            prot_coords.append([int(aa_line[1]), int(aa_line[2])])
 
-    # Parse protein coordinates file
-    prot_names, prot_coords = [], []
-    for aa_line in aa_coords:
-        aa_line = aa_line.strip()
-        aa_line = aa_line.split(',')
-        prot_names.append(aa_line[0])
-        prot_coords.append([int(aa_line[1]), int(aa_line[2])])
+        # Match protein regions to nucleotide regions
+        for i, coords in enumerate(prot_coords):
+            for region_name in ref_regions:
+                if prot_names[i].startswith(ref_regions[region_name].region_name):
+                    # Set protein coordinates and sequences
+                    ref_regions[region_name].set_coords(coords, 'prot')
+                    ref_regions[region_name].set_sequence('prot', aa_seq[i][1])
 
-    # Match protein regions to nucleotide regions
-    for i, coords in enumerate(prot_coords):
-        for region_name in genome_regions:
-            if prot_names[i].startswith(genome_regions[region_name].region_name):
-                # Set protein coordinates and sequences
-                genome_regions[region_name].set_coords(coords, 'prot')
-                genome_regions[region_name].set_sequence(aa_seq[i][1], 'prot')
+        # Align nucleotide sequence with protein sequence
+        for name in ref_regions:
+            ref_regions[name].make_codon_aln()
 
-    # Align nucleotide sequence with protein sequence
-    for name in genome_regions:
-        genome_regions[name].make_codon_aln()
+        return ref_regions
 
-    return genome_regions
+    def sequence_align(self, query_sequence, outfile=None):
+        """
+        Aligns the query sequence to the reference genome
+        :param query_sequence: The query sequence
+        :param outfile: <option> The file stream of the output file in write mode
+        """
+        result = align(query_sequence[0][1], self.reference_sequence[0][1])
+
+        if outfile is not None:
+            outfile.write("Alignment:\n")
+        else:
+            print("Alignment:")
+
+        for h, s in result:
+            if outfile is not None:
+                outfile.write(">{}\n".format(h))
+                outfile.write(textwrap.fill(s, 60))
+            else:
+                print(">{}".format(h))
+                print(textwrap.fill(s, 60))
+
+        return result
+
+    @staticmethod
+    def query_region_coordinates(alignment):
+        """
+        Gets the indices of regions where the query aligns with the reference sequence
+        :param alignment: A list containing the header of the query sequence, and the aligned query sequence
+        :return query_matches: The positions where the query aligns with the reference sequences with no gaps
+        """
+        pat = re.compile('[A-Z]{2,}')  # Match the aligned region (minimum alignment length is 2)
+        query_matches = [(match.start(), match.end()) for match in pat.finditer(alignment[1])]
+        return query_matches
+
+    def find_matches(self, base, query_matches):
+        """
+        Finds the genomic regions where the query sequence aligns with the reference sequence
+        :param base: The base of the query sequence
+        :param query_matches: <list> of indices where the query sequence aligns with the reference sequence
+        :return query_regions: <dict> with keys as region name and values as the QueryRegion object
+        """
+        query_regions = {}
+
+        for q_coords in query_matches:
+            for name in self.ref_genome_regions:
+                if name != 'Complete':
+
+                    # Use coordinates to find which regions overlap with the query region
+                    overlap = self.ref_genome_regions[name].find_overlap(base, q_coords)
+                    query_regions[name] = overlap
+
+        return query_regions
+
+    def retrieve(self, base, region, qstart=1, qend='end'):
+        """
+        Retrieves a sequence given its coordinates
+        :param base: The base of the sequence (nucleotide or protein)
+        :param region: The genomic region
+        :param qstart: <option> The start coordinate of the query region (given as local coordinate)
+        :param qend: <option> The end coordinate of the query region (given as local coordinate)
+        :return: The genomic region defined by the starting and ending coordinates
+        """
+        if region in self.ref_genome_regions:
+            ref_region = self.ref_genome_regions[region]
+            global_range = ref_region.get_coords(base)
+            region_start, region_end = global_range[0], global_range[1]
+
+            if qend == 'end':
+                qend = region_end - region_start
+
+            # Convert global region coordinates to local coordinates
+            global_start = region_start + qstart
+            global_end = region_end + qend
+
+            # Check if the coordinates are valid
+            if global_start < region_start or global_end < region_end:
+                print("Invalid {} coordinates: {} to {}.\nValid range: 1 to {}"
+                      .format(region, qstart, qend, (region_end - region_start)))
+                sys.exit(0)
+
+            retrieved_regions = self.find_matches(base, [global_start, global_end])
+            query_region = retrieved_regions.pop(region)
+
+            return query_region, retrieved_regions
 
 
 def valid_sequence(base, sequence):
@@ -376,164 +542,6 @@ def reverse_comp(query_sequence):
     complement = {'A': 'T', 'C': 'G', 'G': 'C', 'T': 'A', '*': '*', 'N': 'N', '-': '-'}
     rev_comp = "".join(complement.get(nt, nt) for nt in reversed(query_sequence))
     return rev_comp
-
-
-def sequence_align(query_sequence, reference_sequence, outfile=None):
-    """
-    Aligns the query sequence to the reference genome
-    :param query_sequence: The query sequence
-    :param reference_sequence: The reference sequence
-    :param outfile: <option> The file stream of the output file in write mode
-    """
-
-    result = align(query_sequence[0][1], reference_sequence)
-
-    if outfile is not None:
-        outfile.write("Alignment:\n")
-    else:
-        print("Alignment:")
-
-    for h, s in result:
-        if outfile is not None:
-            outfile.write(">{}\n".format(h))
-            outfile.write(textwrap.fill(s, 60))
-        else:
-            print(">{}".format(h))
-            print(textwrap.fill(s, 60))
-
-    return result
-
-
-def query_region_coordinates(alignment):
-    """
-    Gets the indices of regions where the query aligns with the reference sequence
-    :param alignment: A list containing the header of the query sequence, and the aligned query sequence
-    :return query_matches: The positions where the query sequence aligns with the reference sequences(s) with no gaps
-    """
-    pat = re.compile('[A-Z]{2,}')  # Match the aligned region (minimum alignment length is 2)
-    query_matches = [(match.start(), match.end()) for match in pat.finditer(alignment[1])]
-    return query_matches
-
-
-def find_matches(base, query_matches):
-    """
-    Finds the genomic regions where the query sequence aligns with the reference sequence
-    :param base: The base of the query sequence
-    :param query_matches: A list of indices where the query sequence aligns with the reference sequence
-    :return query_regions: A dictionary of matches, with keys as the region name and values as the GenomeRegion object
-    """
-    query_regions = {}
-
-    for q_coords in query_matches:
-        for name in GENOME_REGIONS:
-            if GENOME_REGIONS[name].region_name != 'Complete':
-
-                # Use coordinates to find which regions overlap with the query region
-                overlap = find_overlap(base, GENOME_REGIONS[name].region_name, q_coords)
-                if overlap['region_name'] is not None:
-                    query_region = GenomeRegion(overlap['region_name'])
-                    query_region.set_sequence(overlap['nt_seq'], 'nucl')
-                    query_region.set_coords(overlap['nt_coords'], 'nucl')
-                    query_region.set_sequence(overlap['aa_seq'], 'prot')
-                    query_region.set_coords(overlap['aa_coords'], 'prot')
-
-    return query_regions
-
-
-def find_overlap(base, reg, q_coords):
-    """
-    Gets the sequence regions that overlap with the region of interest
-    :param base: the base of the sequence (nucleotide or protein)
-    :param reg: the genome region
-    :param q_coords: the coordinates of the query region (global coordinates)
-    :return: the sequence of the overlap, and the indices of the overlap
-    """
-
-    overlap = {'region_name': None, 'nt_seq': None, 'nt_coords': None, 'aa_seq': None, 'aa_coords': None}
-    start, end = 0, 0
-    ref_coords = GENOME_REGIONS[reg].get_coords(base)       # Coordinates are global coordinates
-
-    # If the ref_coords are in the range of the query region and the q_coords are in the range of the ref region
-    if not ((ref_coords[0] < ref_coords[1] < q_coords[0]) or (q_coords[0] < q_coords[1] < ref_coords[0])):
-
-        # If the end of the query region exceeds the end of the reference region
-        if q_coords[1] > ref_coords[1]:
-            end = ref_coords[1]
-        else:
-            end = q_coords[1]
-
-        # If the query region starts before the reference region starts
-        if q_coords[0] < ref_coords[0]:
-            start = ref_coords[0]
-        else:
-            start = q_coords[0]
-
-    overlap['region_name'] = GENOME_REGIONS[reg].region_name
-
-    if base == 'nucl':
-        q_nt_seq = GENOME_REGIONS[reg].get_sequence('nucl')[start: end]
-        overlap['nt_seq'] = q_nt_seq
-        overlap['nt_coords'] = q_coords
-
-        prot_overlap = set_protein_equivalents(overlap)
-        overlap['aa_seq'] = prot_overlap[0]
-        overlap['aa_coords'] = prot_overlap[1]
-
-    else:
-        q_aa_seq = reg.get_sequence('prot')[start: end]
-        overlap['aa_seq'] = q_aa_seq
-        overlap['aa_coords'] = q_coords
-
-    return overlap
-
-
-def set_protein_equivalents(overlap):
-    """
-    Finds the protein equivalent of the nucleotide sequence
-    :param overlap: the region that aligns with the query sequence
-    :return aa_seq, aa_coords: the sequence and coordinates of the overlapping protein sequence
-    """
-    non_coding = ["5'LTR", "TAR", "3'LTR"]
-    aa_seq, aa_coords = '', []
-
-    for ref_reg in GENOME_REGIONS:
-        if GENOME_REGIONS[ref_reg].region_name == overlap['region_name'] \
-                and GENOME_REGIONS[ref_reg].region_name not in non_coding:
-            if GENOME_REGIONS[ref_reg].codon_aln is not None:
-
-                # Convert query nt_coordinates to local coordinates
-                local_nt_coords = GenomeRegion.global_to_local_index(overlap['nt_coords'])
-
-                # Slice aligned nucleotide sequence at the nucleotide position
-                aligned_prot = GENOME_REGIONS[ref_reg].codon_aln[local_nt_coords[0]: local_nt_coords[1]]
-
-                aligned_prot_seq = re.sub('[-]', '', aligned_prot)        # Get corresponding protein sequence
-                aa_seq = aligned_prot_seq
-                aa_coords = [1, len(aligned_prot_seq)]
-
-    return aa_seq, aa_coords
-
-
-def set_nucleotide_equivalents(overlap):
-    """
-    Finds the nucleotide equivalent of the protein sequence
-    :param overlap: the region that aligns with the query sequence
-    :return nt_seq, nt_coords: the sequence and coordinates of the overlapping nucleotide sequence
-    """
-    nt_seq, nt_coords = '', []
-
-    for ref_reg in GENOME_REGIONS:
-        if ref_reg.region_name == overlap['region_name'] and ref_reg.codon_aln is not None:
-            if query_reg.ncoords is not None:
-                query_reg.make_codon_aln()
-                regex = re.compile(query_reg.codon_aln)
-                coords = regex.search(ref_reg.codon_aln).span()
-                nt_coords = query_reg.get_overlap(query_reg.region_name, query_reg.get_coords('nucl'), 'nucl')
-                nt_seq = ref_reg.nt_seq[coords[0]: coords[1]]
-                query_reg.set_sequence('nucl', nt_seq)
-                query_reg.set_coords(nt_coords, 'nucl')
-
-    return nt_seq, nt_coords
 
 
 def output_retrieved_region(region, outfile=None):
@@ -696,64 +704,6 @@ def output_overlap(overlap_regions, outfile=None):
                               .format(region.rel_pos['qstart'][0], region.rel_pos['qstart'][1]))
 
 
-def retrieve(base, region, qstart=1, qend='end'):
-    """
-    Retrieves a sequence given its coordinates
-    :param base: The base of the sequence (nucleotide or protein)
-    :param region: The genomic region
-    :param qstart: <option> The start coordinate of the query region (given as local coordinate)
-    :param qend: <option> The end coordinate of the query region (given as local coordinate)
-    :return: The genomic region defined by the starting and ending coordinates
-    """
-    query_region = None
-    overlap_regions = {}
-    for ref_region in GENOME_REGIONS:
-
-        if ref_region.region_name == region:
-            global_range = ref_region.get_coords(base)
-
-            # Convert global region coordinates to local coordinates
-            local_range = ref_region.global_to_local_index(global_range, base)
-
-            region_start, region_end = local_range[0], local_range[1]
-
-            if qend == 'end':
-                qend = region_end - region_start
-
-            if qstart < region_start or qend > region_end:
-                print("Invalid {} coordinates: {} to {}.\nValid range: 1 to {}"
-                      .format(region, qstart, qend, (region_end - region_start)))
-                sys.exit(0)
-
-            query_region = GenomeRegion(region)
-
-            # Set local and global coordinates
-            global_coords = GenomeRegion.local_to_global_index(ref_region, [qstart, qend])
-            query_region.set_coords(global_coords, base)
-
-            # Set sequences protein and nucleotide sequences
-            seq = ref_region.get_sequence(base)[qstart - 1: qend + 1]
-            query_region.set_sequence(seq, base)
-
-            # Set equivalent sequence
-            if base == 'nucl':
-                equiv_seq = set_nucleotide_equivalents(query_region)
-                query_region.set_sequence(equiv_seq, 'prot')
-            else:
-                equiv_seq = set_protein_equivalents(query_region)
-                query_region.set_sequence(equiv_seq, 'nucl')
-
-        if query_region is not None:
-            retrieved_regions = find_matches(base, [query_region.get_coords(base)])
-
-            # Remove duplicated retrieved region
-            for key in retrieved_regions:
-                if retrieved_regions[key].region_name != region:
-                    overlap_regions[key] = retrieved_regions[key]
-
-    return query_region, overlap_regions
-
-
 def handle_args(virus, base, ref_nt, nt_coords, ref_aa, aa_coords):
     """
     Handles the possible execution paths for the program
@@ -849,10 +799,9 @@ def parse_args():
     parser_retrieve.add_argument('-region', metavar='', default="Complete", choices=regions,
                                  help='List of case sensitive genomic regions. '
                                       'Allowed regions are: ' + ', '.join(regions))
-    parser_retrieve.add_argument('-start', default=1, type=int,
-                                 help='Coordinate relative to the start of the region.')
-    parser_retrieve.add_argument('-end', default='end',
-                                 help='Coordinate relative to the end of the region. Enter an integer or \'end\'.')
+    parser_retrieve.add_argument('-start', help='Coordinate relative to the start of the region.')
+    parser_retrieve.add_argument('-end', help='Coordinate relative to the end of the region. '
+                                              'Enter an integer or \'end\'.')
     parser_retrieve.add_argument('-outfile', metavar='', type=argparse.FileType('w'),
                                  help='File where results will be written. If no file is specified'
                                       'the results will be printed to the console')
@@ -870,17 +819,16 @@ def main():
 
     with open(nt_coords) as nt_coords_handle, open(aa_coords) as aa_coords_handle:
 
-        # Create genomic region objects based on configuration files
-        global GENOME_REGIONS
-        GENOME_REGIONS = make_regions(nt_coords_handle, ref_nt_seq, aa_coords_handle, ref_aa_seq)
+        # Create genome object based on configuration files
+        ref_genome = Genome(nt_coords_handle, ref_nt_seq, aa_coords_handle, ref_aa_seq, reference_sequence)
 
         if args.subcommand == "align":
             query = get_query(args.base, args.query, args.revcomp)
-            alignment = sequence_align(query, reference_sequence, args.outfile)
+            alignment = ref_genome.sequence_align(query, args.outfile)
 
             # Find indices where the query sequence aligns with the reference sequence
-            match_coords = query_region_coordinates(alignment[-1])  # Query sequence will be the last item in the list
-            query_regions = find_matches(args.base, match_coords)
+            match_coords = ref_genome.query_region_coordinates(alignment[-1])  # Query is the last item
+            query_regions = ref_genome.find_matches(args.base, match_coords)
             output_overlap(query_regions, args.outfile)
 
         else:
@@ -889,11 +837,11 @@ def main():
             if not valid_in:
                 sys.exit(0)
             else:
-                result = retrieve(args.base, args.region, args.start, args.end)
+                result = ref_genome.retrieve(args.base, args.region, args.start, args.end)
                 query_region = result[0]
                 overlap_regions = result[1]
 
-                output_retrieved_region(query_region, args.outfile)        # Ouptput retrieved region first
+                output_retrieved_region(query_region, args.outfile)        # Output retrieved region first
                 if args.outfile is None:
                     print("\n\nRegions touched by the query sequence:")
                 else:
