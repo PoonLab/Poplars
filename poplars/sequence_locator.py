@@ -7,10 +7,13 @@ Note: The first 256 nucleotides of SIVMM239 correspond to the flanking sequence,
 and are included in the complete SIV genome (https://www.ncbi.nlm.nih.gov/nucleotide/M33262)
 """
 
+import argparse
 import re
-from poplars.mafft import *
-from poplars.common import convert_fasta
+import sys
 import textwrap
+
+from common import convert_fasta
+from mafft import *
 
 
 class Region:
@@ -263,7 +266,7 @@ class Genome:
     """
     def __init__(self, nt_coords, nt_seq, aa_coords, aa_seq, reference_sequence):
         self.nt_seq = nt_seq
-        # self.aa_seq = aa_seq  # List of lists
+        self.aa_seq = aa_seq  # List of lists
         self.ref_genome_regions = self.make_ref_regions(nt_coords, aa_coords, aa_seq)
         self.reference_sequence = reference_sequence
 
@@ -460,12 +463,11 @@ def valid_inputs(virus, start_coord, end_coord, region):
     return True
 
 
-def get_query(base, query, revcomp):
+def get_query(base, query):
     """
     Gets the query sequence and checks that it is valid
     :param base: The base (nucleotide or protein)
     :param query: The query sequence as a string or the file path to the query sequence
-    :param revcomp: Option to align the reverse complement of the nucleotide sequence
     :return: A list of lists containing the sequence identifiers and the query sequences
     """
 
@@ -505,14 +507,11 @@ def get_query(base, query, revcomp):
     if not valid_sequence(base, query_seq):
         sys.exit(0)
 
-    # At this point, the sequence is valid
-    if revcomp:
-        if base == 'prot':
-            print("Invalid option: reverse complement is not available for proteins.")
-        else:
-            rc_query = reverse_comp(query_seq[0][1])
-            header = query_seq[0][0]
-            query_seq = [[header, rc_query]]
+    # # At this point, the sequence is valid
+    # if base == 'nucl':
+    #     rc_query = reverse_comp(query_seq[0][1])
+    #     header = query_seq[0][0]
+    #     query_seq = [[header, rc_query]]
 
     return query_seq
 
@@ -704,36 +703,24 @@ def output_overlap(overlap_regions, outfile=None):
                               .format(region.rel_pos['qstart'][0], region.rel_pos['qstart'][1]))
 
 
-def handle_args(virus, base, ref_nt, nt_coords, ref_aa, aa_coords):
+def handle_args(virus, base):
     """
     Handles the possible execution paths for the program
     :param virus: The reference virus
     :param base: The base of the reference sequence
-    :param ref_nt: Path to the file containing the reference nucleotide sequence
-    :param nt_coords: Path to the csv file containing the coordinates of the genomic regions
-    :param ref_aa: Path to the file stream containing the reference amino acid sequence
-    :param aa_coords: Path to the csv file containing the coordinates of the protein regions
     :return configs: a list containing the query sequence and paths to the reference nucleotide and protein sequences
     """
     if virus == 'hiv':
-        if ref_nt is None:
-            ref_nt = os.path.join(os.path.dirname(__file__), "ref_genomes/K03455.fasta")
-        if nt_coords is None:
-            nt_coords = os.path.join(os.path.dirname(__file__), "ref_genomes/K03455_genome_coordinates.csv")
-        if ref_aa is None:
-            ref_aa = os.path.join(os.path.dirname(__file__), "ref_genomes/K03455-protein.fasta")
-        if aa_coords is None:
-            aa_coords = os.path.join(os.path.dirname(__file__), "ref_genomes/K03455_protein_coordinates.csv")
+        ref_nt = os.path.join(os.path.dirname(__file__), "ref_genomes/K03455.fasta")
+        nt_coords = os.path.join(os.path.dirname(__file__), "ref_genomes/K03455_genome_coordinates.csv")
+        ref_aa = os.path.join(os.path.dirname(__file__), "ref_genomes/K03455-protein.fasta")
+        aa_coords = os.path.join(os.path.dirname(__file__), "ref_genomes/K03455_protein_coordinates.csv")
 
     else:
-        if ref_nt is None:
-            ref_nt = os.path.join(os.path.dirname(__file__), "ref_genomes/M33262.fasta")
-        if nt_coords is None:
-            nt_coords = os.path.join(os.path.dirname(__file__), "ref_genomes/M33262_genome_coordinates.csv")
-        if ref_aa is None:
-            ref_aa = os.path.join(os.path.dirname(__file__), "ref_genomes/M33262-protein.fasta")
-        if aa_coords is None:
-            aa_coords = os.path.join(os.path.dirname(__file__), "ref_genomes/M33262_protein_coordinates.csv")
+        ref_nt = os.path.join(os.path.dirname(__file__), "ref_genomes/M33262.fasta")
+        nt_coords = os.path.join(os.path.dirname(__file__), "ref_genomes/M33262_genome_coordinates.csv")
+        ref_aa = os.path.join(os.path.dirname(__file__), "ref_genomes/M33262-protein.fasta")
+        aa_coords = os.path.join(os.path.dirname(__file__), "ref_genomes/M33262_protein_coordinates.csv")
 
     ref_nt_seq = get_ref_seq(ref_nt, 'nucl')
     ref_aa_seq = get_ref_seq(ref_aa, 'prot')
@@ -753,58 +740,59 @@ def parse_args():
     """
     Parses command line arguments
     """
-    regions = ['5\'LTR', '5\'LTR-R', '5\'LTR-U3', '5\'LTR-U5', 'TAR', 'Gag-Pol', 'Gag', 'Matrix',
-               'Capsid', 'p2', 'Nucleocapsid', 'p1', 'p6', 'Pol', 'GagPolTF', 'Protease', 'RT', 'RNase',
-               'Integrase', 'Vif', 'Vpr', 'Tat(with intron)', 'Tat(exon1)', 'Tat(exon2)', 'Rev(with intron)',
-               'Rev(exon1)', 'Rev(exon2)', 'Vpu', 'Vpx', 'Env', 'gp160', 'V1', 'V2', 'V3', 'V4', 'V5',
-               'RRE', 'gp120', 'gp41', 'Nef', '3\'LTR', '3\'LTR-R', '3\'LTR-U3', '3\'LTR-U5', 'Complete']
 
     parser = argparse.ArgumentParser(
-        description='An implementation of the HIV Sequence Locator tool by the Los Alamos National Laboratory.'
-                    'This tool aligns a nucleotide or protein sequence relative to HIV or SIV reference genomes; '
-                    'or retrieves a sequence in the HXB2 or SIVmm239 reference genome from its coordinates.',
+        description='An implementation of the HIV Sequence Locator tool by the Los Alamos National Laboratory.\n\n'
+                    'This tool finds the location of the nucleotide or protein query sequence relative to the \n'
+                    'HIV or SIV reference genomes; or retrieves a sequence in the HXB2 or SIVmm239 reference \n'
+                    'genome from its coordinates.\n\n',
+        epilog='For help using a specific sub-command enter:  sequence_locator.py <sub-command> -h',
+        formatter_class=argparse.RawDescriptionHelpFormatter
     )
-    parser.add_argument('virus', metavar='virus', choices=['hiv', 'siv'],
-                        help='The reference virus')
-    parser.add_argument('base', metavar='base', choices=['nucl', 'prot'],
-                        help='Sequence base type. Allowed bases are \'nucl\' and \'prot\'')
-    parser.add_argument('-nt_coords', default=None,
-                        help='Path to the csv file containing the coordinates of the nucleotide region.'
-                             'The file must be contain the region name, start coordinate, and end coordinate.'
-                             'Ex: region_name,start,end')
-    parser.add_argument('-aa_coords', default=None,
-                        help='Path to the csv file containing the coordinates of the amino acid region.'
-                             'The file must contain the region name, start coordinate, and end coordinate.'
-                             'Ex: region_name,start,end')
-    parser.add_argument('-ref_nt', metavar='',
-                        help='Path to the file containing the reference nucleotide sequence')
-    parser.add_argument('-ref_aa', metavar='',
-                        help='Path to the file containing the reference amino acid sequence')
-    subparsers = parser.add_subparsers(dest='subcommand')
+    subparsers = parser.add_subparsers(title='sub-commands', dest='subcommand')
 
-    # Create subparser for 'align' mode
-    parser_align = subparsers.add_parser('align', formatter_class=argparse.ArgumentDefaultsHelpFormatter,
-                                         description='Align a nucleotide or protein sequence '
-                                                     'relative to the HIV or SIV reference genome')
-    parser_align.add_argument('query', help='The query sequence. This can be the a string or a file path.')
-    parser_align.add_argument('--revcomp', action="store_true", default=False,
-                              help='Align the reverse complement of the query sequence with the reference sequence')
-    parser_align.add_argument('-outfile', type=argparse.FileType('w'),
-                              help='Path to the file where results will be written. '
-                                   'If no file is specified, the results will be printed to the console')
+    # Create sub-parser for 'align' mode
+    parser_align = subparsers.add_parser('locate',
+                                         help='find the location of a sequence')
+    parser_align.add_argument('query', metavar='query',
+                              help='the query sequence as a string or a FASTA file')
+    parser_align.add_argument('virus', metavar='virus', choices=['hiv', 'siv'],
+                              help='the reference virus (choices: hiv, siv)')
+    parser_align.add_argument('base', metavar='base', choices=['nucl', 'prot'],
+                              help='sequence base type (choices: \'nucl\' and \'prot\')')
+    parser_align.add_argument('-o', '--out', metavar='FILE', type=argparse.FileType('w'),
+                              help='directs the output to a file (default: stdout)')
 
-    # Create subparser for 'retrieve' mode
-    parser_retrieve = subparsers.add_parser('retrieve', formatter_class=argparse.ArgumentDefaultsHelpFormatter,
-                                            description='Retrieve a sequence in HXB2 or SIVmm239 from its coordinates')
-    parser_retrieve.add_argument('-region', metavar='', default="Complete", choices=regions,
-                                 help='List of case sensitive genomic regions. '
-                                      'Allowed regions are: ' + ', '.join(regions))
-    parser_retrieve.add_argument('-start', help='Coordinate relative to the start of the region.')
-    parser_retrieve.add_argument('-end', help='Coordinate relative to the end of the region. '
-                                              'Enter an integer or \'end\'.')
-    parser_retrieve.add_argument('-outfile', metavar='', type=argparse.FileType('w'),
-                                 help='File where results will be written. If no file is specified'
-                                      'the results will be printed to the console')
+    # Create sub-parser for 'retrieve' mode
+    parser_retrieve = subparsers.add_parser('retrieve',
+                                            formatter_class=argparse.RawTextHelpFormatter,
+                                            help='retrieve a region by its coordinates')
+    parser_retrieve.add_argument('virus', metavar='virus', choices=['hiv', 'siv'],
+                                 help='the reference virus (choices: hiv, siv)')
+    parser_retrieve.add_argument('base', metavar='base', choices=['nucl', 'prot'],
+                                 help='sequence base type (choices: \'nucl\' and \'prot\')')
+    parser_retrieve.add_argument('-r', '--region', metavar='REG', default='Complete',
+                                 help='list of genomic regions \n'
+                                      'accepted regions are: \n\t '
+                                      '5\'LTR               5\'LTR-R            5\'LTR-U3       5\'LTR-U5\t\n\t '
+                                      'TAR                 Gag-Pol            Gag            Matrix\t\n\t ' 
+                                      'Capsid              p2                 Nucleocapsid   p1\t\n\t ' 
+                                      'p6                  Pol                GagPolTF       Protease\t\n\t ' 
+                                      'RT                  RNase              Integrase      Vif\t\n\t '
+                                      'Vpr                 Tat(with intron)   Tat(exon1)     Tat(exon2)\t\n\t ' 
+                                      'Rev(with intron)    Rev(exon1)         Rev(exon2)     Vpu\t\n\t ' 
+                                      'Vpx                 Env                gp160          V1\t\n\t '
+                                      'V2                  V3                 V4             V5\t\n\t '
+                                      'RRE                 gp120              gp41           Nef\t\n\t '
+                                      '3\'LTR               3\'LTR-R            3\'LTR-U3       3\'LTR-U5\t\n\t '
+                                      'Complete')
+
+    parser_retrieve.add_argument('-s', '--start', metavar='ST', default=1,
+                                 help='start coordinate (default: 1)')
+    parser_retrieve.add_argument('-e', '--end', metavar='END', default='end',
+                                 help='end coordinate, either an integer or \'end\' (deault: end)')
+    parser_retrieve.add_argument('-o', '--out', metavar='FILE', type=argparse.FileType('w'),
+                                 help='directs the output a file (default: stdout)')
     return parser.parse_args()
 
 
@@ -812,7 +800,7 @@ def main():
     args = parse_args()
 
     # Ensure proper configuration files are set
-    configs = handle_args(args.virus, args.base, args.ref_nt, args.nt_coords, args.ref_aa, args.aa_coords)
+    configs = handle_args(args.virus, args.base)
     ref_nt_seq, ref_aa_seq = configs[0][0][1], configs[1]
     nt_coords, aa_coords = configs[2], configs[3]
     reference_sequence = configs[4]
@@ -822,14 +810,14 @@ def main():
         # Create genome object based on configuration files
         ref_genome = Genome(nt_coords_handle, ref_nt_seq, aa_coords_handle, ref_aa_seq, reference_sequence)
 
-        if args.subcommand == "align":
-            query = get_query(args.base, args.query, args.revcomp)
-            alignment = ref_genome.sequence_align(query, args.outfile)
+        if args.subcommand == "locate":
+            query = get_query(args.base, args.query)
+            alignment = ref_genome.sequence_align(query, args.out)
 
             # Find indices where the query sequence aligns with the reference sequence
-            match_coords = ref_genome.query_region_coordinates(alignment[-1])  # Query is the last item
-            query_regions = ref_genome.find_matches(args.base, match_coords)
-            output_overlap(query_regions, args.outfile)
+            # match_coords = ref_genome.query_region_coordinates(alignment[-1])  # Query is the last item
+            # query_regions = ref_genome.find_matches(args.base, match_coords)
+            # output_overlap(query_regions, args.out)
 
         else:
             valid_in = valid_inputs(args.virus, args.start, args.end, args.region)
@@ -841,13 +829,13 @@ def main():
                 query_region = result[0]
                 overlap_regions = result[1]
 
-                output_retrieved_region(query_region, args.outfile)        # Output retrieved region first
+                output_retrieved_region(query_region, args.out)        # Output retrieved region first
                 if args.outfile is None:
                     print("\n\nRegions touched by the query sequence:")
                 else:
                     args.outfile.write("\n\nRegions touched by the query sequence:\n\n")
 
-                output_overlap(overlap_regions, args.outfile)
+                output_overlap(overlap_regions, args.out)
 
 
 if __name__ == '__main__':
