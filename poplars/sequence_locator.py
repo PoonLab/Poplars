@@ -11,9 +11,12 @@ import argparse
 import re
 import sys
 import textwrap
+import os
 
 from common import convert_fasta
 from mafft import *
+
+NON_CODING = ["5'LTR", "TAR", "3'LTR"]
 
 
 class Region:
@@ -31,7 +34,7 @@ class Region:
         self.genome = genome
         self.ncoords = ncoords
         self.pcoords = pcoords
-        self.nt_seq = self.set_nt_seq_from_genome()
+        self.nt_seq = None
         self.aa_seq = None
 
     def get_coords(self, base):
@@ -53,7 +56,7 @@ class Region:
             self.pcoords = coord_pair
 
     def set_nt_seq_from_genome(self):
-        return self.genome.nt_seq[self.ncoords[0] - 1: self.ncoords[1]]
+        self.nt_seq = self.genome.nt_seq[self.ncoords[0] - 1: self.ncoords[1]]
 
     def set_sequence(self, base, seq):
         if base == 'nucl':
@@ -115,11 +118,14 @@ class RefRegion(Region):
 
         # Set the nucleotide and protein regions
         if base == 'nucl':
-            prot_overlap = self.set_protein_equivalents(overlap)
             overlap.set_coords(q_coords, 'nucl')
-            overlap.set_sequence('nucl', self.get_sequence('nucl')[start: end])
-            overlap.set_coords(prot_overlap[1], 'prot')
-            overlap.set_sequence(prot_overlap[0], 'prot')
+            overlap.set_nt_seq_from_genome()
+            prot_overlap = self.set_protein_equivalents(overlap)
+
+            # Set protein coordinates if the overlap is in a coding region
+            if overlap.region_name not in NON_CODING:
+                overlap.set_coords(prot_overlap[1], 'prot')
+                overlap.set_sequence(prot_overlap[0], 'prot')
         else:
             nucl_overlap = self.set_nucleotide_equivalents(overlap)
             overlap.set_coords(q_coords, 'prot')
@@ -135,10 +141,9 @@ class RefRegion(Region):
         :param overlap: the region that aligns with the reference region
         :return aa_seq, aa_coords: the sequence and coordinates of the overlapping protein sequence
         """
-        non_coding = ["5'LTR", "TAR", "3'LTR"]
-        aa_seq, aa_coords = '', []
-        if self.region_name not in non_coding:
 
+        aa_seq, aa_coords = '', []
+        if self.region_name not in NON_CODING:
             # Slice aligned nucleotide sequence using coordinates of the query region
             if self.codon_aln is not None:
                 aligned_prot = self.codon_aln[overlap.ncoords[0]: overlap.ncoords[1]]
@@ -173,11 +178,11 @@ class QueryRegion(Region):
 
         self.ref_region = ref_region
         self.codon_aln = ''
-        self.set_pos_from_cds()
-        self.set_pos_from_gstart()
-        self.set_pos_from_qstart(base)
-        self.set_pos_from_rstart(base)
-        self.set_pos_from_pstart()
+        self.cds_offset = self.set_pos_from_cds()
+        self.gstart = self.set_pos_from_gstart()
+        self.qstart = self.set_pos_from_qstart(base)
+        self.rstart = self.set_pos_from_rstart(base)
+        self.pstart = self.set_pos_from_pstart()
 
     def set_pos_from_cds(self):
         """
@@ -199,10 +204,10 @@ class QueryRegion(Region):
             else:
                 end = query_end - start
 
-            self.cds_offset = [start, end]
+            return [start, end]
 
     def set_pos_from_gstart(self):
-        self.gstart = self.ncoords
+        return self.ncoords
 
     def set_pos_from_qstart(self, base):
         """
@@ -215,7 +220,7 @@ class QueryRegion(Region):
         if q_coords is not None and q_seq is not None:
             start_offset = q_coords[0] - self.ref_region.get_coords(base)[0] + 1
             end_offset = start_offset + len(q_seq) - 1
-            self.qstart = [start_offset, end_offset]
+            return [start_offset, end_offset]
 
     def set_pos_from_rstart(self, base):
         """
@@ -228,7 +233,7 @@ class QueryRegion(Region):
         if q_coords is not None and q_seq is not None:
             start_offset = self.ref_region.get_coords(base)[0] + 1 - q_coords[0]
             end_offset = len(q_seq) - 1 - start_offset
-            self.rstart = [start_offset, end_offset]
+            return [start_offset, end_offset]
 
     def set_pos_from_pstart(self):
         """
@@ -236,9 +241,9 @@ class QueryRegion(Region):
         """
         if self.pcoords is not None:
             if 'LTR' in self.region_name:
-                self.pstart = None
+                return None
             else:
-                self.pstart = self.pcoords
+                return self.pcoords
 
     def set_pcoords_from_ncoords(self):
         """
@@ -278,13 +283,14 @@ class Genome:
         :param aa_coords: File stream containing coordinates for protein regions. Format: region_name,start,end
         :param aa_seq: A list of lists containing the protein sequences
         """
+
         ref_regions = {}
         # Parse nucleotide region coordinates file
         for nt_line in nt_coords:
             nt_line = nt_line.strip()
             nt_line = nt_line.split(',')
             nucl_coords = [int(nt_line[1]), int(nt_line[2])]
-            seq_region = RefRegion(nt_line[0], self, nucl_coords)
+            seq_region = RefRegion(nt_line[0], self, nucl_coords, aa_coords)
             ref_regions[nt_line[0]] = seq_region
 
         # Parse protein coordinates file
@@ -646,23 +652,21 @@ def output_overlap(overlap_regions, outfile=None):
 
             print("\n\tRelative Positions:")
 
-            if region.rel_pos['CDS']:
+            if region.cds_offset:
                 print("\t\tNucleotide position relative to CDS start:\t{} --> {}"
-                      .format(region.rel_pos['CDS'][0], region.rel_pos['CDS'][1]))
+                      .format(region.cds_offset[0], region.cds_offset[1]))
             else:
                 print("\t\tNucleotide position relative to CDS start: N/A")
 
-            if region.rel_pos['gstart']:
+            if region.gstart:
                 print("\t\tNucleotide position relative to genome start:\t{} --> {}"
-                      .format(region.rel_pos['gstart'][0], region.rel_pos['gstart'][1]))
-
-            if region.rel_pos['pstart']:
+                      .format(region.gstart[0], region.gstart[1]))
+            if region.pstart:
                 print("\t\tAmino acid position relative to protein start:\t{} --> {}"
-                      .format(region.rel_pos['pstart'][0], region.rel_pos['pstart'][1]))
-
-            if region.rel_pos['qstart']:
+                      .format(region.pstart[0], region.pstart[1]))
+            if region.qstart:
                 print("\t\tPosition relative to query start:\t{} --> {}"
-                      .format(region.rel_pos['qstart'][0], region.rel_pos['qstart'][1]))
+                      .format(region.qstart[0], region.qstart[1]))
 
     else:
         for key in overlap_regions:
@@ -684,23 +688,21 @@ def output_overlap(overlap_regions, outfile=None):
 
             outfile.write("\n\tRelative Positions:")
 
-            if region.rel_pos['CDS']:
+            if region.cds_offset:
                 outfile.write("\t\tNucleotide position relative to CDS start:\t{} --> {}"
-                              .format(region.rel_pos['CDS'][0], region.rel_pos['CDS'][1]))
+                              .format(region.cds_offset[0], region.cds_offset[1]))
             else:
                 outfile.write("\t\tNucleotide position relative to CDS start: N/A")
 
-            if region.rel_pos['gstart']:
+            if region.gstart:
                 print("\t\tNucleotide position relative to genome start:\t{} --> {}"
-                      .format(region.rel_pos['gstart'][0] + 1, region.rel_pos['gstart'][1] + 1))
-
-            if region.rel_pos['pstart']:
+                      .format(region.gstart[0] + 1, region.gstart[1] + 1))
+            if region.pstart:
                 outfile.write("\t\tAmino acid position relative to protein start:\t{} --> {}"
-                              .format(region.rel_pos['pstart'][0], region.rel_pos['pstart'][1]))
-
-            if region.rel_pos['qstart']:
+                              .format(region.pstart[0], region.pstart[1]))
+            if region.qstart:
                 outfile.write("\t\tPosition relative to query start:\t{} --> {}"
-                              .format(region.rel_pos['qstart'][0], region.rel_pos['qstart'][1]))
+                              .format(region.qstart[0], region.qstart[1]))
 
 
 def handle_args(virus, base):
@@ -752,16 +754,16 @@ def parse_args():
     subparsers = parser.add_subparsers(title='sub-commands', dest='subcommand')
 
     # Create sub-parser for 'align' mode
-    parser_align = subparsers.add_parser('locate',
-                                         help='find the location of a sequence')
-    parser_align.add_argument('query', metavar='query',
-                              help='the query sequence as a string or a FASTA file')
-    parser_align.add_argument('virus', metavar='virus', choices=['hiv', 'siv'],
-                              help='the reference virus (choices: hiv, siv)')
-    parser_align.add_argument('base', metavar='base', choices=['nucl', 'prot'],
-                              help='sequence base type (choices: \'nucl\' and \'prot\')')
-    parser_align.add_argument('-o', '--out', metavar='FILE', type=argparse.FileType('w'),
-                              help='directs the output to a file (default: stdout)')
+    parser_locate = subparsers.add_parser('locate',
+                                          help='find the location of a sequence')
+    parser_locate.add_argument('query', metavar='query',
+                               help='the query sequence as a string or a FASTA file')
+    parser_locate.add_argument('virus', metavar='virus', choices=['hiv', 'siv'],
+                               help='the reference virus (choices: hiv, siv)')
+    parser_locate.add_argument('base', metavar='base', choices=['nucl', 'prot'],
+                               help='sequence base type (choices: \'nucl\' and \'prot\')')
+    parser_locate.add_argument('-o', '--out', metavar='FILE', type=argparse.FileType('w'),
+                               help='directs the output to a file (default: stdout)')
 
     # Create sub-parser for 'retrieve' mode
     parser_retrieve = subparsers.add_parser('retrieve',
@@ -774,18 +776,16 @@ def parse_args():
     parser_retrieve.add_argument('-r', '--region', metavar='REG', default='Complete',
                                  help='list of genomic regions \n'
                                       'accepted regions are: \n\t '
-                                      '5\'LTR               5\'LTR-R            5\'LTR-U3       5\'LTR-U5\t\n\t '
-                                      'TAR                 Gag-Pol            Gag            Matrix\t\n\t ' 
-                                      'Capsid              p2                 Nucleocapsid   p1\t\n\t ' 
-                                      'p6                  Pol                GagPolTF       Protease\t\n\t ' 
-                                      'RT                  RNase              Integrase      Vif\t\n\t '
-                                      'Vpr                 Tat(with intron)   Tat(exon1)     Tat(exon2)\t\n\t ' 
-                                      'Rev(with intron)    Rev(exon1)         Rev(exon2)     Vpu\t\n\t ' 
-                                      'Vpx                 Env                gp160          V1\t\n\t '
-                                      'V2                  V3                 V4             V5\t\n\t '
-                                      'RRE                 gp120              gp41           Nef\t\n\t '
-                                      '3\'LTR               3\'LTR-R            3\'LTR-U3       3\'LTR-U5\t\n\t '
-                                      'Complete')
+                                      '5\'LTR         TAR                 Gag-Pol             Gag\t\n\t ' 
+                                      'Matrix        Capsid              p2                  Nucleocapsid\t\n\t ' 
+                                      'p1            p6                  Pol                 GagPolTF\t\n\t ' 
+                                      'Protease      RT                  RNase               Integrase\t\n\t '
+                                      'Vif           Vpr                 Tat(with intron)    Tat(exon1)\t\n\t ' 
+                                      'Tat(exon2)    Rev(with intron)    Rev(exon1)          Rev(exon2)\t\n\t ' 
+                                      'Vpu           Vpx                 Env                 gp160\t\n\t '
+                                      'V1            V2                  V3                  V4\t\n\t '
+                                      'V5            RRE                 gp120               gp41\t\n\t '
+                                      'Nef           3\'LTR               Complete\t\n\t')
 
     parser_retrieve.add_argument('-s', '--start', metavar='ST', default=1,
                                  help='start coordinate (default: 1)')
@@ -793,6 +793,20 @@ def parse_args():
                                  help='end coordinate, either an integer or \'end\' (deault: end)')
     parser_retrieve.add_argument('-o', '--out', metavar='FILE', type=argparse.FileType('w'),
                                  help='directs the output a file (default: stdout)')
+
+    # TODO: add custom parser
+    # Show help text if no arguments or 1 arguments are given
+    if len(sys.argv) == 1 or len(sys.argv) == 2:
+        print("\033[1mSequence Locator\033[0m")
+        parser.print_help()
+        print("\n{}".format("-" * 80))
+        print("\n\033[1m'locate' sub-command:\033[0m")
+        parser_locate.print_help()
+        print("\n{}".format("-" * 80))
+        print("\n\033[1m'retrieve' sub-command:\033[0m")
+        parser_retrieve.print_help()
+        sys.exit(2)
+
     return parser.parse_args()
 
 
@@ -815,8 +829,8 @@ def main():
             alignment = ref_genome.sequence_align(query, args.out)
 
             # Find indices where the query sequence aligns with the reference sequence
-            # match_coords = ref_genome.query_region_coordinates(alignment[-1])  # Query is the last item
-            # query_regions = ref_genome.find_matches(args.base, match_coords)
+            match_coords = ref_genome.query_region_coordinates(alignment[-1])  # Query is the last item
+            query_regions = ref_genome.find_matches(args.base, match_coords)
             # output_overlap(query_regions, args.out)
 
         else:
