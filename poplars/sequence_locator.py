@@ -96,7 +96,6 @@ class RefRegion(Region):
         :param q_coords: the coordinates of the query region (global coordinates)
         :return overlap: A QueryRegion object that represents the where the query overlaps with the reference region
         """
-        start, end = 0, 0
         ref_coords = self.get_coords(base)  # Coordinates are global coordinates
 
         # If the ref_coords are in the range of the query region and the q_coords are in the range of the ref region
@@ -114,26 +113,34 @@ class RefRegion(Region):
             else:
                 start = q_coords[0]
 
-        overlap = QueryRegion(self.region_name, self, base, self.genome)
+            overlap = QueryRegion(self.region_name, self, base, self.genome)
 
-        # Set the nucleotide and protein regions
-        if base == 'nucl':
-            overlap.set_coords(q_coords, 'nucl')
-            overlap.set_nt_seq_from_genome()
-            prot_overlap = self.set_protein_equivalents(overlap)
+            # Set the nucleotide and protein regions
+            if base == 'nucl':
+                overlap.set_coords(q_coords, 'nucl')
+                overlap.set_nt_seq_from_genome()
+                prot_overlap = self.set_protein_equivalents(overlap)
+                overlap.set_pos_from_qstart('nucl')
+                overlap.set_pos_from_rstart('nucl')
 
-            # Set protein coordinates if the overlap is in a coding region
-            if overlap.region_name not in NON_CODING:
-                overlap.set_coords(prot_overlap[1], 'prot')
-                overlap.set_sequence(prot_overlap[0], 'prot')
+                # Set protein coordinates if the overlap is in a coding region
+                if overlap.region_name not in NON_CODING:
+                    overlap.set_coords(prot_overlap[1], 'prot')
+                    overlap.set_sequence('prot', prot_overlap[0])
+                    print(overlap.aa_seq)
+                    overlap.set_pos_from_gstart()
+                    overlap.set_pos_from_cds()
+            else:
+                nucl_overlap = self.set_nucleotide_equivalents(overlap)
+                overlap.set_coords(q_coords, 'prot')
+                overlap.set_sequence('prot', self.get_sequence('prot')[start: end])
+                overlap.set_coords(nucl_overlap[1], 'nucl')
+                overlap.set_sequence(nucl_overlap[0], 'nucl')
+
+            return overlap  # return overlap object not dict
+
         else:
-            nucl_overlap = self.set_nucleotide_equivalents(overlap)
-            overlap.set_coords(q_coords, 'prot')
-            overlap.set_sequence('prot', self.get_sequence('prot')[start: end])
-            overlap.set_coords(nucl_overlap[1], 'nucl')
-            overlap.set_sequence(nucl_overlap[0], 'nucl')
-
-        return overlap  # return overlap object not dict
+            return None
 
     def set_protein_equivalents(self, overlap):
         """
@@ -361,10 +368,11 @@ class Genome:
         for q_coords in query_matches:
             for name in self.ref_genome_regions:
                 if name != 'Complete':
-
                     # Use coordinates to find which regions overlap with the query region
                     overlap = self.ref_genome_regions[name].find_overlap(base, q_coords)
-                    query_regions[name] = overlap
+
+                    if overlap is not None:
+                        query_regions[name] = overlap
 
         return query_regions
 
@@ -635,8 +643,6 @@ def output_overlap(overlap_regions, outfile=None):
 
         for key in overlap_regions:
             region = overlap_regions[key]
-            if region.region_name.startswith('5\'LTR'):
-                print("\t3'LTR\n")
 
             print("\nRegion:\t{}".format(region.region_name))
             print("\n\tNucleotide Sequence:")
@@ -646,9 +652,9 @@ def output_overlap(overlap_regions, outfile=None):
 
             if region.aa_seq is not None:
                 print("\n\tProtein Sequence:")
-                seq_lines = [region.nt_seq[i:i + 60] for i in range(0, len(region.nt_seq), 60)]
+                seq_lines = [region.nt_seq[i:i + 60] for i in range(0, len(region.aa_seq), 60)]
                 for line in seq_lines:
-                    print('\t\t{}\n'.format(line))
+                    print('\t\t{}'.format(line))
 
             print("\n\tRelative Positions:")
 
@@ -682,7 +688,7 @@ def output_overlap(overlap_regions, outfile=None):
 
             if region.aa_seq is not None:
                 outfile.write("\n\tProtein Sequence:\n")
-                seq_lines = [region.nt_seq[i:i + 60] for i in range(0, len(region.nt_seq), 60)]
+                seq_lines = [region.nt_seq[i:i + 60] for i in range(0, len(region.aa_seq), 60)]
                 for line in seq_lines:
                     print('\t\t{}'.format(line))
 
@@ -831,7 +837,7 @@ def main():
             # Find indices where the query sequence aligns with the reference sequence
             match_coords = ref_genome.query_region_coordinates(alignment[-1])  # Query is the last item
             query_regions = ref_genome.find_matches(args.base, match_coords)
-            # output_overlap(query_regions, args.out)
+            output_overlap(query_regions, args.out)
 
         else:
             valid_in = valid_inputs(args.virus, args.start, args.end, args.region)
