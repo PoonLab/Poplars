@@ -15,7 +15,7 @@ SIV_PCOORDS_PATH = os.path.abspath('fixtures/siv_test_prot_coords.csv')
 class HIV(unittest.TestCase):
 
     def setUp(self):
-        self.hiv_configs = handle_args('hiv', 'nucl', HIV_NSEQ_PATH, HIV_NCOORDS_PATH, HIV_PSEQ_PATH, HIV_PCOORDS_PATH)
+        self.hiv_configs = handle_args('hiv', 'nucl')
 
         self.ref_nt_seq, self.ref_aa_seq = self.hiv_configs[0][0][1], self.hiv_configs[1]
         nt_coords, aa_coords = self.hiv_configs[2], self.hiv_configs[3]
@@ -33,7 +33,7 @@ class HIV(unittest.TestCase):
 
 
 ####################################
-# Test cases Region
+# Test cases for Region
 ####################################
 class TestGenome(HIV):
 
@@ -216,43 +216,37 @@ class TestGetQuery(unittest.TestCase):
 
     def testNucleotideQuery(self):
         expected = [["query", "ATGCGCG"]]
-        result = get_query("nucl", "ATGCGCG", False)
+        result = get_query("nucl", "ATGCGCG")
         self.assertEqual(expected, result)
 
     def testProteinQuery(self):
         expected = [["query1", "MPPLMMADLADLGG"]]
         query = ">query1\nMPPLMMADLADLGG"
-        result = get_query("prot", query, False)
+        result = get_query("prot", query)
         self.assertEqual(expected, result)
 
     def testLongNucleotideSequence(self):
         expected = [["query", "ATGCGCGAATTAGCGA"]]
         query = "atgcgcg\naattagcga"
-        result = get_query("nucl", query, False)
-        self.assertEqual(expected, result)
-
-    def testRevCompNucl(self):
-        query = ">seq1\nTCGCTAATTCGCGCATN*"
-        expected = [["seq1", "*NATGCGCGAATTAGCGA"]]
-        result = get_query("nucl", query, True)
+        result = get_query("nucl", query)
         self.assertEqual(expected, result)
 
     def testInvalidNucleotideQuery(self):
         query = ">query\natgcgcg&\n"
         with self.assertRaises(SystemExit) as e:
-            get_query("nucl", query, 'n')
+            get_query("nucl", query)
         self.assertEqual(e.exception.code, 0)
 
     def testInvalidProteinQuery(self):
         query = ">query\nMPPLMMAD>LADLGG"
         with self.assertRaises(SystemExit) as e:
-            get_query("prot", query, 'n')
+            get_query("prot", query)
         self.assertEqual(e.exception.code, 0)
 
     def testRevCompProt(self):
         handle = ">seq2\nMPPLMMADLADLGG\n"
         expected = [["seq2", "MPPLMMADLADLGG"]]
-        result = get_query('prot', handle, True)
+        result = get_query('prot', handle)
         self.assertEqual(expected, result)
 
 
@@ -289,7 +283,7 @@ class TestHandleNuclArgs(unittest.TestCase):
         """
         Tests the scenario when the user selects HIV and nucleotide alignment
         """
-        result = handle_args('hiv', 'nucl', None, None, None, None)
+        result = handle_args('hiv', 'nucl')
 
         expected_ref_nt_seq = [
             ['K03455|HIVHXB2CG',
@@ -321,7 +315,7 @@ class TestHandleNuclArgs(unittest.TestCase):
         """
         Tests the scenario when the user selects HIV, specifies the reference protein and nucleotide sequences
         """
-        result = handle_args('hiv', 'nucl', HIV_NSEQ_PATH, HIV_NCOORDS_PATH, HIV_PSEQ_PATH, HIV_PCOORDS_PATH)
+        result = handle_args('hiv', 'nucl')
 
         expected_ref_nt = [
             ['K03455|HIVHXB2CG',
@@ -357,7 +351,7 @@ class TestHandleNuclArgs(unittest.TestCase):
         """
         Tests the scenario when the user selects SIV and protein alignment
         """
-        result = handle_args('siv', 'prot', None, None, None, None)
+        result = handle_args('siv', 'prot')
 
         expected_ref_nt_seq = [
             ['M33262|SIVMM239', 'GCATGCACATTTTAAAGGCTTTTGCTAAATATAGCCAAAAGTCCTTCTACAAATTTTCTAAGAGTTCTGATTCAAAGCAGTAACAG'
@@ -386,7 +380,7 @@ class TestHandleNuclArgs(unittest.TestCase):
         """
         Tests the scenario when the user specifies only the protein sequences
         """
-        result = handle_args('siv', 'prot', None, None, SIV_PSEQ_PATH, SIV_PCOORDS_PATH)
+        result = handle_args('siv', 'prot')
 
         expected_ref_nt = [
             ['M33262|SIVMM239', 'GCATGCACATTTTAAAGGCTTTTGCTAAATATAGCCAAAAGTCCTTCTACAAATTTTCTAAGAGTTCTGATTCAAAGCAGTAACAG'

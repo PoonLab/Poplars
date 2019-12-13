@@ -37,6 +37,11 @@ class Region:
         self.nt_seq = None
         self.aa_seq = None
 
+        # if self.nt_seq is None:
+        #     self.set_nt_seq_from_genome()
+        # if self.pcoords and self.region_name in self.genome.aa_seq.keys():
+        #     self.set_aa_seq_from_genome()
+
     def get_coords(self, base):
         if base == 'nucl':
             return self.ncoords
@@ -49,6 +54,19 @@ class Region:
         else:
             return self.aa_seq
 
+    def get_sequence_from_genome(self, base):
+        seq = ''
+        if base == 'nucl':
+            seq = self.genome.nt_seq[self.ncoords[0] - 1: self.ncoords[1]]
+
+        else:
+            try:
+                seq = self.genome.aa_seq[self.region_name][self.pcoords[0] - self.pcoords[1]]
+            except KeyError as e:
+                print(e.message)
+
+        return seq
+
     def set_coords(self, coord_pair, base):
         if base == 'nucl':
             self.ncoords = coord_pair
@@ -57,6 +75,9 @@ class Region:
 
     def set_nt_seq_from_genome(self):
         self.nt_seq = self.genome.nt_seq[self.ncoords[0] - 1: self.ncoords[1]]
+
+    def set_aa_seq_from_genome(self):
+        self.aa_seq = self.genome.aa_seq[self.region_name][self.pcoords[0] - self.pcoords[1]]
 
     def set_sequence(self, base, seq):
         if base == 'nucl':
@@ -71,7 +92,7 @@ class RefRegion(Region):
     """
     def __init__(self, region_name, genome, ncoords=None, pcoords=None):
         super().__init__(region_name, genome, ncoords, pcoords)
-        self.codon_aln = ''
+        self.codon_aln = self.make_codon_aln()
 
     def make_codon_aln(self):
         """
@@ -87,7 +108,7 @@ class RefRegion(Region):
                 else:
                     codon_aln.append('-{}-'.format(aa))
             self.codon_aln = ''.join(codon_aln)
-        return self.codon_aln
+            return codon_aln
 
     def find_overlap(self, base, q_coords):
         """
@@ -127,7 +148,6 @@ class RefRegion(Region):
                 if overlap.region_name not in NON_CODING:
                     overlap.set_coords(prot_overlap[1], 'prot')
                     overlap.set_sequence('prot', prot_overlap[0])
-                    print(overlap.aa_seq)
                     overlap.set_pos_from_gstart()
                     overlap.set_pos_from_cds()
             else:
@@ -279,8 +299,8 @@ class Genome:
     def __init__(self, nt_coords, nt_seq, aa_coords, aa_seq, reference_sequence):
         self.nt_seq = nt_seq
         self.aa_seq = aa_seq  # List of lists
-        self.ref_genome_regions = self.make_ref_regions(nt_coords, aa_coords, aa_seq)
         self.reference_sequence = reference_sequence
+        self.ref_genome_regions = self.make_ref_regions(nt_coords, aa_coords, aa_seq)
 
     def make_ref_regions(self, nt_coords, aa_coords, aa_seq):
         """
@@ -290,14 +310,13 @@ class Genome:
         :param aa_coords: File stream containing coordinates for protein regions. Format: region_name,start,end
         :param aa_seq: A list of lists containing the protein sequences
         """
-
         ref_regions = {}
         # Parse nucleotide region coordinates file
         for nt_line in nt_coords:
             nt_line = nt_line.strip()
             nt_line = nt_line.split(',')
             nucl_coords = [int(nt_line[1]), int(nt_line[2])]
-            seq_region = RefRegion(nt_line[0], self, nucl_coords, aa_coords)
+            seq_region = RefRegion(nt_line[0], self, nucl_coords)
             ref_regions[nt_line[0]] = seq_region
 
         # Parse protein coordinates file
@@ -309,12 +328,12 @@ class Genome:
             prot_coords.append([int(aa_line[1]), int(aa_line[2])])
 
         # Match protein regions to nucleotide regions
-        for i, coords in enumerate(prot_coords):
-            for region_name in ref_regions:
+        for region_name in ref_regions:
+            for i, coords in enumerate(prot_coords):
                 if prot_names[i].startswith(ref_regions[region_name].region_name):
                     # Set protein coordinates and sequences
                     ref_regions[region_name].set_coords(coords, 'prot')
-                    ref_regions[region_name].set_sequence('prot', aa_seq[i][1])
+                    ref_regions[region_name].set_sequence('prot', aa_seq[region_name])
 
         # Align nucleotide sequence with protein sequence
         for name in ref_regions:
@@ -739,7 +758,12 @@ def handle_args(virus, base):
     else:
         reference_sequence = ref_aa_seq
 
-    configs = [ref_nt_seq, ref_aa_seq, nt_coords, aa_coords, reference_sequence]
+    # Convert list of lists to dictionary
+    ref_prot_seq = {}
+    for name, seq, in ref_aa_seq:
+        ref_prot_seq[name.split('|')[0]] = seq      # Remove organism name
+
+    configs = [ref_nt_seq, ref_prot_seq, nt_coords, aa_coords, reference_sequence]
 
     return configs
 
