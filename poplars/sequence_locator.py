@@ -13,8 +13,8 @@ import sys
 import textwrap
 import os
 
-from common import convert_fasta
-from mafft import *
+from poplars.common import convert_fasta
+from poplars.mafft import *
 
 NON_CODING = ["5'LTR", "TAR", "3'LTR"]
 
@@ -36,11 +36,6 @@ class Region:
         self.pcoords = pcoords
         self.nt_seq = None
         self.aa_seq = None
-
-        # if self.nt_seq is None:
-        #     self.set_nt_seq_from_genome()
-        # if self.pcoords and self.region_name in self.genome.aa_seq.keys():
-        #     self.set_aa_seq_from_genome()
 
     def get_coords(self, base):
         if base == 'nucl':
@@ -135,21 +130,31 @@ class RefRegion(Region):
                 start = q_coords[0]
 
             overlap = QueryRegion(self.region_name, self, base, self.genome)
+            if base == 'nucl':
+                overlap.set_coords(q_coords, 'nucl')
+                overlap.set_nt_seq_from_genome()
+                overlap.cds_offset = overlap.set_pos_from_cds()
+
+            else:
+                overlap.set_coords(q_coords, 'prot')
+                overlap.set_aa_seq_from_genome()
+                overlap.set_pos_from_cds()
+                overlap.cds_offset = overlap.set_pos_from_cds()
 
             # Set the nucleotide and protein regions
             if base == 'nucl':
                 overlap.set_coords(q_coords, 'nucl')
                 overlap.set_nt_seq_from_genome()
                 prot_overlap = self.set_protein_equivalents(overlap)
-                overlap.set_pos_from_qstart('nucl')
-                overlap.set_pos_from_rstart('nucl')
+                overlap.qstart = overlap.set_pos_from_qstart('nucl')
+                overlap.rstart = overlap.set_pos_from_rstart('nucl')
 
                 # Set protein coordinates if the overlap is in a coding region
                 if overlap.region_name not in NON_CODING:
                     overlap.set_coords(prot_overlap[1], 'prot')
                     overlap.set_sequence('prot', prot_overlap[0])
-                    overlap.set_pos_from_gstart()
-                    overlap.set_pos_from_cds()
+                    overlap.gstart = overlap.set_pos_from_gstart()
+                    overlap.cds_offset = overlap.set_pos_from_cds()
             else:
                 nucl_overlap = self.set_nucleotide_equivalents(overlap)
                 overlap.set_coords(q_coords, 'prot')
@@ -159,8 +164,7 @@ class RefRegion(Region):
 
             return overlap  # return overlap object not dict
 
-        else:
-            return None
+        return None
 
     def set_protein_equivalents(self, overlap):
         """
@@ -824,7 +828,6 @@ def parse_args():
     parser_retrieve.add_argument('-o', '--out', metavar='FILE', type=argparse.FileType('w'),
                                  help='directs the output a file (default: stdout)')
 
-    # TODO: add custom parser
     # Show help text if no arguments or 1 arguments are given
     if len(sys.argv) == 1 or len(sys.argv) == 2:
         print("\033[1mSequence Locator\033[0m")
