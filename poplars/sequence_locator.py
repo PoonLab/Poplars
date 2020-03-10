@@ -13,13 +13,13 @@ import sys
 import textwrap
 import os
 
-from poplars.common import convert_fasta
-from poplars.mafft import *
+from common import convert_fasta
+from mafft import *
 
 NON_CODING = ["5'LTR", "TAR", "3'LTR"]
 
 
-class Region:
+class Region(object):
     """
     Stores information about a genome region
     """
@@ -58,7 +58,7 @@ class Region:
             try:
                 seq = self.genome.aa_seq[self.region_name][self.pcoords[0] - self.pcoords[1]]
             except KeyError as e:
-                print(e.message)
+                print(e)
 
         return seq
 
@@ -86,7 +86,7 @@ class RefRegion(Region):
     Stores information about each region in the reference genome
     """
     def __init__(self, region_name, genome, ncoords=None, pcoords=None):
-        super().__init__(region_name, genome, ncoords, pcoords)
+        super(RefRegion, self).__init__(region_name, genome, ncoords, pcoords)
         self.codon_aln = self.make_codon_aln()
 
     def make_codon_aln(self):
@@ -205,7 +205,7 @@ class QueryRegion(Region):
     Represents information about the query sequence region
     """
     def __init__(self, region_name, ref_region, base, genome, ncoords=None, pcoords=None):
-        super().__init__(region_name, genome, ncoords, pcoords)
+        super(QueryRegion, self).__init__(region_name, genome, ncoords, pcoords)
 
         self.ref_region = ref_region
         self.codon_aln = ''
@@ -233,7 +233,7 @@ class QueryRegion(Region):
             if query_end == ref_end:
                 end = query_end - query_start
             else:
-                end = query_end - start
+                end = start + (query_end - query_start)
 
             return [start, end]
 

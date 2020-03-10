@@ -1,3 +1,4 @@
+#!/usr/bin/env python3
 """
 Wrapper script to ensure that MAFFT use system-specific binaries
 MAFFT versions: 7.427 (Linux), 7.429 (Windows), 7.427 (Mac OS X)
@@ -10,7 +11,7 @@ import logging
 import argparse
 import tempfile
 
-from poplars.common import convert_fasta
+from common import convert_fasta
 
 
 def align(query, reference):
