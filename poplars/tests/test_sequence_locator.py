@@ -1,5 +1,6 @@
 import unittest
-from poplars.sequence_locator import *
+
+from sequence_locator import *
 
 HIV_NSEQ_PATH = os.path.abspath('fixtures/hiv-test-genome.fasta')
 HIV_PSEQ_PATH = os.path.abspath('fixtures/hiv-test-proteins.fasta')
@@ -35,77 +36,57 @@ class HIV(unittest.TestCase):
 ####################################
 # Test cases for Region
 ####################################
-class TestGenome(HIV):
+class TestRegion(HIV):
 
-    def testMakeRefRegions(self):
-        expected = {'Gag':
-                    [[790, 2292], 'ATGGGTGCGAGAGCGTCAGTATTAAGCGGGGGAGAATTAGATCGATGGGAAAAAATTCGGTTAAGGCCAGGGGGAAAGAAAAAA'
-                                  'TATAAATTAAAACATATAGTATGGGCAAGCAGGGAGCTAGAACGATTCGCAGTTAATCCTGGCCTGTTAGAAACATCAGAAGGC'
-                                  'TGTAGACAAATACTGGGACAGCTACAACCATCCCTTCAGACAGGATCAGAAGAACTTAGATCATTATATAATACAGTAGCAACC'
-                                  'CTCTATTGTGTGCATCAAAGGATAGAGATAAAAGACACCAAGGAAGCTTTAGACAAGATAGAGGAAGAGCAAAACAAAAGTAAG'
-                                  'AAAAAAGCACAGCAAGCAGCAGCTGACACAGGACACAGCAATCAGGTCAGCCAAAATTACCCTATAGTGCAGAACATCCAGGGG'
-                                  'CAAATGGTACATCAGGCCATATCACCTAGAACTTTAAATGCATGGGTAAAAGTAGTAGAAGAGAAGGCTTTCAGCCCAGAAGTG'
-                                  'ATACCCATGTTTTCAGCATTATCAGAAGGAGCCACCCCACAAGATTTAAACACCATGCTAAACACAGTGGGGGGACATCAAGCA'
-                                  'GCCATGCAAATGTTAAAAGAGACCATCAATGAGGAAGCTGCAGAATGGGATAGAGTGCATCCAGTGCATGCAGGGCCTATTGCA'
-                                  'CCAGGCCAGATGAGAGAACCAAGGGGAAGTGACATAGCAGGAACTACTAGTACCCTTCAGGAACAAATAGGATGGATGACAAAT'
-                                  'AATCCACCTATCCCAGTAGGAGAAATTTATAAAAGATGGATAATCCTGGGATTAAATAAAATAGTAAGAATGTATAGCCCTACC'
-                                  'AGCATTCTGGACATAAGACAAGGACCAAAGGAACCCTTTAGAGACTATGTAGACCGGTTCTATAAAACTCTAAGAGCCGAGCAA'
-                                  'GCTTCACAGGAGGTAAAAAATTGGATGACAGAAACCTTGTTGGTCCAAAATGCGAACCCAGATTGTAAGACTATTTTAAAAGCA'
-                                  'TTGGGACCAGCGGCTACACTAGAAGAAATGATGACAGCATGTCAGGGAGTAGGAGGACCCGGCCATAAGGCAAGAGTTTTGGCT'
-                                  'GAAGCAATGAGCCAAGTAACAAATTCAGCTACCATAATGATGCAGAGAGGCAATTTTAGGAACCAAAGAAAGATTGTTAAGTGT'
-                                  'TTCAATTGTGGCAAAGAAGGGCACACAGCCAGAAATTGCAGGGCCCCTAGGAAAAAGGGCTGTTGGAAATGTGGAAAGGAAGGA'
-                                  'CACCAAATGAAAGATTGTACTGAGAGACAGGCTAATTTTTTAGGGAAGATCTGGCCTTCCTACAAGGGAAGGCCAGGGAATTTT'
-                                  'CTTCAGAGCAGACCAGAGCCAACAGCCCCACCAGAAGAGAGCTTCAGGTCTGGGGTAGAGACAACAACTCCCCCTCAGAAGCAG'
-                                  'GAGCCGATAGACAAGGAACTGTATCCTTTAACTTCCCTCAGGTCACTCTTTGGCAACGACCCCTCGTCACAATAA',
-                     [1, 500], 'MGARASVLSGGELDRWEKIRLRPGGKKKYKLKHIVWASRELERFAVNPGLLETSEGCRQILGQLQPSLQTGSEELRSLYNTVATLYC'
-                               'VHQRIEIKDTKEALDKIEEEQNKSKKKAQQAAADTGHSNQVSQNYPIVQNIQGQMVHQAISPRTLNAWVKVVEEKAFSPEVIPMFSA'
-                               'LSEGATPQDLNTMLNTVGGHQAAMQMLKETINEEAAEWDRVHPVHAGPIAPGQMREPRGSDIAGTTSTLQEQIGWMTNNPPIPVGEI'
-                               'YKRWIILGLNKIVRMYSPTSILDIRQGPKEPFRDYVDRFYKTLRAEQASQEVKNWMTETLLVQNANPDCKTILKALGPAATLEEMMT'
-                               'ACQGVGGPGHKARVLAEAMSQVTNSATIMMQRGNFRNQRKIVKCFNCGKEGHTARNCRAPRKKGCWKCGKEGHQMKDCTERQANFLG'
-                               'KIWPSYKGRPGNFLQSRPEPTAPPEESFRSGVETTTPPQKQEPIDKELYPLTSLRSLFGNDPSSQ'],
-                    'Matrix(p17/p15)':
-                    [[790, 1185], 'ATGGGTGCGAGAGCGTCAGTATTAAGCGGGGGAGAATTAGATCGATGGGAAAAAATTCGGTTAAGGCCAGGGGGAAAGAAAAAA'
-                                  'TATAAATTAAAACATATAGTATGGGCAAGCAGGGAGCTAGAACGATTCGCAGTTAATCCTGGCCTGTTAGAAACATCAGAAGGC'
-                                  'TGTAGACAAATACTGGGACAGCTACAACCATCCCTTCAGACAGGATCAGAAGAACTTAGATCATTATATAATACAGTAGCAACC'
-                                  'CTCTATTGTGTGCATCAAAGGATAGAGATAAAAGACACCAAGGAAGCTTTAGACAAGATAGAGGAAGAGCAAAACAAAAGTAAG'
-                                  'AAAAAAGCACAGCAAGCAGCAGCTGACACAGGACACAGCAATCAGGTCAGCCAAAATTAC',
-                     [1, 132], 'MGARASVLSGGELDRWEKIRLRPGGKKKYKLKHIVWASRELERFAVNPGLLETSEGCRQILGQLQPSLQTGSEELRSLYNTVATLYC'
-                               'VHQRIEIKDTKEALDKIEEEQNKSKKKAQQAAADTGHSNQVSQNY'],
-                    'Capsid(p24/p27)':
-                    [[1186, 1878], 'CCTATAGTGCAGAACATCCAGGGGCAAATGGTACATCAGGCCATATCACCTAGAACTTTAAATGCATGGGTAAAAGTAGTAGA'
-                                   'AGAGAAGGCTTTCAGCCCAGAAGTGATACCCATGTTTTCAGCATTATCAGAAGGAGCCACCCCACAAGATTTAAACACCATGC'
-                                   'TAAACACAGTGGGGGGACATCAAGCAGCCATGCAAATGTTAAAAGAGACCATCAATGAGGAAGCTGCAGAATGGGATAGAGTG'
-                                   'CATCCAGTGCATGCAGGGCCTATTGCACCAGGCCAGATGAGAGAACCAAGGGGAAGTGACATAGCAGGAACTACTAGTACCCT'
-                                   'TCAGGAACAAATAGGATGGATGACAAATAATCCACCTATCCCAGTAGGAGAAATTTATAAAAGATGGATAATCCTGGGATTAA'
-                                   'ATAAAATAGTAAGAATGTATAGCCCTACCAGCATTCTGGACATAAGACAAGGACCAAAGGAACCCTTTAGAGACTATGTAGAC'
-                                   'CGGTTCTATAAAACTCTAAGAGCCGAGCAAGCTTCACAGGAGGTAAAAAATTGGATGACAGAAACCTTGTTGGTCCAAAATGC'
-                                   'GAACCCAGATTGTAAGACTATTTTAAAAGCATTGGGACCAGCGGCTACACTAGAAGAAATGATGACAGCATGTCAGGGAGTAG'
-                                   'GAGGACCCGGCCATAAGGCAAGAGTTTTG',
-                     [133, 363], 'PIVQNIQGQMVHQAISPRTLNAWVKVVEEKAFSPEVIPMFSALSEGATPQDLNTMLNTVGGHQAAMQMLKETINEEAAEWDRVHP'
-                                 'VHAGPIAPGQMREPRGSDIAGTTSTLQEQIGWMTNNPPIPVGEIYKRWIILGLNKIVRMYSPTSILDIRQGPKEPFRDYVDRFYK'
-                                 'TLRAEQASQEVKNWMTETLLVQNANPDCKTILKALGPAATLEEMMTACQGVGGPGHKARVL'],
-                    'p2':
-                    [[1879, 1920], 'GCTGAAGCAATGAGCCAAGTAACAAATTCAGCTACCATAATG',
-                     [364, 377], 'AEAMSQVTNSATIM'],
-                    'Nucleocapsid(p7/p8)':
-                    [[1921, 2085], 'ATGCAGAGAGGCAATTTTAGGAACCAAAGAAAGATTGTTAAGTGTTTCAATTGTGGCAAAGAAGGGCACACAGCCAGAAATTG'
-                                   'CAGGGCCCCTAGGAAAAAGGGCTGTTGGAAATGTGGAAAGGAAGGACACCAAATGAAAGATTGTACTGAGAGACAGGCTAAT',
-                     [378, 432], 'MQRGNFRNQRKIVKCFNCGKEGHTARNCRAPRKKGCWKCGKEGHQMKDCTERQAN'],
-                    'p1':
-                    [[2086, 2133], 'TTTTTAGGGAAGATCTGGCCTTCCTACAAGGGAAGGCCAGGGAATTTT',
-                     [433, 448], 'FLGKIWPSYKGRPGNF'],
-                    'p6':
-                    [[2134, 2292], 'CTTCAGAGCAGACCAGAGCCAACAGCCCCACCAGAAGAGAGCTTCAGGTCTGGGGTAGAGACAACAACTCCCCCTCAGAAGCA'
-                                   'GGAGCCGATAGACAAGGAACTGTATCCTTTAACTTCCCTCAGGTCACTCTTTGGCAACGACCCCTCGTCACAATAA',
-                     [449, 500], 'LQSRPEPTAPPEESFRSGVETTTPPQKQEPIDKELYPLTSLRSLFGNDPSSQ']}
-        result = self.genome.make_ref_regions(self.nt_coords_handle, self.aa_coords_handle, self.ref_nt_seq)
+    def testCoords(self):
+        region = Region('Gag', self.genome)
 
-        for i, reg in enumerate(result):
-            self.assertEqual(list(expected.keys())[i], reg.region_name)
-            self.assertEqual(expected[reg.region_name][0], reg.ncoords)
-            self.assertEqual(expected[reg.region_name][1], reg.nt_seq)
-            self.assertEqual(expected[reg.region_name][2], reg.pcoords)
-            self.assertEqual(expected[reg.region_name][3], reg.aa_seq)
+        region.set_coords([790, 2292], 'nucl')
+        expected_ncoords = [790, 2292]
+        result_ncoords = region.get_coords('nucl')
+        self.assertEqual(expected_ncoords, result_ncoords)
+
+        region.set_coords([1, 500], 'prot')
+        expected_pcoords = [1, 500]
+        result_pccords = region.get_coords('prot')
+        self.assertEqual(expected_pcoords, result_pccords)
+
+    def testSequenceFromGenome(self):
+        region = Region('Vpu', self.genome, [6062, 6310], [2009, 2090])
+
+        region.set_nt_seq_from_genome()
+        expected_nt = 'ACGCAACCTATACCAATAGTAGCAATAGTAGCATTAGTAGTAGCAATAATAATAGCAATAGTTGTGTGGTCCATAGTAAT' \
+                      'CATAGAATATAGGAAAATATTAAGACAAAGAAAAATAGACAGGTTAATTGATAGACTAATAGAAAGAGCAGAAGACAGTG' \
+                      'GCAATGAGAGTGAAGGAGAAATATCAGCACTTGTGGAGATGGGGGTGGAGATGGGGCACCATGCTCCTTGGGATGTTGATGATCTGTAG'
+        result_nt = region.get_sequence_from_genome('nucl')
+        self.assertEqual(expected_nt, result_nt)
+
+        region.set_aa_seq_from_genome()
+        expected_aa = 'TQPIPIVAIVALVVAIIIAIVVWSIVIIEYRKILRQRKIDRLIDRLIERAEDSGNESEGEISALVEMGVEMGHHAPWDVDDL'
+        result_aa = region.get_sequence_from_genome('prot')
+        self.assertEqual(expected_aa, result_aa)
+
+
+####################################
+# Test cases for RefRegion
+####################################
+class TestRefRegion(HIV):
+
+    def testMakeCodonAln(self):
+        p2_ref = RefRegion('p2', self.genome, [1879, 1920], [364, 377])
+        p2_ref.set_nt_seq_from_genome()
+        p2_ref.set_aa_seq_from_genome()
+        expected = '-A--E--A--M--S--Q--V--T--N--S--A--T--I--M-'
+        p2_ref.make_codon_aln()
+        self.assertEqual(expected, p2_ref.codon_aln)
+
+        p6_ref = RefRegion('p6', self.genome, [2134, 2292], [449, 500])
+        p6_ref.set_nt_seq_from_genome()
+        p6_ref.set_aa_seq_from_genome()
+        expected = '-L--Q--S--R--P--E--P--T--A--P--P--E--E--S--F--R--S--G--V--E--T--T--T--P--P--Q--K-' \
+                   '-Q--E--P--I--D--K--E--L--Y--P--L--T--S--L--R--S--L--F--G--N--D--P--S--S--Q--*-'
+        p6_ref.make_codon_aln()
+        self.assertEqual(expected, p6_ref.codon_aln)
 
 
 ####################################
@@ -298,18 +279,14 @@ class TestHandleNuclArgs(unittest.TestCase):
         result_ref_nt_seq = [[header, seq]]
         self.assertEqual(expected_ref_nt_seq, result_ref_nt_seq)
 
-        expected_ref_aa_seq = [
-            ['Gag|HIVHXB2CG',
-             'MGARASVLSGGELDRWEKIRLRPGGKKKYKLKHIVWASRELERFAVNPGLLETSEGCRQILGQLQPSLQTGSEELRSLYNTVATLYCVHQRIEIKDTKEALDKIE'
-             'EEQNKSKKKAQQAAADTGHSNQVSQNYPIVQNIQGQMVHQAISPRTLNAWVKVVEEKAFSPEVIPMFSALSEGATPQDLNTMLNTVGGHQAAMQMLKETINEEAA'
-             'EWDRVHPVHAGPIAPGQMREPRGSDIAGTTSTLQEQIGWMTNNPPIPVGEIYKRWIILGLNKIVRMYSPTSILDIRQGPKEPFRDYVDRFYKTLRAEQASQEVKN'
-             'WMTETLLVQNANPDCKTILKALGPAATLEEMMTACQGVGGPGHKARVLAEAMSQVTNSATIMMQRGNFRNQRKIVKCFNCGKEGH']]
+        expected_ref_aa_seq = 'MGARASVLSGGELDRWEKIRLRPGGKKKYKLKHIVWASRELERFAVNPGLLETSEGCRQILGQLQPSLQTGSEELRSLYNTVATLYC'\
+                              'VHQRIEIKDTKEALDKIEEEQNKSKKKAQQAAADTGHSNQVSQNYPIVQNIQGQMVHQAISPRTLNAWVKVVEEKAFSPEVIPMFSA'\
+                              'LSEGATPQDLNTMLNTVGGHQAAMQMLKETINEEAAEWDRVHPVHAGPIAPGQMREPRGSDIAGTTSTLQEQIGWMTNNPPIPVGEI'\
+                              'YKRWIILGLNKIVRMYSPTSILDIRQGPKEPFRDYVDRFYKTLRAEQASQEVKNWMTETLLVQNANPDCKTILKALGPAATLEEMMT'\
+                              'ACQGVGGPGHKARVLAEAMSQVTNSATIMMQRGNFRNQRKIVKCFNCGKEGH'
 
-        # Check the first 400 amino acids in the reference protein sequence
-        aa_seq = result[1][0][1][:400]
-        header = result[1][0][0]
-        result_ref_aa_seq = [[header, aa_seq]]
-        self.assertEqual(expected_ref_aa_seq, result_ref_aa_seq)
+        aa_seq = result[1]['Gag'][:400]
+        self.assertEqual(expected_ref_aa_seq, aa_seq)
 
     def testHIVArgs(self):
         """
@@ -330,21 +307,9 @@ class TestHandleNuclArgs(unittest.TestCase):
         result_ref_nt = [[header, seq]]
         self.assertEqual(expected_ref_nt, result_ref_nt)
 
-        expected_ref_prot = [
-            ['Gag|HIVHXB2CG',             'MGARASVLSGGELDRWEKIRLRPGGKKKYKLKHIVWASRELERFAVNPGLLETSEGCRQILGQLQPSLQTGSEELR'
-                                          'SLYNTVATLYCVHQRIEIKDTKEALDKIEEEQNKSKKKAQQAAADTGHSNQVSQNYPIVQNIQGQMVHQAISPRTL'
-                                          'NAWVKVVEEKAFSPEVIPMFSALSEGATPQDLNTMLNTVGGHQAAMQMLKETINEEAAEWDRVHPVHAGPIAPGQM'
-                                          'REPRGSDIAGTTSTLQEQIGWMTNNPPIPVGEIYKRWIILGLNKIVRMYSPTSILDIRQGPKEPFRDYVDRFYKTL'
-                                          'RAEQASQEVKNWMTETLLVQNANPDCKTILKALGPAATLEEMMTACQGVGGPGHKARVLAEAMSQVTNSATIMMQR'
-                                          'GNFRNQRKIVKCFNCGKEGHTARNCRAPRKKGCWKCGKEGHQMKDCTERQANFLGKIWPSYKGRPGNFLQSRPEPT'
-                                          'APPEESFRSGVETTTPPQKQEPIDKELYPLTSLRSLFGNDPSSQ'],
-            ['Matrix(p17/p15)|HIVHXB2CG', 'MGARASVLSGGELDRWEKIRLRPGGKKKYKLKHIVWASRELERFAVNPGLLETSEGCRQILGQLQPSLQTGSEELR'
-                                          'SLYNTVATLYCVHQRIEIKDTKEALDKIEEEQNKSKKKAQQAAADTGHSNQVSQNY'],
-            ['Capsid(p24/p27)|HIVHXB2CG', 'PIVQNIQGQMVHQAISPRTLNAWVKVVEEKAFSPEVIPMFSALSEGATPQDLNTMLNTVGGHQAAMQMLKETINEE'
-                                          'AAEWDRVHPVHAGPIAPGQMREPRGSDIAGTTSTLQEQIGWMTNNPPIPVGEIYKRWIILGLNKIVRMYSPTSILD'
-                                          'IRQGPKEPFRDYVDRFYKTLRAEQASQEVKNWMTETLLVQNANPDCKTILKALGPAATLEEMMTACQGVGGPGHKA'
-                                          'RVL']]
-        result_ref_prot = result[1][:3]
+        expected_ref_prot = 'MGARASVLSGGELDRWEKIRLRPGGKKKYKLKHIVWASRELERFAVNPGLLETSEGCRQILGQLQPSLQTGSEELRSLYNTVATLYCV' \
+                            'HQRIEIKDTKEALDKIEEEQNKSKKKAQQAAADTGHSNQVSQNY'
+        result_ref_prot = result[1]['Matrix(p17/p15)']
         self.assertEqual(expected_ref_prot, result_ref_prot)
 
     def testSIVDefaultArgs(self):
@@ -366,14 +331,10 @@ class TestHandleNuclArgs(unittest.TestCase):
         result_ref_nt_seq = [[header, seq]]
         self.assertEqual(expected_ref_nt_seq, result_ref_nt_seq)
 
-        expected_ref_aa_seq = [
-            ['Capsid(p24/p27)|SIVMM239',     'PVQQIGGNYVHLPLSPRTLNAWVKLIEEKKFGAEVVPGFQALSEGCTPYDINQMLNCVGDHQAAMQIIRDIIN'
-                                             'EEAADWDLQHPQPAPQQGQLREPSGSDIAGTTSSVDEQIQWMYRQQNPIPVGNIYRRWIQLGLQKCVRMYNPT'
-                                             'NILDVKQGPKEPFQSYVDRFYKSLRAEQTDAAVKNWMTQTLLIQNANPDCKLVLKGLGVNPTLEEMLTACQGV'
-                                             'GGPGQKARLM'],
-            ['p2|SIVMM239',                  'AEALKEALAPVPIPFAA'],
-            ['Nucleocapsid(p7/p8)|SIVMM239', 'AQQRGPRKPIKCWNCGKEGHSARQCRAPRRQGCWKCGKMDHVMAKCPDRQAG']]
-        result_ref_aa_seq = result[1][2:5]
+        expected_ref_aa_seq = 'PVQQIGGNYVHLPLSPRTLNAWVKLIEEKKFGAEVVPGFQALSEGCTPYDINQMLNCVGDHQAAMQIIRDIINEEAADWDLQHPQPA'\
+                              'PQQGQLREPSGSDIAGTTSSVDEQIQWMYRQQNPIPVGNIYRRWIQLGLQKCVRMYNPTNILDVKQGPKEPFQSYVDRFYKSLRAEQ'\
+                              'TDAAVKNWMTQTLLIQNANPDCKLVLKGLGVNPTLEEMLTACQGVGGPGQKARLM'
+        result_ref_aa_seq = result[1]['Capsid(p24/p27)']
         self.assertEqual(expected_ref_aa_seq, result_ref_aa_seq)
 
     def testSIVProtArgs(self):
@@ -393,10 +354,9 @@ class TestHandleNuclArgs(unittest.TestCase):
         result_ref_nt = [[header, seq]]
         self.assertEqual(expected_ref_nt, result_ref_nt)
 
-        expected_ref_prot = [['Rev(exon1)|SIVMM239', 'MSNHEREEELRKRLRLIHLLHQT'],
-                             ['Rev(exon2)|SIVMM239', 'PYPTGPGTANQRRQRKRRWRRRWQQLLALADRIYSFPDPPTDTPLDLAIQQLQNLAIESIPDPP'
-                                                     'TNTPEALCDPTEDSRSPQD']]
-        result_ref_prot = result[1]
+        expected_ref_prot = 'MSDPRERIPPGNSGEETIGEAFEWLNRTVEEINREAVNHLPRELIFQVWQRSWEYWHDEQGMSPSYVKYRYLCLI' \
+                            'QKALFMHCKKGCRCLGEGHGAGGWRPGPPPPPPPGLA'
+        result_ref_prot = result[1]['Vpx']
         self.assertEqual(expected_ref_prot, result_ref_prot)
 
 

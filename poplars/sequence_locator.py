@@ -11,7 +11,6 @@ import argparse
 import re
 import sys
 import textwrap
-import os
 
 from common import convert_fasta
 from mafft import *
@@ -53,10 +52,9 @@ class Region(object):
         seq = ''
         if base == 'nucl':
             seq = self.genome.nt_seq[self.ncoords[0] - 1: self.ncoords[1]]
-
         else:
             try:
-                seq = self.genome.aa_seq[self.region_name][self.pcoords[0] - self.pcoords[1]]
+                seq = self.genome.aa_seq[self.region_name]
             except KeyError as e:
                 print(e)
 
@@ -72,7 +70,7 @@ class Region(object):
         self.nt_seq = self.genome.nt_seq[self.ncoords[0] - 1: self.ncoords[1]]
 
     def set_aa_seq_from_genome(self):
-        self.aa_seq = self.genome.aa_seq[self.region_name][self.pcoords[0] - self.pcoords[1]]
+        self.aa_seq = self.genome.aa_seq[self.region_name]
 
     def set_sequence(self, base, seq):
         if base == 'nucl':
@@ -97,13 +95,17 @@ class RefRegion(Region):
             codon_aln = []
             codons = [''.join(t) for t in zip(*[iter(self.nt_seq)] * 3)]
             for aa, codon in zip(self.aa_seq, codons):
-                # Check if stop codon
+                # Check if in-frame stop codon
                 if codon == 'TAA' or codon == 'TGA' or codon == 'TAG':
                     codon_aln.append('-*-')
                 else:
                     codon_aln.append('-{}-'.format(aa))
+
+            # Account for stop codon at the end of the sequence
+            if (len(self.aa_seq) + 1) == len(codons):
+                codon_aln.append('-*-')
+
             self.codon_aln = ''.join(codon_aln)
-            return codon_aln
 
     def find_overlap(self, base, q_coords):
         """
