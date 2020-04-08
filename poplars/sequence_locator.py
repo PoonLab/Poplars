@@ -173,7 +173,7 @@ class RefRegion(Region):
 
     def set_protein_equivalents(self, overlap):
         """
-        Finds the protein equivalent of the nucleotide sequence
+        Finds the protein equivalent to the nucleotide sequence
         :param overlap: the region that aligns with the reference region
         :return aa_seq, aa_coords: the sequence and coordinates of the overlapping protein sequence
         """
@@ -182,6 +182,7 @@ class RefRegion(Region):
         if self.region_name not in NON_CODING:
             # Slice aligned nucleotide sequence using coordinates of the query region
             if self.codon_aln is not None:
+                (print(type(overlap)))
                 aligned_prot = self.codon_aln[overlap.ncoords[0]: overlap.ncoords[1]]
                 aa_seq = re.sub('[-]', '', aligned_prot)  # Get corresponding protein sequence
                 aa_coords = [1, len(aa_seq)]
@@ -210,6 +211,14 @@ class QueryRegion(Region):
     Represents information about the query sequence region
     """
     def __init__(self, region_name, ref_region, base, genome, query_coords, ncoords=None, pcoords=None):
+        """
+        :param region_name: name of the query region
+        :param ref-region: reference to the genome region
+        :param genome: reference to the genome
+        :param query_coords: the local coordinates of the region
+        :param ncoords: the global coordinates of the nucleotide sequence
+        :param pcoords: the global coordinates of the protein sequence
+        """
         super(QueryRegion, self).__init__(region_name, genome, ncoords, pcoords)
 
         self.ref_region = ref_region
@@ -237,7 +246,7 @@ class QueryRegion(Region):
                 start = query_start - ref_start + 1     # 1-based indexing
 
             if query_end == ref_end:
-                end = query_end - query_start
+                end = query_end - query_start + 1
             else:
                 end = start + (query_end - query_start)
 
@@ -415,28 +424,42 @@ class Genome:
         :param qend: <option> The end coordinate of the query region (given as local coordinate)
         :return: The genomic region defined by the starting and ending coordinates
         """
-        if region in self.ref_genome_regions:
-            ref_region = self.ref_genome_regions[region]
-            global_range = ref_region.get_coords(base)
-            region_start, region_end = global_range[0], global_range[1]
+        if region == 'Rev' or 'rev':
+            self.retrieve(base, 'Rev(exon1)', qstart, qend)
+            self.retrieve(base, 'Rev(exon2)', 8379, 8653)
 
-            if qend == 'end':
-                qend = region_end - region_start
+        elif region == 'Tat' or 'tat':
+            self.retrieve(base, 'Tat(exon1)', qstart, 6045)
+            self.retrieve(base, 'Tat(exon2)', 8379, 8469)
 
-            # Convert global region coordinates to local coordinates
-            global_start = region_start + qstart
-            global_end = region_end + qend
+        elif region == 'LTR3' or region == 'Nef' or region == 'LTR5':
+            self.retrieve(base, 'LTR3', qstart, qend)
+            self.retrieve(base, 'Nef', qstart, qend)
+            self.retrieve(base, 'LTR5', qstart, qend)
 
-            # Check if the coordinates are valid
-            if global_start < region_start or global_end < region_end:
-                print("Invalid {} coordinates: {} to {}.\nValid range: 1 to {}"
-                      .format(region, qstart, qend, (region_end - region_start)))
-                sys.exit(0)
+        else:
+            if region in self.ref_genome_regions:
+                ref_region = self.ref_genome_regions[region]
+                global_range = ref_region.get_coords(base)
+                region_start, region_end = global_range[0], global_range[1]
 
-            retrieved_regions = self.find_matches(base, [global_start, global_end])
-            query_region = retrieved_regions.pop(region)
+                if qend == 'end':
+                    qend = region_end - region_start
 
-            return query_region, retrieved_regions
+                # Convert global region coordinates to local coordinates
+                global_start = region_start + qstart
+                global_end = region_end + qend
+
+                # Check if the coordinates are valid
+                if global_start < region_start or global_end < region_end:
+                    print("Invalid {} coordinates: {} to {}.\nValid range: 1 to {}"
+                          .format(region, qstart, qend, (region_end - region_start)))
+                    sys.exit(0)
+
+                retrieved_regions = self.find_matches(base, [global_start, global_end])
+                query_region = retrieved_regions.pop(region)
+
+                return query_region, retrieved_regions
 
 
 def valid_sequence(base, sequence):

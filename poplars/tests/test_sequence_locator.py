@@ -25,12 +25,33 @@ class HIV(unittest.TestCase):
         self.nt_coords_handle = open(nt_coords)
         self.aa_coords_handle = open(aa_coords)
 
-        self.genome = Genome(self.nt_coords_handle, self.ref_nt_seq,
+        self.hiv_genome = Genome(self.nt_coords_handle, self.ref_nt_seq,
                              self.aa_coords_handle, self.ref_aa_seq, self.ref_seq)
+
+        self.p2_ref = RefRegion('p2', self.hiv_genome, [1879, 1920], [364, 377])
+        self.p6_ref = RefRegion('p6', self.hiv_genome, [2134, 2292], [449, 500])
 
     def tearDown(self):
         self.nt_coords_handle.close()
         self.aa_coords_handle.close()
+
+
+class SIV(unittest.TestCase):
+
+    def setUp(self):
+        self.siv_configs = handle_args('siv', 'nucl')
+        self.ref_nt_seq, self.ref_aa_seq = self.siv_configs[0][0][1], self.siv_configs[1]
+        nt_coords, aa_coords = self.siv_configs[2], self.siv_configs[3]
+        self.ref_seq = self.siv_configs[4]
+
+        self.nt_coords_handle = open(nt_coords)
+        self.aa_coords_handle = open(aa_coords)
+        self.siv_genome = Genome(self.nt_coords, self.ref_nt_seq,
+                             self.aa_coords, self.ref_aa_seq, self.ref_seq)
+
+    def tearDown(self):
+        self.nt_coords.close()
+        self.aa_coords.close()
 
 
 ####################################
@@ -39,7 +60,7 @@ class HIV(unittest.TestCase):
 class TestRegion(HIV):
 
     def testCoords(self):
-        region = Region('Gag', self.genome)
+        region = Region('Gag', self.hiv_genome)
 
         region.set_coords([790, 2292], 'nucl')
         expected_ncoords = [790, 2292]
@@ -52,7 +73,7 @@ class TestRegion(HIV):
         self.assertEqual(expected_pcoords, result_pccords)
 
     def testSequenceFromGenome(self):
-        region = Region('Vpu', self.genome, [6062, 6310], [2009, 2090])
+        region = Region('Vpu', self.hiv_genome, [6062, 6310], [2009, 2090])
 
         region.set_nt_seq_from_genome()
         expected_nt = 'ACGCAACCTATACCAATAGTAGCAATAGTAGCATTAGTAGTAGCAATAATAATAGCAATAGTTGTGTGGTCCATAGTAAT' \
@@ -73,20 +94,66 @@ class TestRegion(HIV):
 class TestRefRegion(HIV):
 
     def testMakeCodonAln(self):
-        p2_ref = RefRegion('p2', self.genome, [1879, 1920], [364, 377])
-        p2_ref.set_nt_seq_from_genome()
-        p2_ref.set_aa_seq_from_genome()
+        self.p2_ref.set_nt_seq_from_genome()
+        self.p2_ref.set_aa_seq_from_genome()
         expected = '-A--E--A--M--S--Q--V--T--N--S--A--T--I--M-'
-        p2_ref.make_codon_aln()
-        self.assertEqual(expected, p2_ref.codon_aln)
+        self.p2_ref.make_codon_aln()
+        self.assertEqual(expected, self.p2_ref.codon_aln)
 
-        p6_ref = RefRegion('p6', self.genome, [2134, 2292], [449, 500])
-        p6_ref.set_nt_seq_from_genome()
-        p6_ref.set_aa_seq_from_genome()
+        self.p6_ref.set_nt_seq_from_genome()
+        self.p6_ref.set_aa_seq_from_genome()
         expected = '-L--Q--S--R--P--E--P--T--A--P--P--E--E--S--F--R--S--G--V--E--T--T--T--P--P--Q--K-' \
                    '-Q--E--P--I--D--K--E--L--Y--P--L--T--S--L--R--S--L--F--G--N--D--P--S--S--Q--*-'
-        p6_ref.make_codon_aln()
-        self.assertEqual(expected, p6_ref.codon_aln)
+        self.p6_ref.make_codon_aln()
+        self.assertEqual(expected, self.p6_ref.codon_aln)
+
+    def testSetProteinEquivalent(self):
+        self.p2_ref.set_nt_seq_from_genome()
+        self.p2_ref.set_aa_seq_from_genome()
+        self.p2_ref.make_codon_aln()
+        expected_prot_seq = 'EAMSQVTNSATI'
+        expected_prt_coords = [1, 13]
+        result = self.p2_ref.set_protein_equivalents([1, 13])
+        self.assertEqual(expected_prot_seq, result[0])
+        self.assertEqual(expected_prt_coords, result[1])
+
+        self.p6_ref.set_nt_seq_from_genome()
+        self.p6_ref.set_aa_seq_from_genome()
+        self.p6_ref.make_codon_aln()
+        expected = 'LQSRPEPTAPPEESFRSGVETTTPPQKQEPIDKELYPLTSLRSLFGNDPSSQ*'
+        result = self.p6_ref.set_protein_equivalents([0, 53])
+        self.assertEqual(expected, result[0])
+        self.assertEqual(expected, result[1])
+
+
+####################################
+# Test cases for QueryRegion
+####################################
+class TestQueryRegion(HIV):
+
+    def test_set_relative_positions(self):
+
+        # Test p2
+        p2_q = QueryRegion('p2', self.p2_ref, 'nucl', self.hiv_genome, [1879, 1920], [1879, 1920], [364, 377])
+        p2_q.set_nt_seq_from_genome()
+        p2_q.set_aa_seq_from_genome()
+
+        self.assertEqual([1, 42], p2_q.set_pos_from_cds())
+        self.assertEqual([1879, 1920], p2_q.set_pos_from_gstart())
+        self.assertEqual([1, 14], p2_q.set_pos_from_pstart())
+        self.assertEqual([1, 42], p2_q.set_pos_from_qstart('nucl'))
+        self.assertEqual([1, 42], p2_q.set_pos_from_rstart('nucl'))
+
+        # Test p6
+        p6_q = QueryRegion('p6', self.p6_ref, 'nucl', self.hiv_genome, [2135, 2291],  [2135, 2291], [449, 500])
+        p6_q.set_nt_seq_from_genome()
+        p6_q.set_aa_seq_from_genome()
+
+        self.assertEqual([2, 158], p6_q.set_pos_from_cds())
+        self.assertEqual([2135, 2291], p6_q.set_pos_from_gstart())
+        self.assertEqual([2, 52], p6_q.set_pos_from_pstart())
+        self.assertEqual([2, 158], p6_q.set_pos_from_qstart('nucl'))
+        self.assertEqual([2, 158], p6_q.set_pos_from_rstart('nucl'))
 
 
 ####################################
@@ -252,6 +319,7 @@ class TestGetReferenceSequence(unittest.TestCase):
 
 
 class TestReverseComp(unittest.TestCase):
+
     def testSimpleUse(self):
         expected = "TCGCTAATTCGCGCATN*"
         result = reverse_comp("*NATGCGCGAATTAGCGA")
