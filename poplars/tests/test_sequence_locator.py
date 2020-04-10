@@ -111,19 +111,30 @@ class TestRefRegion(HIV):
         self.p2_ref.set_nt_seq_from_genome()
         self.p2_ref.set_aa_seq_from_genome()
         self.p2_ref.make_codon_aln()
-        expected_prot_seq = 'EAMSQVTNSATI'
-        expected_prt_coords = [1, 13]
-        result = self.p2_ref.set_protein_equivalents([1, 13])
+        expected_prot_seq = 'AEAMSQVTNSATIM'
+        expected_prot_coords = [1, 14]
+
+        # Local coordinates: 0, 42 (relative to the start of the p2 coding region)
+        # Global coordinates: 1879, 1920 (relative to the start of the genome)
+        overlap = QueryRegion('p2', self.p2_ref, 'nucl', self.hiv_genome, [0, 42], [1879, 1920])
+        overlap.set_nt_seq_from_genome()
+        overlap.set_aa_seq_from_genome()
+        result = self.p2_ref.set_protein_equivalents(overlap)
         self.assertEqual(expected_prot_seq, result[0])
-        self.assertEqual(expected_prt_coords, result[1])
+        self.assertEqual(expected_prot_coords, result[1])
 
         self.p6_ref.set_nt_seq_from_genome()
         self.p6_ref.set_aa_seq_from_genome()
         self.p6_ref.make_codon_aln()
-        expected = 'LQSRPEPTAPPEESFRSGVETTTPPQKQEPIDKELYPLTSLRSLFGNDPSSQ*'
-        result = self.p6_ref.set_protein_equivalents([0, 53])
-        self.assertEqual(expected, result[0])
-        self.assertEqual(expected, result[1])
+        expected_prot_seq = 'QSRPEPTAPPEESFRSGVETTTPPQKQEPIDKELYPLTSLRSLFGNDPSSQ'    # excludes the first and last amino acids
+        expected_prot_coords = [2, 52]
+
+        # Local coordinates: 1, 52 (relative to the start of the p6 coding region)
+        # Global coordinates: 2131, 2289 (relative to the start of the genome)
+        overlap = QueryRegion('p6', self.p6_ref, 'nucl', self.hiv_genome, [2, 155], [2131, 2289])
+        result = self.p6_ref.set_protein_equivalents(overlap)
+        self.assertEqual(expected_prot_seq, result[0])
+        self.assertEqual(expected_prot_coords, result[1])
 
 
 ####################################
@@ -134,9 +145,14 @@ class TestQueryRegion(HIV):
     def test_set_relative_positions(self):
 
         # Test p2
-        p2_q = QueryRegion('p2', self.p2_ref, 'nucl', self.hiv_genome, [1879, 1920], [1879, 1920], [364, 377])
+        self.p2_ref.set_nt_seq_from_genome()
+        self.p2_ref.set_aa_seq_from_genome()
+        self.p2_ref.codon_aln = self.p2_ref.make_codon_aln()
+
+        p2_q = QueryRegion('p2', self.p2_ref, 'nucl', self.hiv_genome, [0, 42], [1879, 1920])
         p2_q.set_nt_seq_from_genome()
         p2_q.set_aa_seq_from_genome()
+        self.p2_ref.set_protein_equivalents(p2_q)
 
         self.assertEqual([1, 42], p2_q.set_pos_from_cds())
         self.assertEqual([1879, 1920], p2_q.set_pos_from_gstart())
@@ -145,9 +161,14 @@ class TestQueryRegion(HIV):
         self.assertEqual([1, 42], p2_q.set_pos_from_rstart('nucl'))
 
         # Test p6
-        p6_q = QueryRegion('p6', self.p6_ref, 'nucl', self.hiv_genome, [2135, 2291],  [2135, 2291], [449, 500])
+        self.p6_ref.set_nt_seq_from_genome()
+        self.p6_ref.set_aa_seq_from_genome()
+        self.p6_ref.codon_aln = self.p6_ref.make_codon_aln()
+
+        p6_q = QueryRegion('p6', self.p6_ref, 'nucl', self.hiv_genome, [2, 155],  [2131, 2289])
         p6_q.set_nt_seq_from_genome()
         p6_q.set_aa_seq_from_genome()
+        self.p6_ref.set_protein_equivalents(p6_q)
 
         self.assertEqual([2, 158], p6_q.set_pos_from_cds())
         self.assertEqual([2135, 2291], p6_q.set_pos_from_gstart())

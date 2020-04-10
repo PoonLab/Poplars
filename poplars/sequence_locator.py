@@ -105,7 +105,7 @@ class RefRegion(Region):
             if (len(self.aa_seq) + 1) == len(codons):
                 codon_aln.append('-*-')
 
-            self.codon_aln = ''.join(codon_aln)
+            return ''.join(codon_aln)
 
     def find_overlap(self, base, q_coords):
         """
@@ -174,18 +174,24 @@ class RefRegion(Region):
     def set_protein_equivalents(self, overlap):
         """
         Finds the protein equivalent to the nucleotide sequence
-        :param overlap: the region that aligns with the reference region
+        :param overlap: reference to the region that aligns with the reference region
         :return aa_seq, aa_coords: the sequence and coordinates of the overlapping protein sequence
         """
-
         aa_seq, aa_coords = '', []
         if self.region_name not in NON_CODING:
+
             # Slice aligned nucleotide sequence using coordinates of the query region
             if self.codon_aln is not None:
-                (print(type(overlap)))
-                aligned_prot = self.codon_aln[overlap.ncoords[0]: overlap.ncoords[1]]
+                aligned_prot = self.codon_aln[overlap.query_coords[0]: overlap.query_coords[1]]
                 aa_seq = re.sub('[-]', '', aligned_prot)  # Get corresponding protein sequence
-                aa_coords = [1, len(aa_seq)]
+
+                # Set the local amino acid coordinates
+                pat = re.compile(aa_seq)
+                m = pat.search(self.aa_seq)
+                aa_coords = [m.start() + 1, m.end()]
+
+                # Set the pcoords of the overlap region
+                overlap.set_coords(aa_coords, 'prot')
 
         return aa_seq, aa_coords
 
