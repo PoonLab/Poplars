@@ -105,7 +105,8 @@ class RefRegion(Region):
             if (len(self.aa_seq) + 1) == len(codons):
                 codon_aln.append('-*-')
 
-            return ''.join(codon_aln)
+            self.codon_aln = ''.join(codon_aln)
+            return self.codon_aln
 
     def find_overlap(self, base, q_coords):
         """
@@ -152,7 +153,6 @@ class RefRegion(Region):
                 overlap.set_nt_seq_from_genome()
                 prot_overlap = self.set_protein_equivalents(overlap)
                 overlap.qstart = overlap.set_pos_from_qstart('nucl')
-                overlap.rstart = overlap.set_pos_from_rstart('nucl')
 
                 # Set protein coordinates if the overlap is in a coding region
                 if overlap.region_name not in NON_CODING:
@@ -233,7 +233,6 @@ class QueryRegion(Region):
         self.cds_offset = self.set_pos_from_cds()
         self.gstart = self.set_pos_from_gstart()
         self.qstart = self.set_pos_from_qstart(base)
-        self.rstart = self.set_pos_from_rstart(base)
         self.pstart = self.set_pos_from_pstart()
 
     def set_pos_from_cds(self):
@@ -268,23 +267,12 @@ class QueryRegion(Region):
         :return: The position of the reference region relative to the query region
         """
         overlap_coords = self.get_coords(base)
+        parent_coords = self.ref_region.get_coords(base)
         overlap_seq = self.get_sequence(base)
-        if overlap_coords is not None and overlap_seq is not None:
-            start_offset = overlap_coords[0] - self.query_coords[0] + 1
-            end_offset = start_offset + len(overlap_seq) - 1
-            return [start_offset, end_offset]
 
-    def set_pos_from_rstart(self, base):
-        """
-        Gives the position of the sequence relative to the start of the region of interest
-        :param base: The base of the sequence (nucleotide or protein)
-        :return: The position of the reference region relative to the query region
-        """
-        q_coords = self.get_coords(base)
-        q_seq = self.ref_region.get_sequence(base)
-        if q_coords is not None and q_seq is not None:
-            start_offset = self.ref_region.get_coords(base)[0] + 1 - q_coords[0]
-            end_offset = len(q_seq) - 1 - start_offset
+        if overlap_coords is not None and parent_coords is not None and overlap_seq is not None:
+            start_offset = overlap_coords[0] - parent_coords[0] + 1
+            end_offset = start_offset + len(overlap_seq) - 1
             return [start_offset, end_offset]
 
     def set_pos_from_pstart(self):
