@@ -92,8 +92,16 @@ class RefRegion(Region):
         Aligns the protein sequence with its associated nucleotide sequence
         """
         if self.nt_seq is not None and self.aa_seq is not None:
+
+            # Account for the frame-shift at position 5572 in vpr (extra T relative to other subtype B)
+            if self.region_name == 'Vpr' and self.genome.virus == 'hiv':
+                pos = 215   # position of extra T relative to the start of the Vpr CDS (0-based indexing)
+                nt_seq = self.nt_seq[:pos] + self.nt_seq[(pos + 1):]
+            else:
+                nt_seq = self.nt_seq
+
             codon_aln = []
-            codons = [''.join(t) for t in zip(*[iter(self.nt_seq)] * 3)]
+            codons = [''.join(t) for t in zip(*[iter(nt_seq)] * 3)]
             for aa, codon in zip(self.aa_seq, codons):
                 # Check if in-frame stop codon
                 if codon == 'TAA' or codon == 'TGA' or codon == 'TAG':
@@ -160,15 +168,14 @@ class RefRegion(Region):
                     overlap.set_sequence('prot', prot_overlap[0])
                     overlap.gstart = overlap.set_pos_from_gstart()
                     overlap.cds_offset = overlap.set_pos_from_cds()
-            else:
-                nucl_overlap = self.set_nucleotide_equivalents(overlap)
-                overlap.set_coords(overlap_coords, 'prot')
-                overlap.set_sequence('prot', self.get_sequence('prot')[start: end])
-                overlap.set_coords(nucl_overlap[1], 'nucl')
-                overlap.set_sequence(nucl_overlap[0], 'nucl')
+            # else:
+            #     nucl_overlap = self.set_nucleotide_equivalents(overlap)
+            #     overlap.set_coords(overlap_coords, 'prot')
+            #     overlap.set_sequence('prot', self.get_sequence('prot')[start: end])
+            #     overlap.set_coords(nucl_overlap[1], 'nucl')
+            #     overlap.set_sequence(nucl_overlap[0], 'nucl')
 
-            return overlap  # return overlap object not dict
-
+            return overlap
         return None
 
     def set_protein_equivalents(self, overlap):
@@ -194,22 +201,6 @@ class RefRegion(Region):
                 overlap.set_coords(aa_coords, 'prot')
 
         return aa_seq, aa_coords
-
-    def set_nucleotide_equivalents(self, overlap):
-        """
-        Finds the nucleotide equivalent of the protein sequence
-        :param overlap: the region that aligns with the reference region
-        :return nt_seq, nt_coords: the sequence and coordinates of the overlapping nucleotide sequence
-        """
-        nt_seq, nt_coords = '', []
-        if self.ncoords is not None:
-            overlap.make_codon_aln()
-            regex = re.compile(overlap.codon_aln)
-            coords = regex.search(self.codon_aln).span()
-            nt_coords = overlap.get_coords('nucl')
-            nt_seq = self.nt_seq[coords[0]: coords[1]]
-
-        return nt_seq, nt_coords
 
 
 class QueryRegion(Region):
@@ -309,18 +300,18 @@ class Genome:
     """
     Stores information about the reference genome
     """
-    def __init__(self, nt_coords, nt_seq, aa_coords, aa_seq, reference_sequence):
+    def __init__(self, virus, nt_coords, nt_seq, aa_seq, reference_sequence):
+        self.virus = virus
         self.nt_seq = nt_seq
         self.aa_seq = aa_seq  # List of lists
         self.reference_sequence = reference_sequence
-        self.ref_genome_regions = self.make_ref_regions(nt_coords, aa_coords, aa_seq)
+        self.ref_genome_regions = self.make_ref_regions(nt_coords, aa_seq)
 
-    def make_ref_regions(self, nt_coords, aa_coords, aa_seq):
+    def make_ref_regions(self, nt_coords, aa_seq):
         """
         Reads in the start and end coordinates of the genomic regions and associates the region with its coordinates.
         If no coordinate files are specified, set default nucleotide and protein coordinate files.
         :param nt_coords: File stream containing coordinates for nucleotide regions. Format: region_name,start,end
-        :param aa_coords: File stream containing coordinates for protein regions. Format: region_name,start,end
         :param aa_seq: A list of lists containing the protein sequences
         """
         ref_regions = {}
@@ -334,20 +325,19 @@ class Genome:
             ref_regions[nt_line[0]] = seq_region
 
         # Parse protein coordinates file
-        prot_names, prot_coords = [], []
-        for aa_line in aa_coords:
+        prot_names = []
+        for aa_line in aa_seq:
             aa_line = aa_line.strip()
-            aa_line = aa_line.split(',')
-            prot_names.append(aa_line[0])
-            prot_coords.append([int(aa_line[1]), int(aa_line[2])])
+            prot_name = aa_line[aa_line.find('>') + 1: aa_line.find('|')]
+            prot_names.append(prot_name)
 
         # Match protein regions to nucleotide regions
         for region_name in ref_regions:
-            for i, coords in enumerate(prot_coords):
-                if prot_names[i].startswith(ref_regions[region_name].region_name):
+            for prot_name in prot_names:
+                if prot_name.startswith(region_name):
                     # Set protein coordinates and sequences
-                    ref_regions[region_name].set_coords(coords, 'prot')
                     ref_regions[region_name].set_sequence('prot', aa_seq[region_name])
+                    ref_regions[region_name].set_coords([1, len(aa_seq[region_name])], 'prot')
 
         # Align nucleotide sequence with protein sequence
         for name in ref_regions:
@@ -769,13 +759,11 @@ def handle_args(virus, base):
         ref_nt = os.path.join(os.path.dirname(__file__), "ref_genomes/K03455.fasta")
         nt_coords = os.path.join(os.path.dirname(__file__), "ref_genomes/K03455_genome_coordinates.csv")
         ref_aa = os.path.join(os.path.dirname(__file__), "ref_genomes/K03455-protein.fasta")
-        aa_coords = os.path.join(os.path.dirname(__file__), "ref_genomes/K03455_protein_coordinates.csv")
 
     else:
         ref_nt = os.path.join(os.path.dirname(__file__), "ref_genomes/M33262.fasta")
         nt_coords = os.path.join(os.path.dirname(__file__), "ref_genomes/M33262_genome_coordinates.csv")
         ref_aa = os.path.join(os.path.dirname(__file__), "ref_genomes/M33262-protein.fasta")
-        aa_coords = os.path.join(os.path.dirname(__file__), "ref_genomes/M33262_protein_coordinates.csv")
 
     ref_nt_seq = get_ref_seq(ref_nt, 'nucl')
     ref_aa_seq = get_ref_seq(ref_aa, 'prot')
@@ -791,7 +779,7 @@ def handle_args(virus, base):
     for name, seq, in ref_aa_seq:
         ref_prot_seq[name.split('|')[0]] = seq      # Remove organism name
 
-    configs = [ref_nt_seq, ref_prot_seq, nt_coords, aa_coords, reference_sequence]
+    configs = [ref_nt_seq, ref_prot_seq, nt_coords, reference_sequence]
 
     return configs
 
@@ -876,10 +864,10 @@ def main():
     nt_coords, aa_coords = configs[2], configs[3]
     reference_sequence = configs[4]
 
-    with open(nt_coords) as nt_coords_handle, open(aa_coords) as aa_coords_handle:
+    with open(nt_coords) as nt_coords_handle:
 
         # Create genome object based on configuration files
-        ref_genome = Genome(nt_coords_handle, ref_nt_seq, aa_coords_handle, ref_aa_seq, reference_sequence)
+        ref_genome = Genome(args.virus, nt_coords_handle, ref_nt_seq, ref_aa_seq, reference_sequence)
 
         if args.subcommand == "locate":
             query = get_query(args.base, args.query)
