@@ -29,6 +29,18 @@ class TestConvertFasta(unittest.TestCase):
         self.assertEqual(expected, result)
 
 
+class TestConvertClustal(unittest.TestCase):
+    def testSimpleConversion(self):
+        handle = StringIO('\n\n\n'
+                          'query1     ATGCTGCGGCGCATG\n'
+                          'query2     --GCTACGGCGCATG\n'
+                          '             ***.*********\n')
+        result = convert_clustal(handle.readlines())
+        expected = {'query1': 'ATGCTGCGGCGCATG', 'query2': '--GCTACGGCGCATG', 'aln':    '  ***.*********'}
+
+        self.assertEqual(expected, result)
+
+
 class TestTransposeFasta(unittest.TestCase):
 
     def testWrongType(self):

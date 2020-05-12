@@ -11,13 +11,14 @@ import logging
 import argparse
 import tempfile
 
-from common import convert_fasta
+from poplars.common import convert_fasta, convert_clustal
 
 
-def align(query, reference):
+def align(query, reference, clustal=False):
     """
     Python wrapper to MAFFT for pairwise/multiple sequence alignment
     :param query: The query sequence
+    :param clustal: output Clustal format (default: FASTA)
     :param reference: Either a reference sequence (str) or a list from convert_fasta()
     """
     handle = tempfile.NamedTemporaryFile('w+', delete=False)
@@ -31,16 +32,23 @@ def align(query, reference):
     handle.close()
 
     # Path to the temporary query file for MAFFT
-    raw_output = run_mafft(handle.name)
+    raw_output = run_mafft(handle.name, clustal)
 
     output = raw_output.decode('utf-8')
-    return convert_fasta(output.split('\n'))
+
+    if not clustal:
+        aln_output = convert_fasta(output.split('\n'))
+    else:
+        aln_output = convert_clustal(output.split('\n'))
+
+    return aln_output
 
 
-def run_mafft(file_path):
+def run_mafft(file_path, clustal=False):
     """
-    Runs MAFFT on Linux, Windows, or Mac OS X
+    Runs MAFFT on Linux, Windows, or Mac OS X and produces FASTA output
     :param file_path: path to the input file
+    :param clustal: output Clustal format (default: FASTA)
     :return output: the output of MAFFT
     """
 
@@ -65,10 +73,21 @@ def run_mafft(file_path):
     if not os.path.isfile(bin_path):
         logging.error("No file exists.")
 
-    if sys.platform.startswith("win"):
-        raw_output = subprocess.check_output([bin_path, '--quiet', file_path], shell=False, stderr=subprocess.DEVNULL)
+    if not clustal:
+        if sys.platform.startswith("win"):
+            raw_output = subprocess.check_output([bin_path, '--quiet', file_path],
+                                                 shell=False, stderr=subprocess.DEVNULL)
+        else:
+            raw_output = subprocess.check_output([bin_path, '--quiet', file_path],
+                                                 shell=False, stderr=subprocess.STDOUT)
+
     else:
-        raw_output = subprocess.check_output([bin_path, '--quiet', file_path], shell=False, stderr=subprocess.STDOUT)
+        if sys.platform.startswith("win"):
+            raw_output = subprocess.check_output([bin_path, '--quiet', '--clustalout', file_path],
+                                                 shell=False, stderr=subprocess.DEVNULL)
+        else:
+            raw_output = subprocess.check_output([bin_path, '--quiet', '--clustalout', file_path],
+                                                 shell=False, stderr=subprocess.STDOUT)
 
     return raw_output
 

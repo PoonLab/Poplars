@@ -1,3 +1,4 @@
+#!/usr/bin/env python3
 """
 Python implementation of HIV Sequence Locator from https://www.hiv.lanl.gov
 HIV and SIV genomic region coordinates are based on the HXB2 and Mac239
@@ -7,13 +8,13 @@ Note: The first 256 nucleotides of SIVMM239 correspond to the flanking sequence,
 and are included in the complete SIV genome (https://www.ncbi.nlm.nih.gov/nucleotide/M33262)
 """
 
-import argparse
 import re
 import sys
-import textwrap
+import os
+import argparse
 
-from common import convert_fasta
-from mafft import *
+from poplars.common import convert_fasta, convert_clustal
+from poplars.mafft import align
 
 NON_CODING = ["5'LTR", "TAR", "3'LTR"]
 
@@ -300,11 +301,12 @@ class Genome:
     """
     Stores information about the reference genome
     """
-    def __init__(self, virus, nt_coords, nt_seq, aa_seq, reference_sequence):
+    def __init__(self, virus, nt_coords, nt_seq, aa_seq, reference_sequence, base):
         self.virus = virus
         self.nt_seq = nt_seq
         self.aa_seq = aa_seq  # List of lists
         self.reference_sequence = reference_sequence
+        self.ref_base = base
         self.ref_genome_regions = self.make_ref_regions(nt_coords, aa_seq)
 
     def make_ref_regions(self, nt_coords, aa_seq):
@@ -351,51 +353,52 @@ class Genome:
         :param query_sequence: The query sequence
         :param outfile: <option> The file stream of the output file in write mode
         """
-        result = align(query_sequence[0][1], self.reference_sequence[0][1])
+        if self.ref_base == 'nucl':
+            result = align(query_sequence[1], self.reference_sequence[0][1], True)
+
+        else:
+            for ref_seq in self.ref_genome_regions:
+                result = align(query_sequence[1], ref_seq.get_sequence('prot'))
 
         if outfile is not None:
             outfile.write("Alignment:\n")
         else:
             print("Alignment:")
 
-        for h, s in result:
-            if outfile is not None:
-                outfile.write(">{}\n".format(h))
-                outfile.write(textwrap.fill(s, 60))
-            else:
-                print(">{}".format(h))
-                print(textwrap.fill(s, 60))
-
+        clustal_to_fasta(result, outfile)
         return result
 
     @staticmethod
-    def query_region_coordinates(alignment):
+    def find_query_match_coords(alignment):
         """
         Gets the indices of regions where the query aligns with the reference sequence
-        :param alignment: A list containing the header of the query sequence, and the aligned query sequence
+        :param alignment: the aligned query sequence
         :return query_matches: The positions where the query aligns with the reference sequences with no gaps
         """
-        pat = re.compile('[A-Z]{2,}')  # Match the aligned region (minimum alignment length is 2)
-        query_matches = [(match.start() + 1, match.end()) for match in pat.finditer(alignment[1])]
-        return query_matches
+        pat = re.compile('\w[\w-]*\w')  # Get the query sequence from the alignment
+        match = pat.search(alignment)
+        query_match_coords = (match.start() + 1, match.end())
+        return query_match_coords
 
-    def find_matches(self, base, query_matches):
+    def find_matches(self, base, qmatch_coords, lookup_table):
         """
         Finds the genomic regions where the query sequence aligns with the reference sequence
         :param base: The base of the query sequence
-        :param query_matches: <list> of indices where the query sequence aligns with the reference sequence
+        :param qmatch_coords: tuple containing the coordinates of the query sequence in the alignment
+        :param lookup_table: a list that maps coordinates of reference genome to the aligned sequence
         :return query_regions: <dict> with keys as region name and values as the QueryRegion object
         """
         query_regions = {}
 
-        for q_coords in query_matches:
-            for name in self.ref_genome_regions:
-                if name != 'Complete':
-                    # Use coordinates to find which regions overlap with the query region
-                    overlap = self.ref_genome_regions[name].find_overlap(base, q_coords)
+        for name in self.ref_genome_regions:
+            if name != 'Complete':
+                # Convert query coordinates from "alignment space" to "region space"
+                converted_coords = (lookup_table[qmatch_coords[0]], lookup_table[qmatch_coords[1]])
+                # Find which regions overlap with the query region
+                overlap = self.ref_genome_regions[name].find_overlap(base, converted_coords)
 
-                    if overlap is not None:
-                        query_regions[name] = overlap
+                if overlap is not None:
+                    query_regions[name] = overlap
 
         return query_regions
 
@@ -444,6 +447,45 @@ class Genome:
                 query_region = retrieved_regions.pop(region)
 
                 return query_region, retrieved_regions
+
+
+def make_aln_lookup_table(aln):
+    """
+    Maps the coordinates of reference genome to the aligned sequence
+    :param aln: dictionary of header, sequence pairs
+    :param genome: the reference genome
+    :return: list where indices correspond to a position in the aligned sequence
+              and the value corresponds to the position in the reference sequence
+    """
+    aln_lookup_table = []
+    count = -1
+    for pos, nt in enumerate(aln['reference']):
+        if nt != '-':   # Account for gaps
+            count += 1
+        aln_lookup_table.append(count)
+    return aln_lookup_table
+
+
+def clustal_to_fasta(aln, outfile=None):
+    """
+    Outputs a Clustal-formatted alignment to FASTA to the console by default or to a file
+    :param aln: the Clustal formatted alignment as a dictionary of header, sequence pairs
+    :param outfile: path to the FASTA output file
+    """
+    for header in aln:
+        if header != 'aln':
+            seq = aln[header]
+
+            if outfile:
+                with open(outfile) as out_handle:
+                    out_handle.write('>{}\n'.format(header))
+                    for i in range(0, len(seq), 60):
+                        out_handle.write('{}\n'.format(seq[i:i + 60]))
+
+            else:
+                print('>{}'.format(header))
+                for i in range(0, len(seq), 60):
+                    print(seq[i:i+60])
 
 
 def valid_sequence(base, sequence):
@@ -514,11 +556,12 @@ def valid_inputs(virus, start_coord, end_coord, region):
     return True
 
 
-def get_query(base, query):
+def get_query(base, query, rev_comp):
     """
     Gets the query sequence and checks that it is valid
     :param base: The base (nucleotide or protein)
     :param query: The query sequence as a string or the file path to the query sequence
+    :param rev_comp: Reverse complement flag (False by default)
     :return: A list of lists containing the sequence identifiers and the query sequences
     """
 
@@ -558,11 +601,11 @@ def get_query(base, query):
     if not valid_sequence(base, query_seq):
         sys.exit(0)
 
-    # # At this point, the sequence is valid
-    # if base == 'nucl':
-    #     rc_query = reverse_comp(query_seq[0][1])
-    #     header = query_seq[0][0]
-    #     query_seq = [[header, rc_query]]
+    # At this point, the sequence is valid
+    if base == 'nucl' and rev_comp:
+        rc_query = reverse_comp(query_seq[0][1])
+        header = query_seq[0][0]
+        query_seq = [[header, rc_query]]
 
     return query_seq
 
@@ -810,6 +853,8 @@ def parse_args():
                                help='sequence base type (choices: \'nucl\' and \'prot\')')
     parser_locate.add_argument('-o', '--out', metavar='FILE', type=argparse.FileType('w'),
                                help='directs the output to a file (default: stdout)')
+    parser_locate.add_argument('-rc', '--revcomp', action='store_true',
+                               help='aligns the reverse complement of the query with the reference genome')
 
     # Create sub-parser for 'retrieve' mode
     parser_retrieve = subparsers.add_parser('retrieve',
@@ -821,7 +866,7 @@ def parse_args():
                                  help='sequence base type (choices: \'nucl\' and \'prot\')')
     parser_retrieve.add_argument('-r', '--region', metavar='REG', default='Complete',
                                  help='list of genomic regions \n'
-                                      'accepted regions are: \n\t '
+                                      'Accepted regions are: \n\t '
                                       '5\'LTR         TAR                 Gag-Pol             Gag\t\n\t ' 
                                       'Matrix        Capsid              p2                  Nucleocapsid\t\n\t ' 
                                       'p1            p6                  Pol                 GagPolTF\t\n\t ' 
@@ -861,23 +906,30 @@ def main():
     # Ensure proper configuration files are set
     configs = handle_args(args.virus, args.base)
     ref_nt_seq, ref_aa_seq = configs[0][0][1], configs[1]
-    nt_coords, aa_coords = configs[2], configs[3]
-    reference_sequence = configs[4]
+    nt_coords = configs[2]
+    reference_sequence = configs[3]
 
     with open(nt_coords) as nt_coords_handle:
-
         # Create genome object based on configuration files
-        ref_genome = Genome(args.virus, nt_coords_handle, ref_nt_seq, ref_aa_seq, reference_sequence)
+        ref_genome = Genome(args.virus, nt_coords_handle, ref_nt_seq, ref_aa_seq, reference_sequence, args.base)
 
         if args.subcommand == "locate":
-            query = get_query(args.base, args.query)
-            alignment = ref_genome.sequence_align(query, args.out)
+            if args.base == 'nucl':
+                query_sequences = get_query(args.base, args.query, args.revcomp)
+            else:
+                query_sequences = get_query(args.base, args.query, False)
 
-            # Find indices where the query sequence aligns with the reference sequence
-            match_coords = ref_genome.query_region_coordinates(alignment[-1])  # Query is the last item
-            query_regions = ref_genome.find_matches(args.base, match_coords)
-            output_overlap(query_regions, args.out)
+            # Handle multiple query sequences
+            for seq in query_sequences:
+                alignment = ref_genome.sequence_align(seq, args.out)
 
+                # Find where the query sequence aligns with the reference sequence
+                lookup_table = make_aln_lookup_table(alignment)
+                query_match_coords = ref_genome.find_query_match_coords(alignment['query'])
+                query_regions = ref_genome.find_matches(args.base, query_match_coords, lookup_table)
+                output_overlap(query_regions, args.out)
+
+        # Retrieve Mode
         else:
             valid_in = valid_inputs(args.virus, args.start, args.end, args.region)
 

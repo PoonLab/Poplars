@@ -1,4 +1,6 @@
+#!/usr/bin/env python3
 import random
+import re
 
 mixture_dict = {'W': 'AT', 'R': 'AG', 'K': 'GT', 'Y': 'CT', 'S': 'CG',
                 'M': 'AC', 'V': 'AGC', 'H': 'ATC', 'D': 'ATG',
@@ -117,3 +119,33 @@ def consensus(fasta, alphabet='ACGT', resolve=False):
     newseq = "".join(consen)
 
     return newseq
+
+
+def convert_clustal(handle):
+    """
+    Import Clustal-formatted sequences from file stream
+    :param handle:  File stream in read mode, or the contents of a file split into lines
+    :return: dictionary containing header-sequence pairs
+    """
+    result = {'aln': ''}
+
+    pat = re.compile('\w+\s*')
+    offset = pat.match(handle[3]).end()
+
+    # Loop over sequences in the Clustal alignment
+    for ln in handle[3:]:
+        # Skip first three lines
+        if len(ln) > 0:
+            # Match sequence label and build up sequence
+            if ln[0].isalpha():
+                line = ln.split()
+                header = line[0].strip()
+                seq = line[1].strip()
+                result.setdefault(header, '')   # Add header to dictionary
+                result[header] += seq
+
+            # Add conservation information
+            else:
+                result['aln'] += ln[offset:].strip('\n\r')
+
+    return result

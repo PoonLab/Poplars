@@ -1,6 +1,6 @@
 import unittest
 
-from sequence_locator import *
+from poplars.sequence_locator import *
 
 HIV_NSEQ_PATH = os.path.abspath('fixtures/hiv-test-genome.fasta')
 HIV_PSEQ_PATH = os.path.abspath('fixtures/hiv-test-proteins.fasta')
