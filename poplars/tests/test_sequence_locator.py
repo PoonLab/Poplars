@@ -115,7 +115,7 @@ class TestRefRegion(HIV):
 
         # Local coordinates: 0, 42 (relative to the start of the p2 coding region)
         # Global coordinates: 1879, 1920 (relative to the start of the genome)
-        overlap = QueryRegion('p2', self.p2_ref, 'nucl', self.hiv_genome, [0, 42], [1879, 1920])
+        overlap = OverlapRegion('p2', self.p2_ref, 'nucl', self.hiv_genome, [0, 42], [1879, 1920])
         overlap.set_nt_seq_from_genome()
         overlap.set_aa_seq_from_genome()
         result = self.p2_ref.set_protein_equivalents(overlap)
@@ -128,7 +128,7 @@ class TestRefRegion(HIV):
 
         # Local coordinates: 1, 52 (relative to the start of the p6 coding region)
         # Global coordinates: 2131, 2289 (relative to the start of the genome)
-        overlap = QueryRegion('p6', self.p6_ref, 'nucl', self.hiv_genome, [2, 155], [2137, 2289])
+        overlap = OverlapRegion('p6', self.p6_ref, 'nucl', self.hiv_genome, [2, 155], [2137, 2289])
         result = self.p6_ref.set_protein_equivalents(overlap)
         self.assertEqual(expected_prot_seq, result[0])
         self.assertEqual(expected_prot_coords, result[1])
@@ -141,7 +141,7 @@ class TestQueryRegion(HIV):
 
     def test_p2_relative_positions(self):
         self.p2_ref.codon_aln = self.p2_ref.make_codon_aln()
-        p2_q = QueryRegion('p2', self.p2_ref, 'nucl', self.hiv_genome, [0, 42], [1879, 1920])
+        p2_q = OverlapRegion('p2', self.p2_ref, 'nucl', self.hiv_genome, [0, 42], [1879, 1920])
         p2_q.set_nt_seq_from_genome()
         p2_q.set_aa_seq_from_genome()
         self.p2_ref.set_protein_equivalents(p2_q)
@@ -151,10 +151,10 @@ class TestQueryRegion(HIV):
         self.assertEqual([1, 14], p2_q.set_pos_from_pstart())
         self.assertEqual([1, 42], p2_q.set_pos_from_qstart('nucl'))
 
-    def test_p6_relaive_positions(self):
+    def test_p6_relative_positions(self):
         self.p6_ref.codon_aln = self.p6_ref.make_codon_aln()
 
-        p6_q = QueryRegion('p6', self.p6_ref, 'nucl', self.hiv_genome, [2, 155],  [2137, 2289])
+        p6_q = OverlapRegion('p6', self.p6_ref, 'nucl', self.hiv_genome, [2, 155], [2137, 2289])
         p6_q.set_nt_seq_from_genome()
         p6_q.set_aa_seq_from_genome()
         self.p6_ref.set_protein_equivalents(p6_q)
@@ -167,7 +167,7 @@ class TestQueryRegion(HIV):
     def test_vpr_relative_positions(self):
         self.vpr_ref.codon_aln = self.vpr_ref.make_codon_aln()
 
-        vpr_q = QueryRegion('Vpr', self.vpr_ref, 'nucl', self.hiv_genome, [0, 291], [5559, 5850])
+        vpr_q = OverlapRegion('Vpr', self.vpr_ref, 'nucl', self.hiv_genome, [0, 291], [5559, 5850])
         vpr_q.set_nt_seq_from_genome()
         vpr_q.set_aa_seq_from_genome()
         self.vpr_ref.set_protein_equivalents(vpr_q)
