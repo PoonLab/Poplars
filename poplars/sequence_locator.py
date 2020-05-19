@@ -66,18 +66,6 @@ class Region(object):
         else:
             return self.aa_seq
 
-    def get_sequence_from_genome(self, base):
-        seq = ''
-        if base == 'NA':
-            seq = self.genome.nt_seq[self.ncoords[0] - 1: self.ncoords[1]]
-        else:
-            try:
-                seq = self.genome.aa_seq[self.region_name]
-            except KeyError as e:
-                print(e)
-
-        return seq
-
     def set_coords(self, coord_pair, base):
         if base == 'NA':
             self.ncoords = coord_pair
@@ -133,66 +121,32 @@ class RefRegion(Region):
             self.codon_aln = ''.join(codon_aln)
             return self.codon_aln
 
-    def find_overlap(self, base, qmatch, lookup_table, query_seq):
+    def find_overlap_coords(self, base, global_qcoords):
         """
         Gets the sequence regions that overlap with the region of interest
         :param base: the base of the sequence (nucleotide or protein)
-        :param qmatch: tuple containing the coordinates of the query sequence in the alignment
-        :param lookup_table: a dictionary mapping coordinates of reference and query sequence to the aligned sequence
-        :return overlap: A QueryRegion object that represents the where the query overlaps with the reference region
+        :return overlap: A coordinates indicating where the query overlaps with the reference region
         """
         ref_coords = self.get_coords(base)  # Global coordinates
 
-        # Convert query coordinates from "alignment space" to "region space"
-        # Non-inclusive 0-based indexing
-        conv_coords = (lookup_table['reference'][qmatch[0]], lookup_table['reference'][qmatch[1] - 1] + 1)
-
         # If the ref_coords are in the range of the query region and the q_coords are in the range of the ref region
-        if not ((ref_coords[0] < ref_coords[1] < conv_coords[0]) or (conv_coords[0] < conv_coords[1] < ref_coords[0])):
+        if not ((ref_coords[0] < ref_coords[1] < global_qcoords[0]) or
+                (global_qcoords[0] < global_qcoords[1] < ref_coords[0])):
 
             # If the end of the query region exceeds the end of the reference region
-            if conv_coords[1] > ref_coords[1]:
+            if global_qcoords[1] > ref_coords[1]:
                 end = ref_coords[1]
             else:
-                end = conv_coords[1]
+                end = global_qcoords[1]
 
             # If the query region starts before the reference region starts
-            if conv_coords[0] < ref_coords[0]:
+            if global_qcoords[0] < ref_coords[0]:
                 start = ref_coords[0]
             else:
-                start = conv_coords[0]
+                start = global_qcoords[0]
 
             overlap_coords = [start, end]
-
-            overlap = OverlapRegion(self.region_name, self, self.genome, overlap_coords)
-
-            if base == 'NA':
-                overlap.set_coords(overlap_coords, base)    # Set nt_coords
-                overlap.set_nt_seq_from_genome()
-                overlap.cds_offset = overlap.set_pos_from_cds()
-                overlap.qstart = overlap.set_pos_from_qstart(base, lookup_table)
-                overlap.aln_coords= overlap.set_aln_coords(base, lookup_table)
-
-                # Set protein coordinates if the overlap is in a coding region
-                if overlap.region_name not in NON_CODING:
-                    overlap.set_pcoords_from_ncoords()
-                    prot_equiv = overlap.set_protein_equivalent(query_seq)
-                    overlap.set_sequence('AA', prot_equiv)
-
-            else:
-                overlap.set_coords(overlap_coords, base)    # Set aa_cords
-                overlap.set_aa_seq_from_genome()
-                overlap.set_pos_from_cds()
-                overlap.cds_offset = overlap.set_pos_from_cds()
-
-            # else:
-            #     nucl_overlap = self.set_nucleotide_equivalents(overlap)
-            #     overlap.set_coords(overlap_coords, 'AA')
-            #     overlap.set_sequence('AA', self.get_sequence('AA')[start: end])
-            #     overlap.set_coords(nucl_overlap[1], 'NA')
-            #     overlap.set_sequence(nucl_overlap[0], 'NA')
-
-            return overlap
+            return overlap_coords
         return None
 
 
@@ -286,6 +240,7 @@ class OverlapRegion(Region):
             if self.qstart[1] - i < 3:
                 prot_seq += 'X'
             else:
+                print(query_seq)
                 prot_seq += CODON_DICT[query_seq[i:i+3]]
 
         return prot_seq
@@ -318,7 +273,7 @@ class Genome:
     def __init__(self, virus, nt_coords, nt_seq, aa_seq, reference_sequence, base):
         self.virus = virus
         self.nt_seq = nt_seq
-        self.aa_seq = aa_seq  # List of lists
+        self.aa_seq = aa_seq
         self.reference_sequence = reference_sequence
         self.ref_base = base
         self.ref_genome_regions = self.make_ref_regions(nt_coords, aa_seq)
@@ -365,8 +320,10 @@ class Genome:
             result = align(query_sequence[1], self.reference_sequence[0][1], True)
 
         else:
-            for ref_seq in self.ref_genome_regions:
-                result = align(query_sequence[1], ref_seq.get_sequence('AA'))
+            for name, region in self.ref_genome_regions.items():
+                aa_seq = region.get_sequence('AA')
+                if aa_seq is not None:
+                    result = align(query_sequence[1], aa_seq, True)
 
         if outfile is not None:
             outfile.write("Alignment:\n")
@@ -375,37 +332,6 @@ class Genome:
 
         clustal_to_fasta(result, outfile)
         return result
-
-    @staticmethod
-    def find_query_match_coords(alignment):
-        """
-        Gets the indices of regions where the query aligns with the reference sequence
-        :param alignment: the aligned query sequence
-        :return query_matches: The positions where the query aligns with the reference sequences with no gaps
-        """
-        pat = re.compile('\w[\w-]*\w')  # Get the query sequence from the alignment
-        match = pat.search(alignment)
-        query_match_coords = (match.start() + 1, match.end())
-        return query_match_coords
-
-    def find_matches(self, base, qmatch, lookup_table, query_seq):
-        """
-        Finds the genomic regions where the query sequence aligns with the reference sequence
-        :param base: The base of the query sequence
-        :param qmatch: tuple containing the coordinates of the query sequence in the alignment
-        :param lookup_table: a dictionary mapping coordinates of reference and query sequence to the aligned sequence
-        :return query_regions: <dict> with keys as region name and values as the QueryRegion object
-        """
-        query_regions = {}
-        for name in self.ref_genome_regions:
-            if name != 'Complete':
-                # Find which regions overlap with the query region
-                overlap = self.ref_genome_regions[name].find_overlap(base, qmatch, lookup_table, query_seq)
-
-                if overlap is not None:
-                    query_regions[name] = overlap
-
-        return query_regions
 
     def retrieve(self, base, region, qstart=1, qend='end'):
         """
@@ -454,29 +380,278 @@ class Genome:
                 return query_region, retrieved_regions
 
 
-def make_lookup_table(aln):
-    """
-    Maps the coordinates of reference genome and query sequence to the alignment
-    :param aln: dictionary of header, sequence pairs
-    :return: dictionary of of mappings from positions in aligned sequence
-             to positions in the query and reference sequences
-    """
-    lookup_table = {'reference': [], 'query': []}
-    r_count = -1
-    q_count = -1
+class Query(object):
 
-    for r_nt, q_nt in zip(aln['reference'], aln['query']):
-        # Account for gaps in the reference sequence
-        if r_nt != '-':
-            r_count += 1
-        lookup_table['reference'].append(r_count)
+    _count = 0
 
-        # Account for gaps in the query sequence
-        if q_nt != '-':
-            q_count += 1
-        lookup_table['query'].append(q_count)
+    def __init__(self, base, genome, query_sequence, outfile):
+        Query._count += 1
+        self.query_num = Query._count
+        self.base = base
+        self.genome = genome
+        self.query_sequence = query_sequence
+        self.alignment = self.genome.sequence_align(self.query_sequence, outfile)
+        self.overlap_regions = None
 
-    return lookup_table
+    def find_query_match_coords(self):
+        """
+        Gets the indices of regions where the query aligns with the reference sequence
+        :return query_matches: The positions where the query aligns with the reference sequences with no gaps
+        """
+        pat = re.compile('\w[\w-]*\w')  # Get the query sequence from the alignment
+        match = pat.search(self.alignment['query'])
+        query_match_coords = (match.start() + 1, match.end())
+        return query_match_coords
+
+    def make_lookup_table(self):
+        """
+        Maps the coordinates of reference genome and query sequence to the alignment
+        :return: dictionary of of mappings from positions in aligned sequence
+                 to positions in the query and reference sequences
+        """
+        lookup_table = {'reference': [], 'query': []}
+        r_count = -1
+        q_count = -1
+
+        for r_nt, q_nt in zip(self.alignment['reference'], self.alignment['query']):
+            # Account for gaps in the reference sequence
+            if r_nt != '-':
+                r_count += 1
+            lookup_table['reference'].append(r_count)
+
+            # Account for gaps in the query sequence
+            if q_nt != '-':
+                q_count += 1
+            lookup_table['query'].append(q_count)
+
+        return lookup_table
+
+    def find_location(self):
+        """
+        Finds the location of the query sequence in the genome
+        """
+        lookup_table = self.make_lookup_table()
+        qmatch = self.find_query_match_coords()
+
+        # Convert query coordinates from "alignment space" to "region space"
+        # Non-inclusive 0-based indexing
+        global_qcoords = (lookup_table['reference'][qmatch[0]], lookup_table['reference'][qmatch[1] - 1] + 1)
+
+        overlap_regions = {}
+        for name in self.genome.ref_genome_regions:
+            if name != 'Complete':
+                # Find which regions overlap with the query region
+                overlap_coords = self.genome.ref_genome_regions[name].find_overlap_coords(self.base, global_qcoords)
+
+                if overlap_coords is not None:
+
+                    # Exclude overlaps thta have insufficient length
+                    if overlap_coords[1] - overlap_coords[0] < 3:
+                        continue
+
+                    overlap = OverlapRegion(name, self.genome.ref_genome_regions[name], self.genome, overlap_coords)
+
+                    if self.base == 'NA':
+                        overlap.set_coords(overlap_coords, self.base)  # Set nt_coords
+                        overlap.set_nt_seq_from_genome()
+                        overlap.cds_offset = overlap.set_pos_from_cds()
+                        overlap.qstart = overlap.set_pos_from_qstart(self.base, lookup_table)
+                        overlap.aln_coords = overlap.set_aln_coords(self.base, lookup_table)
+
+                        # Set protein coordinates if the overlap is in a coding region
+                        if overlap.region_name not in NON_CODING:
+                            overlap.set_pcoords_from_ncoords()
+                            prot_equiv = overlap.set_protein_equivalent(self.query_sequence[1])
+                            overlap.set_sequence('AA', prot_equiv)
+
+                    else:
+                        overlap.set_coords(overlap_coords, self.base)  # Set aa_cords
+                        overlap.set_aa_seq_from_genome()
+                        overlap.set_pos_from_cds()
+                        overlap.cds_offset = overlap.set_pos_from_cds()
+                    overlap_regions[name] = overlap
+
+        self.overlap_regions = overlap_regions
+
+    def output_overlap(self, virus, outfile=None):
+        """
+        Outputs the regions that overlap with the query
+        :param base: the base type (NA or AA)
+        :param virus: the reference organism
+        :param outfile: The file stream for the output file in write mode
+        """
+        if outfile is None:
+
+            for key in self.overlap_regions:
+                region = self.overlap_regions[key]
+
+                print("\nRegion:\t{}".format(region.region_name))
+
+                print("\n\tNucleotide Sequence:")
+                q = self.alignment['query'][region.aln_coords[0]: region.aln_coords[1]]
+                r = self.alignment['reference'][region.aln_coords[0]: region.aln_coords[1]]
+                a = self.alignment['aln'][region.aln_coords[0]: region.aln_coords[1]]
+
+                qlines = [q[i:i + 60] for i in range(0, len(q), 60)]
+                rlines = [r[i:i + 60] for i in range(0, len(r), 60)]
+                alines = [a[i:i + 60] for i in range(0, len(a), 60)]
+
+                for qline, rline, aline in zip(qlines, rlines, alines):
+                    print('\t\tQuery\t {}\n'
+                          '\t\t         {}\n'
+                          '\t\tRef  \t {}\n'.format(qline, aline, rline))
+
+                if region.aa_seq is not None:
+                    print("\n\tProtein Sequence:")
+                    seq_lines = [region.aa_seq[i:i + 60] for i in range(0, len(region.aa_seq), 60)]
+                    for line in seq_lines:
+                        print('\t\t{}'.format(line))
+
+                print("\n\tRelative Positions:")
+                if region.cds_offset:
+                    print("\t\tNA position relative to CDS start: {} --> {}"
+                          .format(region.cds_offset[0], region.cds_offset[1]))
+
+                    # Compare query region length and CDS length
+                    query_len = region.qstart[1] - region.qstart[0] + 1
+                    cds_len = region.cds_offset[1] - region.cds_offset[0] + 1
+                    if cds_len < query_len:
+                        print('\t\tNotice: length of {} portion of query ({}) is greater than its length in {} ({}) '
+                              '- possible frameshift'.format(region.region_name, query_len, virus.upper(), cds_len))
+                else:
+                    print("\t\tNA position relative to CDS start: N/A")
+
+                if region.qstart:
+                    print("\t\t{} position relative to query start: {} --> {}"
+                          .format(self.base, region.qstart[0], region.qstart[1]))
+                if region.ncoords:
+                    print("\t\tNA position relative to genome start: {} --> {}"
+                          .format(region.ncoords[0], region.ncoords[1]))
+                if region.pcoords:
+                    print("\t\tAA position relative to protein start: {} --> {}"
+                          .format(region.pcoords[0], region.pcoords[1]))
+
+        else:
+            for key in self.overlap_regions:
+                region = self.overlap_regions[key]
+                if region.region_name.startswith('5\'LTR'):
+                    outfile.write("\t3'LTR\n")
+
+                outfile.write("\nRegion:\t{}".format(region.region_name))
+                outfile.write("\n\tNucleotide Sequence:\n")
+
+                q = self.alignment['query'][region.aln_coords[0]: region.aln_coords[1]]
+                r = self.alignment['reference'][region.aln_coords[0]: region.aln_coords[1]]
+                a = self.alignment['aln'][region.aln_coords[0]: region.aln_coords[1]]
+
+                qlines = [q[i:i + 60] for i in range(0, len(q), 60)]
+                rlines = [r[i:i + 60] for i in range(0, len(r), 60)]
+                alines = [a[i:i + 60] for i in range(0, len(a), 60)]
+
+                for qline, rline, aline in zip(qlines, rlines, alines):
+                    outfile.write('\t\tQuery\t {}\n'
+                                  '\t\t         {}\n'
+                                  '\t\tRef  \t {}\n'.format(qline, aline, rline))
+
+                if region.aa_seq is not None:
+                    outfile.write("\n\tProtein Sequence:\n")
+                    seq_lines = [region.nt_seq[i:i + 60] for i in range(0, len(region.aa_seq), 60)]
+                    for line in seq_lines:
+                        print('\t\t{}'.format(line))
+
+                outfile.write("\n\tRelative Positions:")
+                if region.cds_offset:
+                    outfile.write("\t\tNA position relative to CDS start: {},{}"
+                                  .format(region.cds_offset[0], region.cds_offset[1]))
+
+                    # Compare query region length and CDS length
+                    query_len = region.qstart[1] - region.qstart[0] + 1
+                    cds_len = region.cds_offset[1] - region.cds_offset[0] + 1
+                    if cds_len < query_len:
+                        outfile.write(
+                            '\t\tNotice: length of {} portion of query ({}) is greater than its length in {} ({})'
+                            ' - possible frameshift\n'.format(region.region_name, query_len, virus.upper(), cds_len))
+
+                else:
+                    outfile.write("\t\tNA position relative to CDS start: N/A")
+
+                if region.qstart:
+                    outfile.write("\t\t{} position relative to query start: {},{}"
+                                  .format(self.base, region.qstart[0], region.qstart[1]))
+                if region.ncoords:
+                    print("\t\tNA position relative to genome start: {},{}"
+                          .format(region.ncoords[0] + 1, region.ncoords[1] + 1))
+                if region.pcoords:
+                    outfile.write("\t\tAA position relative to protein start: {},{}"
+                                  .format(region.pcoords[0], region.pcoords[1]))
+
+
+def output_retrieved_region(base, region, outfile=None):
+        """
+        Outputs the retrieved region
+        :param base: The sequence base type (NA or AA)
+        :param region: A list of GenomeRegions where the query sequence aligns with the reference sequence
+        :param outfile: The file stream for the output file in write mode
+        """
+
+        if outfile is None:
+            print("\nRetrieved Region:\t{}".format(region.region_name))
+            print("\tNucleotide Sequence:")
+            seq_lines = [region.nt_seq[i:i + 60] for i in range(0, len(region.nt_seq), 60)]
+            for line in seq_lines:
+                print('\t\t{}'.format(line))
+
+            if region.aa_seq:
+                print("\tProtein Sequence:")
+                seq_lines = [region.nt_seq[i:i + 60] for i in range(0, len(region.nt_seq), 60)]
+                for line in seq_lines:
+                    print('\t\t{}\n'.format(line))
+
+            print("\n\tRelative Positions:")
+            if region.cds_offset:
+                print("\t\tNA position relative to CDS start: {} --> {}"
+                      .format(region.cds_offset[0], region.cds_offset[1]))
+            else:
+                print("\t\tNA position relative to CDS start: N/A")
+
+            if region.qstart:
+                print("\t\t{} position relative to query start: {} --> {}"
+                      .format(base, region.qstart[0], region.qstart[1]))
+            if region.ncoords:
+                print("\t\tNA position relative to genome start: {} --> {}"
+                      .format(region.ncoords[0], region.ncoords[1]))
+            if region.pcoords:
+                print("\t\tAA position relative to protein start: {} --> {}"
+                      .format(region.pcoords[0], region.pcoords[1]))
+
+        else:
+            outfile.write("\nRetrieved Region:\t{}".format(region.region_name))
+            outfile.write("\tNucleotide Sequence:\n")
+            seq_lines = [region.nt_seq[i:i + 60] for i in range(0, len(region.nt_seq), 60)]
+            for line in seq_lines:
+                outfile.write('\t\t{}\n'.format(line))
+
+            if region.aa_seq:
+                outfile.write("\tProtein Sequence:\n")
+                seq_lines = [region.nt_seq[i:i + 60] for i in range(0, len(region.nt_seq), 60)]
+                for line in seq_lines:
+                    outfile.write('\t\t{}\n'.format(line))
+
+            outfile.write("\n\tRelative Positions:")
+            if region.cds_offset:
+                outfile.write("\t\tNA position relative to CDS start: {},{}"
+                              .format(region.cds_offset[0], region.cds_offset[1]))
+            else:
+                outfile.write("\t\tNA position relative to CDS start: N/A")
+            if region.qstart:
+                outfile.write("\t\t{} position relative to query start: {},{}"
+                              .format(base, region.qstart[0], region.qstart[1]))
+            if region.ncoords:
+                outfile.write("\t\tNA position relative to genome start: {},{}"
+                              .format(region.ncoords[0] + 1, region.ncoords[1] + 1))
+            if region.pcoords:
+                outfile.write("\t\tAA position relative to protein start: {},{}"
+                              .format(region.pcoords[0], region.pcoords[1]))
 
 
 def clustal_to_fasta(aln, outfile=None):
@@ -569,6 +744,17 @@ def valid_inputs(virus, start_coord, end_coord, region):
     return True
 
 
+def reverse_comp(query_sequence):
+    """
+    Reverses and complements the query sequence
+    :param query_sequence: The query sequence
+    :return: The reverse complement of the query sequence
+    """
+    complement = {'A': 'T', 'C': 'G', 'G': 'C', 'T': 'A', '*': '*', 'N': 'N', '-': '-'}
+    rev_comp = "".join(complement.get(nt, nt) for nt in reversed(query_sequence))
+    return rev_comp
+
+
 def get_query(base, query, rev_comp):
     """
     Gets the query sequence and checks that it is valid
@@ -637,199 +823,6 @@ def get_ref_seq(ref_seq, base):
         return reference_sequence
     else:
         sys.exit(0)
-
-
-def reverse_comp(query_sequence):
-    """
-    Reverses and complements the query sequence
-    :param query_sequence: The query sequence
-    :return: The reverse complement of the query sequence
-    """
-    complement = {'A': 'T', 'C': 'G', 'G': 'C', 'T': 'A', '*': '*', 'N': 'N', '-': '-'}
-    rev_comp = "".join(complement.get(nt, nt) for nt in reversed(query_sequence))
-    return rev_comp
-
-
-def output_retrieved_region(base, region, outfile=None):
-    """
-    Outputs the retrieved region
-    :param base: The sequence base type (NA or AA)
-    :param region: A list of GenomeRegions where the query sequence aligns with the reference sequence
-    :param outfile: The file stream for the output file in write mode
-    """
-
-    if outfile is None:
-        print("\nRetrieved Region:\t{}".format(region.region_name))
-        print("\tNucleotide Sequence:")
-        seq_lines = [region.nt_seq[i:i + 60] for i in range(0, len(region.nt_seq), 60)]
-        for line in seq_lines:
-            print('\t\t{}'.format(line))
-
-        if region.aa_seq:
-            print("\tProtein Sequence:")
-            seq_lines = [region.nt_seq[i:i + 60] for i in range(0, len(region.nt_seq), 60)]
-            for line in seq_lines:
-                print('\t\t{}\n'.format(line))
-
-        print("\n\tRelative Positions:")
-        if region.cds_offset:
-            print("\t\tNA position relative to CDS start: {} --> {}"
-                  .format(region.cds_offset[0], region.cds_offset[1]))
-        else:
-            print("\t\tNA position relative to CDS start: N/A")
-
-        if region.qstart:
-            print("\t\t{} position relative to query start: {} --> {}"
-                  .format(base, region.qstart[0], region.qstart[1]))
-        if region.ncoords:
-            print("\t\tNA position relative to genome start: {} --> {}"
-                  .format(region.ncoords[0], region.ncoords[1]))
-        if region.pcoords:
-            print("\t\tAA position relative to protein start: {} --> {}"
-                  .format(region.pcoords[0], region.pcoords[1]))
-
-    else:
-        outfile.write("\nRetrieved Region:\t{}".format(region.region_name))
-        outfile.write("\tNucleotide Sequence:\n")
-        seq_lines = [region.nt_seq[i:i + 60] for i in range(0, len(region.nt_seq), 60)]
-        for line in seq_lines:
-            outfile.write('\t\t{}\n'.format(line))
-
-        if region.aa_seq:
-            outfile.write("\tProtein Sequence:\n")
-            seq_lines = [region.nt_seq[i:i + 60] for i in range(0, len(region.nt_seq), 60)]
-            for line in seq_lines:
-                outfile.write('\t\t{}\n'.format(line))
-
-        outfile.write("\n\tRelative Positions:")
-        if region.cds_offset:
-            outfile.write("\t\tNA position relative to CDS start: {},{}"
-                          .format(region.cds_offset[0], region.cds_offset[1]))
-        else:
-            outfile.write("\t\tNA position relative to CDS start: N/A")
-        if region.qstart:
-            outfile.write("\t\t{} position relative to query start: {},{}"
-                          .format(base, region.qstart[0], region.qstart[1]))
-        if region.ncoords:
-            outfile.write("\t\tNA position relative to genome start: {},{}"
-                          .format(region.ncoords[0] + 1, region.ncoords[1] + 1))
-        if region.pcoords:
-            outfile.write("\t\tAA position relative to protein start: {},{}"
-                          .format(region.pcoords[0], region.pcoords[1]))
-
-
-def output_overlap(base, virus, overlap_regions, alignment, outfile=None):
-    """
-    Outputs the regions that overlap with the query
-    :param base: the base type (NA or AA)
-    :param virus: the reference organism
-    :param overlap_regions: A dictionary of GenomeRegions where the keys are the region name and
-                                the values are the query sequence aligns with the reference sequence
-    :param outfile: The file stream for the output file in write mode
-    """
-    if outfile is None:
-
-        for key in overlap_regions:
-            region = overlap_regions[key]
-
-            print("\nRegion:\t{}".format(region.region_name))
-
-            print("\n\tNucleotide Sequence:")
-            q = alignment['query'][region.aln_coords[0]: region.aln_coords[1]]
-            r = alignment['reference'][region.aln_coords[0]: region.aln_coords[1]]
-            a = alignment['aln'][region.aln_coords[0]: region.aln_coords[1]]
-
-            qlines = [q[i:i + 60] for i in range(0, len(q), 60)]
-            rlines = [r[i:i + 60] for i in range(0, len(r), 60)]
-            alines = [a[i:i + 60] for i in range(0, len(a), 60)]
-
-            for qline, rline, aline in zip(qlines, rlines, alines):
-                print('\t\tQuery\t {}\n'
-                      '\t\t         {}\n'
-                      '\t\tRef  \t {}\n'.format(qline, aline, rline))
-
-            if region.aa_seq is not None:
-                print("\n\tProtein Sequence:")
-                seq_lines = [region.aa_seq[i:i + 60] for i in range(0, len(region.aa_seq), 60)]
-                for line in seq_lines:
-                    print('\t\t{}'.format(line))
-
-            print("\n\tRelative Positions:")
-            if region.cds_offset:
-                print("\t\tNA position relative to CDS start: {} --> {}"
-                      .format(region.cds_offset[0], region.cds_offset[1]))
-
-                # Compare query region length and CDS length
-                query_len = region.qstart[1] - region.qstart[0] + 1
-                cds_len = region.cds_offset[1] - region.cds_offset[0] + 1
-                if cds_len < query_len:
-                    print('\t\tNotice: length of {} portion of query ({}) is greater than its length in {} ({}) '
-                          '- possible frameshift'.format(region.region_name, query_len, virus.upper(), cds_len))
-            else:
-                print("\t\tNA position relative to CDS start: N/A")
-
-            if region.qstart:
-                print("\t\t{} position relative to query start: {} --> {}"
-                      .format(base, region.qstart[0], region.qstart[1]))
-            if region.ncoords:
-                print("\t\tNA position relative to genome start: {} --> {}"
-                      .format(region.ncoords[0], region.ncoords[1]))
-            if region.pcoords:
-                print("\t\tAA position relative to protein start: {} --> {}"
-                      .format(region.pcoords[0], region.pcoords[1]))
-
-    else:
-        for key in overlap_regions:
-            region = overlap_regions[key]
-            if region.region_name.startswith('5\'LTR'):
-                outfile.write("\t3'LTR\n")
-
-            outfile.write("\nRegion:\t{}".format(region.region_name))
-            outfile.write("\n\tNucleotide Sequence:\n")
-
-            q = alignment['query'][region.aln_coords[0]: region.aln_coords[1]]
-            r = alignment['reference'][region.aln_coords[0]: region.aln_coords[1]]
-            a = alignment['aln'][region.aln_coords[0]: region.aln_coords[1]]
-
-            qlines = [q[i:i + 60] for i in range(0, len(q), 60)]
-            rlines = [r[i:i + 60] for i in range(0, len(r), 60)]
-            alines = [a[i:i + 60] for i in range(0, len(a), 60)]
-
-            for qline, rline, aline in zip(qlines, rlines, alines):
-                outfile.write('\t\tQuery\t {}\n'
-                              '\t\t         {}\n'
-                              '\t\tRef  \t {}\n'.format(qline, aline, rline))
-
-            if region.aa_seq is not None:
-                outfile.write("\n\tProtein Sequence:\n")
-                seq_lines = [region.nt_seq[i:i + 60] for i in range(0, len(region.aa_seq), 60)]
-                for line in seq_lines:
-                    print('\t\t{}'.format(line))
-
-            outfile.write("\n\tRelative Positions:")
-            if region.cds_offset:
-                outfile.write("\t\tNA position relative to CDS start: {},{}"
-                              .format(region.cds_offset[0], region.cds_offset[1]))
-
-                # Compare query region length and CDS length
-                query_len = region.qstart[1] - region.qstart[0] + 1
-                cds_len = region.cds_offset[1] - region.cds_offset[0] + 1
-                if cds_len < query_len:
-                    outfile.write('\t\tNotice: length of {} portion of query ({}) is greater than its length in {} ({})'
-                                  ' - possible frameshift\n'.format(region.region_name, query_len, virus.upper(), cds_len))
-
-            else:
-                outfile.write("\t\tNA position relative to CDS start: N/A")
-
-            if region.qstart:
-                outfile.write("\t\t{} position relative to query start: {},{}"
-                              .format(base, region.qstart[0], region.qstart[1]))
-            if region.ncoords:
-                print("\t\tNA position relative to genome start: {},{}"
-                      .format(region.ncoords[0] + 1, region.ncoords[1] + 1))
-            if region.pcoords:
-                outfile.write("\t\tAA position relative to protein start: {},{}"
-                              .format(region.pcoords[0], region.pcoords[1]))
 
 
 def handle_args(virus, base):
@@ -962,13 +955,9 @@ def main():
 
             # Handle multiple query sequences
             for seq in query_sequences:
-                alignment = ref_genome.sequence_align(seq, args.out)
-
-                # Find where the query sequence aligns with the reference sequence
-                lookup_table = make_lookup_table(alignment)
-                query_match_coords = ref_genome.find_query_match_coords(alignment['query'])
-                query_regions = ref_genome.find_matches(args.base, query_match_coords, lookup_table, seq[1])
-                output_overlap(args.base, args.virus, query_regions, alignment, args.out)
+                query = Query(args.base, ref_genome, seq, args.out)
+                query.find_location()
+                query.output_overlap(args.virus, args.out)
 
         # Retrieve Mode
         else:
@@ -987,7 +976,7 @@ def main():
                 else:
                     args.outfile.write("\n\nRegions touched by the query sequence:\n\n")
 
-                output_overlap(args.base, args.virus, overlap_regions, args.out)
+                # output_overlap(args.base, args.virus, overlap_regions, args.out)
 
 
 if __name__ == '__main__':
