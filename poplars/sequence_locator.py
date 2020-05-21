@@ -8,12 +8,12 @@ Note: The first 256 nucleotides of SIVMM239 correspond to the flanking sequence,
 and are included in the complete SIV genome (https://www.ncbi.nlm.nih.gov/nucleotide/M33262)
 """
 
+import argparse
+import os
 import re
 import sys
-import os
-import argparse
 
-from poplars.common import convert_fasta, convert_clustal
+from poplars.common import convert_fasta
 from poplars.mafft import align
 
 NON_CODING = ["5'LTR", "TAR", "3'LTR"]
@@ -240,7 +240,6 @@ class OverlapRegion(Region):
             if self.qstart[1] - i < 3:
                 prot_seq += 'X'
             else:
-                print(query_seq)
                 prot_seq += CODON_DICT[query_seq[i:i+3]]
 
         return prot_seq
@@ -310,27 +309,40 @@ class Genome:
 
         return ref_regions
 
-    def sequence_align(self, query_sequence, outfile=None):
+    def sequence_align(self, query, outfolder=None):
         """
         Aligns the query sequence to the reference genome
-        :param query_sequence: The query sequence
-        :param outfile: <option> The file stream of the output file in write mode
+        :param query: The query object
+        :param outfolder: <option> The name of the directory where the output will be written
         """
         if self.ref_base == 'NA':
-            result = align(query_sequence[1], self.reference_sequence[0][1], True)
+            result = align(query.query_sequence, self.reference_sequence[0][1], True)
 
         else:
             for name, region in self.ref_genome_regions.items():
                 aa_seq = region.get_sequence('AA')
                 if aa_seq is not None:
-                    result = align(query_sequence[1], aa_seq, True)
+                    result = align(query.query_sequence, aa_seq, True)
 
-        if outfile is not None:
-            outfile.write("Alignment:\n")
+        if outfolder is not None:
+            query_aln_path = os.path.join(outfolder, '{}.fasta'.format(query.name))
+
+            with open(query_aln_path, 'w+') as aln_handle:
+                for header in result:
+                    if header != 'aln':
+                        seq = result[header]
+                        aln_handle.write('>{}\n'.format(header))
+                        for i in range(0, len(seq), 60):
+                            aln_handle.write('{}\n'.format(seq[i:i + 60]))
+
         else:
-            print("Alignment:")
+            for header in result:
+                if header != 'aln':
+                    seq = result[header]
+                    print('>{}'.format(header))
+                    for i in range(0, len(seq), 60):
+                        print(seq[i:i + 60])
 
-        clustal_to_fasta(result, outfile)
         return result
 
     def retrieve(self, base, region, qstart=1, qend='end'):
@@ -387,10 +399,17 @@ class Query(object):
     def __init__(self, base, genome, query_sequence, outfile):
         Query._count += 1
         self.query_num = Query._count
+
+        # If the query has no name, create one
+        if query_sequence[0][0] == 'query':
+            self.name = query_sequence[0][0] + str(Query._count)
+        else:
+            self.name = query_sequence[0][0]
+
         self.base = base
         self.genome = genome
-        self.query_sequence = query_sequence
-        self.alignment = self.genome.sequence_align(self.query_sequence, outfile)
+        self.query_sequence = query_sequence[0][1]
+        self.alignment = self.genome.sequence_align(self, outfile)
         self.overlap_regions = None
 
     def find_query_match_coords(self):
@@ -461,7 +480,7 @@ class Query(object):
                         # Set protein coordinates if the overlap is in a coding region
                         if overlap.region_name not in NON_CODING:
                             overlap.set_pcoords_from_ncoords()
-                            prot_equiv = overlap.set_protein_equivalent(self.query_sequence[1])
+                            prot_equiv = overlap.set_protein_equivalent(self.query_sequence)
                             overlap.set_sequence('AA', prot_equiv)
 
                     else:
@@ -473,29 +492,29 @@ class Query(object):
 
         self.overlap_regions = overlap_regions
 
-    def output_overlap(self, virus, outfile=None):
+    def output_overlap(self, virus, outfolder=None):
         """
         Outputs the regions that overlap with the query
-        :param base: the base type (NA or AA)
         :param virus: the reference organism
-        :param outfile: The file stream for the output file in write mode
+        :param outfolder: The file stream for the output file in write mode
         """
-        if outfile is None:
+        for key in self.overlap_regions:
+            region = self.overlap_regions[key]
 
-            for key in self.overlap_regions:
-                region = self.overlap_regions[key]
+            q = self.alignment['query'][region.aln_coords[0]: region.aln_coords[1]]
+            r = self.alignment['reference'][region.aln_coords[0]: region.aln_coords[1]]
+            a = self.alignment['aln'][region.aln_coords[0]: region.aln_coords[1]]
 
+            qlines = [q[i:i + 60] for i in range(0, len(q), 60)]
+            rlines = [r[i:i + 60] for i in range(0, len(r), 60)]
+            alines = [a[i:i + 60] for i in range(0, len(a), 60)]
+
+            if outfolder is None:
+                print("\nQuery:\t{}".format(self.name))
                 print("\nRegion:\t{}".format(region.region_name))
-
                 print("\n\tNucleotide Sequence:")
-                q = self.alignment['query'][region.aln_coords[0]: region.aln_coords[1]]
-                r = self.alignment['reference'][region.aln_coords[0]: region.aln_coords[1]]
-                a = self.alignment['aln'][region.aln_coords[0]: region.aln_coords[1]]
 
-                qlines = [q[i:i + 60] for i in range(0, len(q), 60)]
-                rlines = [r[i:i + 60] for i in range(0, len(r), 60)]
-                alines = [a[i:i + 60] for i in range(0, len(a), 60)]
-
+                # Print clustal-formatted alignment
                 for qline, rline, aline in zip(qlines, rlines, alines):
                     print('\t\tQuery\t {}\n'
                           '\t\t         {}\n'
@@ -531,59 +550,49 @@ class Query(object):
                     print("\t\tAA position relative to protein start: {} --> {}"
                           .format(region.pcoords[0], region.pcoords[1]))
 
-        else:
-            for key in self.overlap_regions:
-                region = self.overlap_regions[key]
-                if region.region_name.startswith('5\'LTR'):
-                    outfile.write("\t3'LTR\n")
+            else:
+                output_path = os.path.join(outfolder, 'query{}_output.txt'.format(self.name))
+                with open(output_path, 'w+') as outfile:
 
-                outfile.write("\nRegion:\t{}".format(region.region_name))
-                outfile.write("\n\tNucleotide Sequence:\n")
+                    outfile.write("\nRegion:\t{}".format(region.region_name))
+                    outfile.write("\n\tNucleotide Sequence:\n")
 
-                q = self.alignment['query'][region.aln_coords[0]: region.aln_coords[1]]
-                r = self.alignment['reference'][region.aln_coords[0]: region.aln_coords[1]]
-                a = self.alignment['aln'][region.aln_coords[0]: region.aln_coords[1]]
+                    for qline, rline, aline in zip(qlines, rlines, alines):
+                        outfile.write('\t\tQuery\t {}\n'
+                                      '\t\t         {}\n'
+                                      '\t\tRef  \t {}\n'.format(qline, aline, rline))
 
-                qlines = [q[i:i + 60] for i in range(0, len(q), 60)]
-                rlines = [r[i:i + 60] for i in range(0, len(r), 60)]
-                alines = [a[i:i + 60] for i in range(0, len(a), 60)]
+                    if region.aa_seq is not None:
+                        outfile.write("\n\tProtein Sequence:\n")
+                        seq_lines = [region.nt_seq[i:i + 60] for i in range(0, len(region.aa_seq), 60)]
+                        for line in seq_lines:
+                            outfile.write('\t\t{}\n'.format(line))
 
-                for qline, rline, aline in zip(qlines, rlines, alines):
-                    outfile.write('\t\tQuery\t {}\n'
-                                  '\t\t         {}\n'
-                                  '\t\tRef  \t {}\n'.format(qline, aline, rline))
+                    outfile.write("\n\tRelative Positions:\n")
+                    if region.cds_offset:
+                        outfile.write("\t\tNA position relative to CDS start: {},{}\n"
+                                      .format(region.cds_offset[0], region.cds_offset[1]))
 
-                if region.aa_seq is not None:
-                    outfile.write("\n\tProtein Sequence:\n")
-                    seq_lines = [region.nt_seq[i:i + 60] for i in range(0, len(region.aa_seq), 60)]
-                    for line in seq_lines:
-                        print('\t\t{}'.format(line))
+                        # Compare query region length and CDS length
+                        query_len = region.qstart[1] - region.qstart[0] + 1
+                        cds_len = region.cds_offset[1] - region.cds_offset[0] + 1
+                        if cds_len < query_len:
+                            outfile.write(
+                                '\t\tNotice: length of {} portion of query ({}) is greater than its length in {} ({})'
+                                ' - possible frameshift\n'.format(region.region_name, query_len, virus.upper(), cds_len))
 
-                outfile.write("\n\tRelative Positions:")
-                if region.cds_offset:
-                    outfile.write("\t\tNA position relative to CDS start: {},{}"
-                                  .format(region.cds_offset[0], region.cds_offset[1]))
+                    else:
+                        outfile.write("\t\tNA position relative to CDS start: N/A\n")
 
-                    # Compare query region length and CDS length
-                    query_len = region.qstart[1] - region.qstart[0] + 1
-                    cds_len = region.cds_offset[1] - region.cds_offset[0] + 1
-                    if cds_len < query_len:
-                        outfile.write(
-                            '\t\tNotice: length of {} portion of query ({}) is greater than its length in {} ({})'
-                            ' - possible frameshift\n'.format(region.region_name, query_len, virus.upper(), cds_len))
-
-                else:
-                    outfile.write("\t\tNA position relative to CDS start: N/A")
-
-                if region.qstart:
-                    outfile.write("\t\t{} position relative to query start: {},{}"
-                                  .format(self.base, region.qstart[0], region.qstart[1]))
-                if region.ncoords:
-                    print("\t\tNA position relative to genome start: {},{}"
-                          .format(region.ncoords[0] + 1, region.ncoords[1] + 1))
-                if region.pcoords:
-                    outfile.write("\t\tAA position relative to protein start: {},{}"
-                                  .format(region.pcoords[0], region.pcoords[1]))
+                    if region.qstart:
+                        outfile.write("\t\t{} position relative to query start: {},{}\n"
+                                      .format(self.base, region.qstart[0], region.qstart[1]))
+                    if region.ncoords:
+                        outfile.write("\t\tNA position relative to genome start: {},{}\n"
+                              .format(region.ncoords[0] + 1, region.ncoords[1] + 1))
+                    if region.pcoords:
+                        outfile.write("\t\tAA position relative to protein start: {},{}\n"
+                                      .format(region.pcoords[0], region.pcoords[1]))
 
 
 def output_retrieved_region(base, region, outfile=None):
@@ -652,28 +661,6 @@ def output_retrieved_region(base, region, outfile=None):
             if region.pcoords:
                 outfile.write("\t\tAA position relative to protein start: {},{}"
                               .format(region.pcoords[0], region.pcoords[1]))
-
-
-def clustal_to_fasta(aln, outfile=None):
-    """
-    Outputs a Clustal-formatted alignment to FASTA to the console by default or to a file
-    :param aln: the Clustal formatted alignment as a dictionary of header, sequence pairs
-    :param outfile: path to the FASTA output file
-    """
-    for header in aln:
-        if header != 'aln':
-            seq = aln[header]
-
-            if outfile:
-                with open(outfile) as out_handle:
-                    out_handle.write('>{}\n'.format(header))
-                    for i in range(0, len(seq), 60):
-                        out_handle.write('{}\n'.format(seq[i:i + 60]))
-
-            else:
-                print('>{}'.format(header))
-                for i in range(0, len(seq), 60):
-                    print(seq[i:i+60])
 
 
 def valid_sequence(base, sequence):
@@ -879,14 +866,15 @@ def parse_args():
     # Create sub-parser for 'align' mode
     parser_locate = subparsers.add_parser('locate',
                                           help='find the location of a sequence')
-    parser_locate.add_argument('query', metavar='query',
-                               help='the query sequence as a string or a FASTA file')
     parser_locate.add_argument('virus', metavar='virus', choices=['hiv', 'siv'],
                                help='the reference virus (choices: hiv, siv)')
     parser_locate.add_argument('base', metavar='base', choices=['NA', 'AA'],
                                help='sequence base type (choices: \'nucl\' and \'prot\')')
-    parser_locate.add_argument('-o', '--out', metavar='FILE', type=argparse.FileType('w'),
-                               help='directs the output to a file (default: stdout)')
+    parser_locate.add_argument('query', metavar='query', nargs='+',
+                               help='the query sequence as a string or a FASTA file')
+    parser_locate.add_argument('-o', '--out', metavar='DIRECTORY',
+                               help='directs the output to the specified directory (default: stdout) '
+                                    'and creates an alignment and an output file for each query')
     parser_locate.add_argument('-rc', '--revcomp', action='store_true',
                                help='aligns the reverse complement of the query with the reference genome')
 
@@ -915,9 +903,10 @@ def parse_args():
     parser_retrieve.add_argument('-s', '--start', metavar='ST', default=1,
                                  help='start coordinate (default: 1)')
     parser_retrieve.add_argument('-e', '--end', metavar='END', default='end',
-                                 help='end coordinate, either an integer or \'end\' (deault: end)')
-    parser_retrieve.add_argument('-o', '--out', metavar='FILE', type=argparse.FileType('w'),
-                                 help='directs the output a file (default: stdout)')
+                                 help='end coordinate, either an integer or \'end\' (default: end)')
+    parser_retrieve.add_argument('-o', '--out', metavar='DIRECTORY',
+                                 help='directs the output to the specified directory (default: stdout)'
+                                      'and creates an output file for the query')
 
     # Show help text if no arguments or 1 arguments are given
     if len(sys.argv) == 1 or len(sys.argv) == 2:
@@ -943,19 +932,24 @@ def main():
     nt_coords = configs[2]
     reference_sequence = configs[3]
 
-    with open(nt_coords) as nt_coords_handle:
-        # Create genome object based on configuration files
+    with open(nt_coords, 'r') as nt_coords_handle:
         ref_genome = Genome(args.virus, nt_coords_handle, ref_nt_seq, ref_aa_seq, reference_sequence, args.base)
 
         if args.subcommand == "locate":
-            if args.base == 'NA':
-                query_sequences = get_query(args.base, args.query, args.revcomp)
-            else:
-                query_sequences = get_query(args.base, args.query, False)
+
+            # Create output directory if it does not already exist
+            if args.out:
+                if not os.path.isdir(args.out):
+                    os.makedirs(args.out)
 
             # Handle multiple query sequences
-            for seq in query_sequences:
-                query = Query(args.base, ref_genome, seq, args.out)
+            for qseq in args.query:
+                if args.base == 'NA':
+                    query_seq = get_query(args.base, qseq, args.revcomp)
+                else:
+                    query_seq = get_query(args.base, qseq, False)
+
+                query = Query(args.base, ref_genome, query_seq, args.out)
                 query.find_location()
                 query.output_overlap(args.virus, args.out)
 
