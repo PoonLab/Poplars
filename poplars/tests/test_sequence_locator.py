@@ -146,10 +146,10 @@ class TestQueryRegion(HIV):
         p2_q.set_aa_seq_from_genome()
         self.p2_ref.set_protein_equivalents(p2_q)
 
-        self.assertEqual([1, 42], p2_q.set_pos_from_cds())
+        self.assertEqual([1, 42], p2_q.find_pos_from_cds())
         self.assertEqual([1879, 1920], p2_q.set_pos_from_gstart())
         self.assertEqual([1, 14], p2_q.set_pos_from_pstart())
-        self.assertEqual([1, 42], p2_q.set_pos_from_qstart('nucl'))
+        self.assertEqual([1, 42], p2_q.find_pos_from_qstart('nucl'))
 
     def test_p6_relative_positions(self):
         self.p6_ref.codon_aln = self.p6_ref.make_codon_aln()
@@ -159,10 +159,10 @@ class TestQueryRegion(HIV):
         p6_q.set_aa_seq_from_genome()
         self.p6_ref.set_protein_equivalents(p6_q)
 
-        self.assertEqual([4, 156], p6_q.set_pos_from_cds())
+        self.assertEqual([4, 156], p6_q.find_pos_from_cds())
         self.assertEqual([2137, 2289], p6_q.set_pos_from_gstart())
         self.assertEqual([2, 52], p6_q.set_pos_from_pstart())
-        self.assertEqual([4, 156], p6_q.set_pos_from_qstart('nucl'))
+        self.assertEqual([4, 156], p6_q.find_pos_from_qstart('nucl'))
 
     def test_vpr_relative_positions(self):
         self.vpr_ref.codon_aln = self.vpr_ref.make_codon_aln()
@@ -172,10 +172,10 @@ class TestQueryRegion(HIV):
         vpr_q.set_aa_seq_from_genome()
         self.vpr_ref.set_protein_equivalents(vpr_q)
 
-        self.assertEqual([1, 292], vpr_q.set_pos_from_cds())
+        self.assertEqual([1, 292], vpr_q.find_pos_from_cds())
         self.assertEqual([5559, 5850], vpr_q.set_pos_from_gstart())
         self.assertEqual([1, 96], vpr_q.set_pos_from_pstart())
-        self.assertEqual([1, 292], vpr_q.set_pos_from_qstart('nucl'))
+        self.assertEqual([1, 292], vpr_q.find_pos_from_qstart('nucl'))
 
 
 ####################################
