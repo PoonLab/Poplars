@@ -149,3 +149,25 @@ def convert_clustal(handle):
                 result['aln'] += ln[offset:].strip('\n\r')
 
     return result
+
+
+def resolve_mixtures(seq, replaceN=False):
+    """
+    Randomly resolve mixtures (ambiguous base calls) to nucleotides
+    :param seq:  str, nucleotide sequence
+    :param replaceN:  if True, replace N with [ACGT]
+    :return:  str, sequence with all mixtures [WRKYSMBDHVN] replaced with
+              nucleotides [ACGT]; or None if sequence contains illegal characters
+    """
+    newseq = ''
+    for nt in seq.upper():
+        if nt == 'N':
+            newseq += random.sample('ACGT', 1)[0] if replaceN else 'N'
+        elif nt in 'ACGT-':
+            newseq += nt  # unambiguous base call or gap
+        elif nt in mixture_dict:
+            newseq += random.sample(mixture_dict[nt], 1)[0]
+        else:
+            print("Unexpected character {} in resolve_mixtures()".format(nt))
+            return None
+    return newseq

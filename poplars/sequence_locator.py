@@ -13,7 +13,7 @@ import os
 import re
 import sys
 
-from poplars.common import convert_fasta
+from poplars.common import convert_fasta, resolve_mixtures
 from poplars.mafft import align
 
 NON_CODING = ["5'LTR", "TAR", "3'LTR"]
@@ -706,8 +706,9 @@ def output_retrieved_region(base, region, outfile=None):
 def valid_sequence(base, sequence):
     """
     Verifies that input sequence is valid
-    :param base: The base of the sequence (nucl or prot)
+    :param base: The base of the sequence (NA or AA)
     :param sequence: A list of lists containing header and sequence pairs
+    :param verbatim:  if True, reject any nucleotide sequence with mixtures
     :raises ValueError: If the sequence is empty or if it contains invalid characters
     :return: <True> If the input sequence uses the correct alphabet, <False> otherwise
     """
@@ -726,11 +727,13 @@ def valid_sequence(base, sequence):
             if not all(pos in dna_alphabet for pos in s):
                 print("Invalid nucleotide sequence:\n{}\n{}\n".format(h, s))
                 return False
-        else:
+        elif base == 'AA':
             if not all(pos in aa_alphabet for pos in s):
                 print("Invalid amino acid sequence:\n{}\n{}\n".format(h, s))
                 return False
-
+        else:
+            print("Unexpected base argument {} in valid_sequence()".format(base))
+            sys.exit()
     return True
 
 
@@ -782,12 +785,13 @@ def reverse_comp(query_sequence):
     return rev_comp
 
 
-def get_query(base, query, rev_comp):
+def get_query(base, query, rev_comp, verbatim=False):
     """
     Gets the query sequence and checks that it is valid
     :param base: The base (nucleotide or protein)
     :param query: The query sequence as a string or the file path to the query sequence
     :param rev_comp: Reverse complement flag (False by default)
+    :param verbatim: if True, reject any nucleotide sequences with mixtures
     :return: A list of lists containing the sequence identifiers and the query sequences
     """
 
@@ -825,7 +829,18 @@ def get_query(base, query, rev_comp):
                         count += 1
 
     if not valid_sequence(base, query_seq):
-        sys.exit(0)
+        if base == 'NA' and not verbatim:
+            # attempt to salvage sequence with mixtures
+            resolved = []
+            for h, s in query_seq:
+                rs = resolve_mixtures(s)
+                if rs is None:
+                    print("Failed to resolve mixtures in {}".format(h))
+                    sys.exit()
+                resolved.append([h, rs])
+            query_seq = resolved
+        else:
+            sys.exit(0)
 
     # At this point, the sequence is valid
     if base == 'NA' and rev_comp:
@@ -903,13 +918,13 @@ def parse_args():
     )
     subparsers = parser.add_subparsers(title='sub-commands', dest='subcommand')
 
-    # Create sub-parser for 'align' mode
+    # Create sub-parser for 'locate' mode
     parser_locate = subparsers.add_parser('locate',
                                           help='find the location of a sequence')
     parser_locate.add_argument('virus', metavar='virus', choices=['hiv', 'siv'],
                                help='the reference virus (choices: hiv, siv)')
     parser_locate.add_argument('base', metavar='base', choices=['NA', 'AA'],
-                               help='sequence base type (choices: \'nucl\' and \'prot\')')
+                               help='sequence base type (choices: \'NA\' and \'AA\')')
     parser_locate.add_argument('query', metavar='query', nargs='+',
                                help='the query sequence as a string or a FASTA file')
     parser_locate.add_argument('-o', '--out', metavar='DIRECTORY',
@@ -917,6 +932,9 @@ def parse_args():
                                     'and creates an alignment and an output file for each query')
     parser_locate.add_argument('-rc', '--revcomp', action='store_true',
                                help='aligns the reverse complement of the query with the reference genome')
+    parser_locate.add_argument('--verbatim', action='store_true',
+                               help='no tolerance for ambiguous base calls, i.e., mixtures (R=A/G), '
+                                    'exits gracefully')
 
     # Create sub-parser for 'retrieve' mode
     parser_retrieve = subparsers.add_parser('retrieve',
@@ -952,12 +970,6 @@ def parse_args():
     if len(sys.argv) == 1 or len(sys.argv) == 2:
         print("\033[1mSequence Locator\033[0m")
         parser.print_help()
-        print("\n{}".format("-" * 80))
-        print("\n\033[1m'locate' sub-command:\033[0m")
-        parser_locate.print_help()
-        print("\n{}".format("-" * 80))
-        print("\n\033[1m'retrieve' sub-command:\033[0m")
-        parser_retrieve.print_help()
         sys.exit(2)
 
     return parser.parse_args()
