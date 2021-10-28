@@ -8,57 +8,7 @@ import argparse
 import re
 
 import scipy.stats as stats
-from common import *
-
-
-class MutationInfo:
-    """
-    Represents mutation information about how a query sequence compares to a reference sequence
-    """
-
-    def __init__(self, seq_name=None, num_muts=None, potential_muts=None, ctrl_muts=None,
-                 potential_ctrls=None, rate_ratio=None, p_value=None, odds_ratio=None,
-                 ctable=None, mut_sites=None, ctrl_sites=None):
-        """
-        Generate mutation information for a query sequence
-        :param seq_name: the name of the sequence
-        :param num_muts: the number of mutated sites, compared to the reference sequence
-        :param potential_muts: the number of potential mutation sites (GRD)
-        :param ctrl_muts: the number of control sites
-        :param potential_ctrls: the number of potential control sites (GYN|GRC)
-        :param rate_ratio: the rate ratio for the mutation
-        :param p_value: the p-value
-        :param odds_ratio: the odds ratio
-        :param ctable: a contingency table
-        :param mut_sites: <dict> a dictionary where the keys are the locations of potential
-                            mutation sites (GRD motifs) and the values are 1 if the sequence
-                            is mutated; 0 otherwise
-        :param ctrl_sites: <dict> a dictionary where the keys are the locations of potential
-                            control sites (GYN|GRC) and the values are 1 if the sequence is
-                            mutated; 0 otherwise
-        """
-
-        self.seq_name = seq_name
-        self.num_muts = num_muts
-        self.pot_muts = potential_muts
-        self.ctrl_muts = ctrl_muts
-        self.potential_ctrls = potential_ctrls
-        self.rate_ratio = rate_ratio
-        self.p_value = p_value
-        self.odds_ratio = odds_ratio
-        self.ctable = ctable
-        self.mut_sites = mut_sites
-        self.ctrl_sites = ctrl_sites
-
-    def is_hypermutated(self):
-        """
-        Returns if a sequence is hypermutated
-        :return: True if the sequence is hypermutated, False otherwise
-        """
-        self.hypermutated = False
-        if self.p_value is not None and self.p_value <= 0.05:
-            self.hypermutated = True
-        return self.hypermutated
+from poplars.common import *
 
 
 def parse_args():
@@ -117,23 +67,40 @@ def make_results(seq, gees):
             # Populate dictionary with locations of control sites
             ctrl_sites[(i + 1)] = 1 if nt == 'A' else 0
 
-    result = MutationInfo()
+    result = {}
 
-    # Set attributes of MutationInfo
-    result.seq_name = seq[0]  # header
-    result.num_muts = ctable[0][0]  # Mutation sites
-    result.pot_muts = ctable[0][0] + ctable[0][1]  # Potential mutation sites
-    result.ctrl_muts = ctable[1][0]  # Control mutations
-    result.potential_ctrls = ctable[1][0] + ctable[1][1]  # Potential controls
-    result.rate_ratio = rate_ratio(ctable)  # Rate ratio
+    """
+     Generate mutation information for a query sequence
+     :param seq_name: the name of the sequence
+     :param num_muts: the number of mutated sites, compared to the reference sequence
+     :param potential_muts: the number of potential mutation sites (GRD)
+     :param ctrl_muts: the number of control sites
+     :param potential_ctrls: the number of potential control sites (GYN|GRC)
+     :param rate_ratio: the rate ratio for the mutation
+     :param p_value: the p-value
+     :param odds_ratio: the odds ratio
+     :param ctable: a contingency table
+     :param mut_sites: <dict> a dictionary where the keys are the locations of potential
+                         mutation sites (GRD motifs) and the values are 1 if the sequence
+                         is mutated; 0 otherwise
+     :param ctrl_sites: <dict> a dictionary where the keys are the locations of potential
+                         control sites (GYN|GRC) and the values are 1 if the sequence is
+                         mutated; 0 otherwise
+    """
+    result['seq_name'] = seq[0]  # header
+    result['num_muts'] = ctable[0][0]  # Mutation sites
+    result['pot_muts'] = ctable[0][0] + ctable[0][1]  # Potential mutation sites
+    result['ctrl_muts'] = ctable[1][0]  # Control mutations
+    result['potential_ctrls'] = ctable[1][0] + ctable[1][1]  # Potential controls
+    result['rate_ratio'] = rate_ratio(ctable)  # Rate ratio
 
     odds_ratio, p_value = stats.fisher_exact(ctable, alternative='greater')  # Calculate one-sided P-value
-    result.p_value = p_value  # Fisher's exact P-value
-    result.odds_ratio = odds_ratio
-    result.ctable = ctable
+    result['p_value'] = p_value  # Fisher's exact P-value
+    result['odds_ratio'] = odds_ratio
+    result['ctable'] = ctable
 
-    result.mut_sites = mut_sites
-    result.ctrl_sites = ctrl_sites
+    result['mut_sites'] = mut_sites
+    result['ctrl_sites'] = ctrl_sites
 
     return result
 
@@ -151,12 +118,16 @@ def hypermut(infile, cons, skip=None):
     with open(infile) as handle:
         fasta = convert_fasta(handle)
 
-    if cons:
-        refseq = get_consensus(fasta)
+    if type(cons) is str:
+        refseq = cons
         query_seqs = fasta
     else:
-        refseq = fasta[0][1]  # First sequence is the reference sequence
-        query_seqs = fasta[1:]
+        if cons:
+            refseq = get_consensus(fasta)
+            query_seqs = fasta
+        else:
+            refseq = fasta[0][1]  # First sequence is the reference sequence
+            query_seqs = fasta[1:]
 
     if skip:
         print("Skipping first {} records...\n".format(skip))
@@ -205,6 +176,10 @@ def rate_ratio(ctable):
     return r_ratio
 
 
+def is_hypermutated(result, alpha=0.05):
+    return result.p_value is not None and result.p_value <= alpha
+
+
 def pretty_print(results):
     """
     Print results
@@ -218,11 +193,10 @@ def pretty_print(results):
 
     # Print values of rows under corresponding headings
     for result in results:
-        is_hypermutated = result.is_hypermutated()
         print("{0}\t\t{1}\t\t\t{2}\t\t\t\t\t{3}\t\t\t\t\t{4}\t\t\t\t\t{5}\t\t\t{6}\t\t\t\t\t{7}\t\t{8}"
               .format(result.seq_name[:8], result.num_muts, result.pot_muts, result.ctrl_muts,
                       result.potential_ctrls, round(result.rate_ratio, 2), round(result.p_value, 6),
-                      round(result.odds_ratio, 6), str(is_hypermutated)))
+                      round(result.odds_ratio, 6), str(is_hypermutated(result))))
 
     # Print summary of hypermutated sequences
     print("\nSummary:")
@@ -242,7 +216,6 @@ def make_data_file(file_name, results):
     """
 
     with open(file_name, "w+") as output:
-
         output.write("Results:\n")
         output.write("{0},{1},{2},{3},{4},{5},{6},{7},{8}\n".format
                      ("Sequence", "Muts", "Potential Mut Sites", "Control Muts", "Potential Controls",
