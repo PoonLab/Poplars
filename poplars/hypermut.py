@@ -6,24 +6,9 @@ Supplementary Materials.
 
 import argparse
 import re
-
+import csv
 import scipy.stats as stats
 from poplars.common import *
-
-
-def parse_args():
-    parser = argparse.ArgumentParser(
-        description='Classify HIV-1 sequences as being hypermutated '
-                    'based on dinucleotide frequencies relative to the consensus.'
-    )
-    parser.add_argument('fasta', help='<input> path to FASTA file. If no reference sequence is specified, '
-                                      'the program will designate the first sequence as the reference sequence.')
-    parser.add_argument('--consensus', action="store_true", default=False,
-                        help='<option> the majority-rule consensus sequence is designated as the reference sequence.')
-    parser.add_argument('--skip', type=int, help="<option> number of records to skip")
-    parser.add_argument('--out', help="<option> write output to the specified file")
-
-    return parser.parse_args()
 
 
 def make_results(seq, gees):
@@ -42,66 +27,45 @@ def make_results(seq, gees):
         [0, 0],  # (G->A, G) in GRD context
         [0, 0]  # in other contexts (GYN|GRC is !GRD)
     ]
-
     s = seq[1]  # query sequence
-    # Matches downstream RD motif in query sequence
-    ds_motifs = [match.start() for match in mut.finditer(s)]
-    # Matches downstream YN|RC motif in query sequence
-    ds_ctrl = [match.start() for match in ctrl.finditer(s)]
 
-    mut_sites = {}
-    ctrl_sites = {}
-    # Iterate through all positions with G in consensus
+    # Matches downstream RD motif in query sequence
+    ds_motifs = set([match.start() for match in mut.finditer(s)])
+    # Matches downstream YN|RC motif in query sequence
+    ds_ctrl = set([match.start() for match in ctrl.finditer(s)])
+
+    mut_sites = set()  # locations of potential mutation sites (GRD motifs)
+    ctrl_sites = set()  # locations of potential control sites (GYN|GRC)
+
+    # Iterate through all positions with G in reference sequence
     for i in gees:
         nt = s[i]  # Corresponding base in query sequence
-
-        # G->A mutation in downstream
-        row = (0 if nt == 'A' else 1)
+        row = (0 if nt == 'A' else 1)  # G->A mutation in downstream
         if i in ds_motifs:
             ctable[0][row] += 1
-            # Populate dictionary with locations of mutated sites
-            mut_sites[(i + 1)] = 1 if nt == 'A' else 0
-
+            if row:
+                mut_sites.update({i+1})
         elif i in ds_ctrl:
             ctable[1][row] += 1
-            # Populate dictionary with locations of control sites
-            ctrl_sites[(i + 1)] = 1 if nt == 'A' else 0
+            if row:
+                ctrl_sites.update({i+1})
 
+    # Calculate one-sided P-value
+    odds_ratio, p_value = stats.fisher_exact(ctable, alternative='greater')
+
+    # prepare output dictionary
     result = {}
-
-    """
-     Generate mutation information for a query sequence
-     :param seq_name: the name of the sequence
-     :param num_muts: the number of mutated sites, compared to the reference sequence
-     :param potential_muts: the number of potential mutation sites (GRD)
-     :param ctrl_muts: the number of control sites
-     :param potential_ctrls: the number of potential control sites (GYN|GRC)
-     :param rate_ratio: the rate ratio for the mutation
-     :param p_value: the p-value
-     :param odds_ratio: the odds ratio
-     :param ctable: a contingency table
-     :param mut_sites: <dict> a dictionary where the keys are the locations of potential
-                         mutation sites (GRD motifs) and the values are 1 if the sequence
-                         is mutated; 0 otherwise
-     :param ctrl_sites: <dict> a dictionary where the keys are the locations of potential
-                         control sites (GYN|GRC) and the values are 1 if the sequence is
-                         mutated; 0 otherwise
-    """
-    result['seq_name'] = seq[0]  # header
-    result['num_muts'] = ctable[0][0]  # Mutation sites
-    result['pot_muts'] = ctable[0][0] + ctable[0][1]  # Potential mutation sites
-    result['ctrl_muts'] = ctable[1][0]  # Control mutations
-    result['potential_ctrls'] = ctable[1][0] + ctable[1][1]  # Potential controls
-    result['rate_ratio'] = rate_ratio(ctable)  # Rate ratio
-
-    odds_ratio, p_value = stats.fisher_exact(ctable, alternative='greater')  # Calculate one-sided P-value
-    result['p_value'] = p_value  # Fisher's exact P-value
+    result['seq_name'] = seq[0]  # the name of the sequence
+    result['num_muts'] = ctable[0][0]  # the number of mutated sites, compared to the reference sequence
+    result['pot_muts'] = ctable[0][0] + ctable[0][1]  # the number of potential mutation sites (GRD)
+    result['ctrl_muts'] = ctable[1][0]  # the number of control sites
+    result['potential_ctrls'] = ctable[1][0] + ctable[1][1]  # the number of potential control sites (GYN|GRC)
+    result['rate_ratio'] = rate_ratio(ctable)  # the rate ratio for the mutation
+    result['p_value'] = p_value  # Fisher's exact test P-value
     result['odds_ratio'] = odds_ratio
-    result['ctable'] = ctable
-
+    result['ctable'] = ctable  # contingency table
     result['mut_sites'] = mut_sites
     result['ctrl_sites'] = ctrl_sites
-
     return result
 
 
@@ -111,8 +75,9 @@ def hypermut(infile, cons, skip=None):
     :param infile: the input FASTA file
     :param cons: <bool> True if the consensus sequence is designated as the reference sequence
                         False if the first sequence is designated as the reference sequence
-    :param skip: the number of records to skip
-    :return results: a list of MutationInfo Objects
+                 <str> user provides reference sequence
+    :param skip:  int, the number of records to skip
+    :return results: a list of dict objects
     """
 
     with open(infile) as handle:
@@ -162,7 +127,6 @@ def rate_ratio(ctable):
     :param ctable: Contingency table
     :return r_ratio: rate ratio
     """
-
     muts = float(ctable[0][0])
     pot_muts = float(muts + ctable[0][1])
     ctrl_muts = float(ctable[1][0])
@@ -177,7 +141,7 @@ def rate_ratio(ctable):
 
 
 def is_hypermutated(result, alpha=0.05):
-    return result.p_value is not None and result.p_value <= alpha
+    return result['p_value'] is not None and result['p_value'] <= alpha
 
 
 def pretty_print(results):
@@ -193,19 +157,22 @@ def pretty_print(results):
 
     # Print values of rows under corresponding headings
     for result in results:
-        print("{0}\t\t{1}\t\t\t{2}\t\t\t\t\t{3}\t\t\t\t\t{4}\t\t\t\t\t{5}\t\t\t{6}\t\t\t\t\t{7}\t\t{8}"
-              .format(result.seq_name[:8], result.num_muts, result.pot_muts, result.ctrl_muts,
-                      result.potential_ctrls, round(result.rate_ratio, 2), round(result.p_value, 6),
-                      round(result.odds_ratio, 6), str(is_hypermutated(result))))
+        result['is_hypermutated'] = is_hypermutated(result)
+        print("{seq_name:8.8}\t\t{num_muts}\t\t\t{pot_muts}\t\t\t\t\t{ctrl_muts}\t\t\t\t\t{potential_ctrls}"
+              "\t\t\t\t\t{rate_ratio:2.2}\t\t\t{p_value:6.6}\t\t\t\t\t{odds_ratio:6.6}\t\t{is_hypermutated}"
+              .format(**result))
 
     # Print summary of hypermutated sequences
     print("\nSummary:")
+    count = 0
     for result in results:
-        if result.p_value <= 0.05:
-            print("{} appears to be hypermutated (OR={})".format(result.seq_name, result.odds_ratio))
-        else:
-            print("No sequences appear to be hypermutated.")
-            break
+        if result['p_value'] <= 0.05:
+            print("{seq_name} appears to be hypermutated (OR={odds_ratio})".format(**result))
+            count += 1
+
+    if count == 0:
+        print("No sequences appear to be hypermutated.")
+
 
 
 def make_data_file(file_name, results):
@@ -214,27 +181,23 @@ def make_data_file(file_name, results):
     :param file_name: name of the output file
     :param results: list of MutationInfo objects
     """
+    fieldnames = ["Sequence", "Muts", "Potential Mut Sites", "Control Muts",
+                  "Potential Controls", "Rate Ratio", "Fisher's Exact P-value",
+                  "Odds Ratio", "Hypermutated"]
+    output = open(file_name, 'w+')
+    output.write(','.join(fieldnames) + '\n')  # header row
 
-    with open(file_name, "w+") as output:
+    for row in results:
         output.write("Results:\n")
-        output.write("{0},{1},{2},{3},{4},{5},{6},{7},{8}\n".format
-                     ("Sequence", "Muts", "Potential Mut Sites", "Control Muts", "Potential Controls",
-                      "Rate Ratio", "Fisher's Exact P-value", "Odds Ratio", "Hypermutated"))
-
-        # Print values of rows under corresponding headings
-        for result in results:
-            is_hypermutated = result.is_hypermutated()
-            output.write("{0},{1},{2},{3},{4},{5},{6},{7},{8}\n"
-                         .format(result.seq_name[:8], result.num_muts, result.pot_muts, result.ctrl_muts,
-                                 result.potential_ctrls, round(result.rate_ratio, 2),
-                                 round(result.p_value, 6), round(result.odds_ratio, 6),
-                                 str(is_hypermutated)))
+        output.write("{seq_name:8.8},{num_muts},{po_muts},{ctrl_muts},"
+                     "{potential_ctrls},{rate_ratio:2.2},{p_value:6.6},"
+                     "{odds_ratio:6.6},{is_hypermutated}\n".format(**results))
 
         # Print summary of hypermutated sequences
         output.write("\nSummary:\n")
         for result in results:
             if result.p_value <= 0.05:
-                output.write("{} appears to be hypermutated (OR={})\n".format(result.seq_name, result.odds_ratio))
+                output.write("{seq_name} appears to be hypermutated (OR={odds_ratio})\n".format(**result))
             else:
                 output.write("No sequences appear to be hypermutated.\n")
                 break
@@ -242,19 +205,32 @@ def make_data_file(file_name, results):
         # Print detailed output
         output.write("\nLocations of matches:\n")
         for result in results:
-            output.write("\nSequence Name: {}".format(result.seq_name[:8]))
+            output.write("\nSequence Name: {seq_name:8.8}".format(**result))
             output.write("\nPos\tMut\n")
             for key in result.mut_sites:
-                output.write("{}\t{}\n".format(key, result.mut_sites[key]))
+                output.write("{}\t{}\n".format(key, result['mut_sites'][key]))
 
             output.write("\nSequence Name: {} control".format(result.seq_name))
             output.write("\nPos\tMut\n")
             for key in result.ctrl_sites:
-                output.write("{}\t{}\n".format(key, result.ctrl_sites[key]))
+                output.write("{}\t{}\n".format(key, result['ctrl_sites'][key]))
 
 
 def main():
-    args = parse_args()
+    # command line interface
+    parser = argparse.ArgumentParser(
+        description='Classify HIV-1 sequences as being hypermutated '
+                    'based on dinucleotide frequencies relative to the consensus.'
+    )
+    parser.add_argument('fasta', help='<input> path to FASTA file. If no reference sequence is specified, '
+                                      'the program will designate the first sequence as the reference sequence.')
+    parser.add_argument('--consensus', action="store_true", default=False,
+                        help='<option> the majority-rule consensus sequence is designated as the reference sequence.')
+    parser.add_argument('--skip', type=int, help="<option> number of records to skip")
+    parser.add_argument('--out', help="<option> write output to the specified file")
+
+    args = parser.parse_args()
+
     results = hypermut(args.fasta, args.consensus, args.skip)
     if args.out:
         make_data_file(args.out, results)
